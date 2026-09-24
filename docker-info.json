@@ -27,5 +27,20 @@
   },
   "data": {
     "active-hotspot-oracle": "./utils/active-hotspot-oracle"
-  }
+  },
+  "autoTag": [
+    "account-postgres-sink-service",
+    "asset-ownership-service",
+    "blockchain-api",
+    "crons",
+    "distributor-oracle",
+    "ecc-verifier",
+    "geocoder-service",
+    "helium-vote-service",
+    "migration-service",
+    "recent-helium-transactions-service",
+    "solana-monitor",
+    "tuktuk-dca-service",
+    "tuktuk-pyth-service"
+  ]
 }

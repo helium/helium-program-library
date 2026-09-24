@@ -1,0 +1,242 @@
+name: Changeset Bot
+
+# Finds and writes the changesets a PR is missing, by fixed rules, and holds
+# no secret: it runs the PR's own code. It hands the files to
+# changeset-bot-commit.yaml as an artifact, and that workflow commits them.
+# The rules and their invariants live in scripts/write-changesets.mjs and its
+# tests.
+env:
+  # Dry run until go-live. A workflow_dispatch run overrides it.
+  DRY_RUN: true
+  SOLANA_CLI_VERSION: 2.1.6
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - develop
+      - master
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Number of the pull request to run on"
+        type: number
+        required: true
+      dry_run:
+        description: "Write nothing outside the runner"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One run per PR. A new push makes the older run's files stale.
+concurrency:
+  group: changeset-bot-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  changesets:
+    name: Write missing changesets
+    # A job-level gate, not a `paths` filter: a filtered-out workflow reports
+    # nothing. Skipped: drafts, forks (the backstop carries the message), the
+    # App's own commits, the release PR heads, the Promotion PR (head develop),
+    # and the back-merge PR (head master).
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+        !github.event.pull_request.draft &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        !endsWith(github.actor, '[bot]') &&
+        !startsWith(github.head_ref, 'changeset-release/') &&
+        !startsWith(github.head_ref, 'program-release/') &&
+        github.head_ref != 'develop' &&
+        github.head_ref != 'master'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Fails soft: the backstop check is the gate, not this workflow.
+    continue-on-error: true
+    permissions:
+      contents: read
+      # `gh pr view` reads the title.
+      pull-requests: read
+    steps:
+      - name: Resolve dry run
+        id: mode
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # Fail closed: only a literal `false` writes, so a missing or mistyped flag is a dry run.
+          if [ "${INPUT_DRY_RUN:-$DRY_RUN}" = "false" ]; then dry_run=false; else dry_run=true; fi
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+
+      # The head the run works from. A pull_request event names it; a dispatch
+      # run has no payload and asks the API. changeset-bot-commit.yaml commits
+      # against the same sha, so a branch that moved fails the commit.
+      - name: Resolve the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          pr=$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json title,headRefName,headRefOid,baseRefOid,isCrossRepository)
+          if [ "$(jq -r '.isCrossRepository' <<< "$pr")" = "true" ]; then
+            echo "::error::#$NUMBER comes from a fork. The bot does not run on forks."
+            exit 1
+          fi
+          {
+            echo "number=$NUMBER"
+            echo "head-ref=$(jq -r '.headRefName' <<< "$pr")"
+            echo "head-sha=${EVENT_HEAD_SHA:-$(jq -r '.headRefOid' <<< "$pr")}"
+            echo "base-tip=$(jq -r '.baseRefOid' <<< "$pr")"
+          } >> "$GITHUB_OUTPUT"
+          # A title is free text and can hold a newline, which a one-line
+          # output would read as another output. The others cannot: they are
+          # branch names and shas.
+          delim="title-$(openssl rand -hex 8)"
+          {
+            echo "title<<$delim"
+            jq -r '.title' <<< "$pr"
+            echo "$delim"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head-sha }}
+          fetch-depth: 0
+
+      # The merge base, so commits that landed on the base branch after the PR
+      # branched do not count as the PR's changes.
+      - name: Find the base commit
+        id: base
+        env:
+          BASE_TIP: ${{ steps.pr.outputs.base-tip }}
+        run: echo "sha=$(git merge-base "$BASE_TIP" HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      # Both scripts apply the one no-release path filter, so a PR that only
+      # touches docs, tests, or workflows names nothing and the job ends at
+      # the nothing-missing exit.
+      - name: Changed packages and programs
+        id: changed
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          node scripts/changed-packages.mjs "$BASE_SHA" > "$RUNNER_TEMP/packages.json"
+          node scripts/changed-programs.mjs "$BASE_SHA" > "$RUNNER_TEMP/programs.json"
+          echo "programs=$(jq -r 'map(select(.own) | .name) | join(" ")' "$RUNNER_TEMP/programs.json")" >> "$GITHUB_OUTPUT"
+
+      # Only an own-source change can move an IDL. No artifact: this workflow
+      # has no build job, so the action builds the head IDLs itself.
+      - name: Diff the IDLs
+        id: idl-diff
+        uses: ./.github/actions/idl-diff/
+        with:
+          programs: ${{ steps.changed.outputs.programs }}
+          base-sha: ${{ steps.base.outputs.sha }}
+          target-artifact: ""
+
+      - name: Missing names per side
+        id: missing
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          IDL_DIFF: ${{ steps.idl-diff.outputs.diff-file }}
+        run: |
+          args=(--packages "$RUNNER_TEMP/packages.json" --programs "$RUNNER_TEMP/programs.json")
+          if [ -n "$IDL_DIFF" ]; then
+            args+=(--idl-diff "$IDL_DIFF")
+          fi
+          node scripts/missing-changesets.mjs "$BASE_SHA" HEAD "${args[@]}" > "$RUNNER_TEMP/missing.json"
+          if [ "$(jq -r '.nothingMissing' "$RUNNER_TEMP/missing.json")" = "true" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing is missing. No changeset written." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The build left nothing tracked behind (target/ is ignored), so the
+      # files this step writes are the whole commit.
+      - name: Write the changesets
+        id: write
+        if: steps.missing.outputs.run == 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head-sha }}
+          IDL_DIFF: ${{ steps.idl-diff.outputs.diff-file }}
+          TITLE: ${{ steps.pr.outputs.title }}
+        run: |
+          args=(--missing "$RUNNER_TEMP/missing.json" --title "$TITLE" --id "bot-${HEAD_SHA:0:7}")
+          if [ -n "$IDL_DIFF" ]; then
+            args+=(--idl-diff "$IDL_DIFF")
+          fi
+          node scripts/write-changesets.mjs "$BASE_SHA" HEAD "${args[@]}" > "$RUNNER_TEMP/written.json"
+          echo "files=$(jq -r 'join(" ")' "$RUNNER_TEMP/written.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Write the run summary
+        if: steps.missing.outputs.run == 'true'
+        env:
+          FILES: ${{ steps.write.outputs.files }}
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+        run: |
+          {
+            if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
+              echo "## Changeset bot (dry run)"
+              echo
+              echo "Nothing was committed."
+            else
+              echo "## Changeset bot"
+            fi
+            for file in $FILES; do
+              echo
+              echo "### $file"
+              echo
+              echo '```md'
+              cat "$file"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The commit workflow runs no PR code and trusts none of this: it checks
+      # each field against the event and the PR before it commits.
+      - name: Stage the changesets for the commit
+        if: steps.missing.outputs.run == 'true'
+        env:
+          FILES: ${{ steps.write.outputs.files }}
+          NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_REF: ${{ steps.pr.outputs.head-ref }}
+          HEAD_SHA: ${{ steps.pr.outputs.head-sha }}
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+        run: |
+          out="$RUNNER_TEMP/changesets"
+          mkdir -p "$out/files"
+          jq -n \
+            --arg number "$NUMBER" \
+            --arg headRef "$HEAD_REF" \
+            --arg headSha "$HEAD_SHA" \
+            --arg dryRun "$DRY_RUN_EFFECTIVE" \
+            '{number: $number, headRef: $headRef, headSha: $headSha, dryRun: $dryRun}' \
+            > "$out/meta.json"
+          for file in $FILES; do
+            mkdir -p "$out/files/$(dirname "$file")"
+            cp "$file" "$out/files/$file"
+          done
+
+      # Hidden files included: every path starts with `.changeset`.
+      - name: Upload the changesets
+        if: steps.missing.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: changesets
+          path: ${{ runner.temp }}/changesets
+          retention-days: 1
+          include-hidden-files: true
+
+      # The job fails soft, so a failure would otherwise render as success.
+      - name: Flag the failure
+        if: failure()
+        run: echo "::warning::The changeset bot failed, so it wrote no changeset. The Release Declaration check still gates the PR."

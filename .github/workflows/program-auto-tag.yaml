@@ -1,0 +1,165 @@
+name: Program Auto-Tag
+
+# The tag bot. Promotion is the deploy decision: for every program whose
+# Cargo.toml version on master has no `program-<name>-<version>` tag, this
+# creates that tag at the head of master, and release-program.yaml starts on it.
+# A state rule, so a failed or missed run is healed by the next run. A hand tag
+# stays valid and is the recovery path when the bot is down.
+env:
+  # Dry run until go-live. A workflow_dispatch run overrides it.
+  DRY_RUN: true
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Write nothing outside the runner"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One run at a time and no cancel: a cancelled run could push half the tags.
+concurrency:
+  group: program-auto-tag
+
+jobs:
+  program-auto-tag:
+    name: Program Auto-Tag
+    # A dispatch from another branch would tag a commit that is not on master.
+    # release-program.yaml refuses such a tag, but a tag is never deleted, so
+    # the version would be lost.
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release-bots
+    permissions:
+      contents: read
+    steps:
+      # The script reads every `program-*` tag, so a shallow clone without tags
+      # would list a tag for every program.
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Resolve dry run
+        id: mode
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # Fail closed: only a literal `false` writes, so a missing or mistyped flag is a dry run.
+          if [ "${INPUT_DRY_RUN:-$DRY_RUN}" = "false" ]; then dry_run=false; else dry_run=true; fi
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+
+      - name: List the missing program tags
+        id: list
+        run: |
+          # stderr holds the skip log, or the error text when the script fails.
+          node scripts/program-auto-tag.mjs > "$RUNNER_TEMP/tags.txt" 2> "$RUNNER_TEMP/skipped.txt" || {
+            cat "$RUNNER_TEMP/skipped.txt"
+            exit 1
+          }
+          cat "$RUNNER_TEMP/skipped.txt"
+          echo "count=$(wc -l < "$RUNNER_TEMP/tags.txt" | tr -d ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Write the run summary
+        env:
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+          COUNT: ${{ steps.list.outputs.count }}
+        run: |
+          {
+            echo "## Program auto-tag"
+            echo
+            if [ "$COUNT" -eq 0 ]; then
+              echo "Every program version at \`${GITHUB_SHA}\` has a tag. No tag to create."
+            else
+              if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
+                echo "(dry run) No tag was pushed. The tags this run would create at \`${GITHUB_SHA}\`:"
+              else
+                echo "Tags created at \`${GITHUB_SHA}\`:"
+              fi
+              echo
+              while read -r tag; do echo "- \`${tag}\`"; done < "$RUNNER_TEMP/tags.txt"
+            fi
+            if [ -s "$RUNNER_TEMP/skipped.txt" ]; then
+              echo
+              echo "Skipped, the first tag of a program stays manual:"
+              echo
+              sed 's/.*/- &/' "$RUNNER_TEMP/skipped.txt"
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The App token, so release-program.yaml starts on each tag: a
+      # GITHUB_TOKEN push starts no workflow. The checkout persists no
+      # credential, so the push carries only this token.
+      # Scoped to what this job does: pushes tags.
+      - name: Get an App token
+        id: app-token
+        if: steps.list.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      # One push per tag, alphabetical: GitHub starts no workflow for a push
+      # that creates more than three tags. A failure stops the loop, and the
+      # next run creates the tags that are left.
+      - name: Create and push the tags
+        if: steps.list.outputs.count != '0' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          while read -r tag; do
+            git tag "$tag" "$GITHUB_SHA"
+            git push \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+              "refs/tags/${tag}"
+          done < "$RUNNER_TEMP/tags.txt"
+
+      # The report half of the missing-bump check; the gate half is on the
+      # Promotion PR in tests.yaml. A program that reached master with changed
+      # source and a version that is already tagged is a warning here, not a
+      # failure: a red tag-bot run means a tag push failed, nothing else. The
+      # script exits 1 on such a program, so its JSON file stands in for the
+      # exit code; a script error writes no JSON and still fails the step.
+      - name: Report programs that changed with no version bump
+        run: |
+          REPORT="$RUNNER_TEMP/missing-bump.json"
+          node scripts/missing-bump-check.mjs --json "$REPORT" || [ -s "$REPORT" ]
+          if [ "$(jq '.failing | length' "$REPORT")" -gt 0 ]; then
+            echo "## Programs changed with no version bump" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          LINES="$RUNNER_TEMP/unbumped.txt"
+          jq -r '.failing[] | "\(.name) changed since program-\(.name)-\(.version) with no bump"' "$REPORT" > "$LINES"
+          # GitHub keeps ten warning annotations per step and drops the rest
+          # without a word, so past ten the tenth annotation counts how many are
+          # left and the summary below, which has no cap, carries them all.
+          total=$(wc -l < "$LINES" | tr -d ' ')
+          shown=$total
+          if [ "$total" -gt 10 ]; then
+            shown=9
+          fi
+          n=0
+          while read -r line; do
+            n=$((n + 1))
+            if [ "$n" -le "$shown" ]; then
+              echo "::warning title=No version bump::${line}"
+            fi
+            echo "- $line" >> "$GITHUB_STEP_SUMMARY"
+          done < "$LINES"
+          if [ "$total" -gt "$shown" ]; then
+            echo "::warning title=No version bump::$((total - shown)) more programs, see the run summary"
+          fi

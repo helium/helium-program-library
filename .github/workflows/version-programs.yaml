@@ -1,0 +1,264 @@
+name: Version Programs
+
+# Turns the program changesets in .changeset-programs/ into Cargo.toml bumps and
+# changelogs on the program release PR. It writes no tag: the tag bot creates
+# program-<name>-<version> once the bump reaches master.
+env:
+  # Dry run until go-live. A workflow_dispatch run overrides it.
+  DRY_RUN: true
+  BRANCH: program-release/develop
+  # The commit lands here first, so the release branch never sits at a zero
+  # diff between the reset and the commit. Deleted again in the same run.
+  SCRATCH_BRANCH: program-release/develop-${{ github.run_id }}-${{ github.run_attempt }}
+  TITLE: "chore: version programs"
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Write nothing outside the runner"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  version:
+    name: Program release PR
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release-bots
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve dry run
+        id: mode
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "::notice::$GITHUB_REF is not develop, so this run is a dry run whatever the input says."
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          else
+            # Fail closed: only a literal `false` writes, so a missing or mistyped flag is a dry run.
+            if [ "${INPUT_DRY_RUN:-$DRY_RUN}" = "false" ]; then dry_run=false; else dry_run=true; fi
+            echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for program changesets
+        id: check
+        run: |
+          found=$(find .changeset-programs -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l)
+          if [ "$found" -gt 0 ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.found == 'true'
+        with:
+          node-version-file: .node-version
+
+      - name: Version programs
+        if: steps.check.outputs.found == 'true'
+        # `bash` for pipefail, so a failing script is not masked by tee.
+        shell: bash
+        run: node scripts/version-programs.mjs | tee "$RUNNER_TEMP/released.txt"
+
+      - name: Write the run summary
+        if: steps.check.outputs.found == 'true'
+        run: |
+          {
+            if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
+              echo "## Program release PR (dry run)"
+              echo
+              echo "Nothing was written. The diff below is what the release PR would carry."
+            else
+              echo "## Program release PR"
+            fi
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/released.txt"
+            echo '```'
+            echo
+            echo '```diff'
+            # Intent-to-add, so the new changelogs show in the diff.
+            git add --intent-to-add --all
+            git --no-pager diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+
+      - name: Print the mutations (dry run)
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run == 'true'
+        run: |
+          {
+            echo "### The mutations this run would make"
+            echo
+            echo "- \`createRef\` \`refs/heads/$SCRATCH_BRANCH\` at \`$GITHUB_SHA\`"
+            echo "- \`createCommitOnBranch\` on \`$SCRATCH_BRANCH\` with the diff above, headline \`$TITLE\`"
+            echo "- \`updateRef\` \`refs/heads/$BRANCH\` to the new commit, forced"
+            echo "- \`deleteRef\` \`refs/heads/$SCRATCH_BRANCH\`"
+            echo "- \`gh pr create\` or \`gh pr edit\` for \`$BRANCH\` into develop"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The App token, so tests.yaml starts on the PR this job opens. Only the
+      # commit and the PR use it; the checkout above used GITHUB_TOKEN.
+      # Scoped to what this job does: writes the refs and the commit, and opens the PR.
+      - name: Get an App token
+        id: app-token
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # The release commit goes through the GitHub API, so GitHub signs it and
+      # it shows as Verified with the App as its author. It lands on a scratch
+      # branch first; the release branch is then moved onto it in one step, so
+      # the PR head never sits at a zero diff.
+      - name: Create the scratch branch
+        id: scratch
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          repo_id=$(gh api graphql -F owner='{owner}' -F name='{repo}' \
+            -f query='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){id}}' \
+            --jq .data.repository.id)
+          echo "repo-id=$repo_id" >> "$GITHUB_OUTPUT"
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          ref_id=$(gh api graphql -F repositoryId="$repo_id" \
+            -F name="refs/heads/$SCRATCH_BRANCH" -F oid="$GITHUB_SHA" \
+            -f query='mutation($repositoryId:ID!,$name:String!,$oid:GitObjectID!){createRef(input:{repositoryId:$repositoryId,name:$name,oid:$oid}){ref{id}}}' \
+            --jq .data.createRef.ref.id)
+          echo "ref-id=$ref_id" >> "$GITHUB_OUTPUT"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit the version bumps
+        id: commit
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        uses: ./.github/actions/api-commit
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: ${{ env.SCRATCH_BRANCH }}
+          headline: ${{ env.TITLE }}
+          expected-head-oid: ${{ github.sha }}
+
+      - name: Move the release branch onto the commit
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          COMMIT_OID: ${{ steps.commit.outputs.commit-oid }}
+          REPO_ID: ${{ steps.scratch.outputs.repo-id }}
+        run: |
+          set -euo pipefail
+          if [ -z "$COMMIT_OID" ]; then
+            echo "::error::the program changesets produced no change to commit."
+            exit 1
+          fi
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          ref_id=$(gh api graphql -F owner='{owner}' -F name='{repo}' \
+            -F qualifiedName="refs/heads/$BRANCH" \
+            -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){id}}}' \
+            --jq '.data.repository.ref.id // empty')
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          if [ -n "$ref_id" ]; then
+            gh api graphql -F refId="$ref_id" -F oid="$COMMIT_OID" -F force=true \
+              -f query='mutation($refId:ID!,$oid:GitObjectID!,$force:Boolean){updateRef(input:{refId:$refId,oid:$oid,force:$force}){ref{target{oid}}}}'
+          else
+            gh api graphql -F repositoryId="$REPO_ID" \
+              -F name="refs/heads/$BRANCH" -F oid="$COMMIT_OID" \
+              -f query='mutation($repositoryId:ID!,$name:String!,$oid:GitObjectID!){createRef(input:{repositoryId:$repositoryId,name:$name,oid:$oid}){ref{id}}}'
+          fi
+
+      # Also on failure: a run that dies after createRef leaves no scratch ref.
+      - name: Delete the scratch branch
+        if: always() && steps.scratch.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SCRATCH_REF_ID: ${{ steps.scratch.outputs.ref-id }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2016  # the $vars are the GraphQL query's, not the shell's
+          gh api graphql -F refId="$SCRATCH_REF_ID" \
+            -f query='mutation($refId:ID!){deleteRef(input:{refId:$refId}){clientMutationId}}'
+
+      - name: Open or update the program release PR
+        if: steps.check.outputs.found == 'true' && steps.mode.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          {
+            echo "Versions the Anchor programs from the program changesets on develop."
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/released.txt"
+            echo '```'
+            echo
+            echo "Merging this PR bumps each \`Cargo.toml\` and writes each changelog. It creates no tag: the tag bot tags each program once the bump reaches \`master\`."
+            echo
+            echo "Do not push to \`$BRANCH\`. Each push to develop force-moves it onto a fresh commit, which drops any commit pushed here and dismisses the approvals. Edit the changesets on develop instead."
+          } > "$RUNNER_TEMP/body.md"
+          number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base develop --state open --json number,isCrossRepository --jq 'map(select(.isCrossRepository | not))[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh pr create --base develop --head "$BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          fi
+
+  tag-exists:
+    name: New program versions are untagged
+    if: github.event_name == 'pull_request' && github.head_ref == 'program-release/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Without both, git tag -l finds nothing and the check passes vacuously.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Every bumped version is free
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          failed=0
+          for manifest in $(git diff --name-only "$BASE_SHA" HEAD -- 'programs/*/Cargo.toml'); do
+            name=$(basename "$(dirname "$manifest")")
+            version=$(grep -m1 -E '^version = "' "$manifest" | sed -E 's/^version = "(.*)"$/\1/')
+            # An empty version would name the tag `program-<name>-`, which never exists.
+            if [ -z "$version" ]; then
+              echo "::error file=$manifest::$manifest has no literal version = \"x.y.z\". A tag names that version."
+              failed=1
+              continue
+            fi
+            tag="program-$name-$version"
+            if [ -n "$(git tag -l "$tag")" ]; then
+              echo "::error file=$manifest::$tag already exists. A tag is never reused: set $name above every tag it already has."
+              failed=1
+            else
+              echo "$tag is free"
+            fi
+          done
+          exit "$failed"

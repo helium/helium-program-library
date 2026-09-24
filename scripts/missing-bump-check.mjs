@@ -171,7 +171,7 @@ const USAGE =
 const PACKAGE_VERSION = /^version = "(\d+\.\d+\.\d+)"$/m;
 
 /** The file's content at `head`, or null when it is not in that tree. */
-const showFile = (head, file) => {
+export const showFile = (head, file) => {
   try {
     return execFileSync("git", ["show", `${head}:${file}`], {
       encoding: "utf8",

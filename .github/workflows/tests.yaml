@@ -158,7 +158,7 @@ jobs:
           cache: pnpm
       # The pending-proposal tests import `@sqds/multisig` from the workspace.
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: node --test 'scripts/*.test.mjs'
+      - run: node --test 'scripts/*.test.mjs' .github/actions/api-commit/build-payload.test.mjs
 
   test-unit:
     name: Rust Unit Tests

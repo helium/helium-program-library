@@ -21,7 +21,7 @@ const changeset = (text) => parseChangeset(text);
 test("a changed package with no changeset fails, and the text names it", () => {
   const failure = backstopCheck({ ...changed, programs: [] });
   assert.match(failure, /@helium\/spl-utils/);
-  assert.match(failure, /write a changeset by hand$/);
+  assert.match(failure, /write a changeset by hand or re-run the bot job$/);
 });
 
 test("an empty changeset covers the packages but not the programs", () => {
@@ -85,4 +85,23 @@ test("an IDL change with no @helium/idls changeset fails", () => {
     ],
   });
   assert.match(failure, /@helium\/idls/);
+});
+
+test("a program changeset that names an unknown program fails", () => {
+  assert.throws(
+    () =>
+      backstopCheck({
+        ...changed,
+        programChangesets: [
+          {
+            file: ".changeset-programs/typo.md",
+            ...changeset(
+              "---\nlazy-distributor: patch\nwelcome-pak: none\n---\n\nOn chain.\n",
+            ),
+          },
+        ],
+        knownPrograms: ["lazy-distributor", "welcome-pack"],
+      }),
+    /\.changeset-programs\/typo\.md: unknown program "welcome-pak"/,
+  );
 });

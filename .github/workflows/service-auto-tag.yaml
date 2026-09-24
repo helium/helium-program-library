@@ -1,0 +1,145 @@
+name: Service auto-tag
+
+# Pushes the next docker-<env>-<service>-<x.y.z> tag for each opted-in
+# service (`autoTag` in docker-info.json) that changed since its last tag.
+# docker-push.yaml then builds the image. A tag makes an ECR image and deploys
+# nothing. Hand tags stay valid from any branch.
+env:
+  # Dry run until go-live. A workflow_dispatch run overrides it.
+  DRY_RUN: true
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Write nothing outside the runner"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan the tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      dry_run: ${{ steps.mode.outputs.dry_run }}
+      tags: ${{ steps.plan.outputs.tags }}
+    steps:
+      # Every tag, from every branch: the version rule reads the whole repo.
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Resolve dry run
+        id: mode
+        env:
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # Fail closed: only a literal `false` writes, so a missing or mistyped flag is a dry run.
+          if [ "${INPUT_DRY_RUN:-$DRY_RUN}" = "false" ]; then dry_run=false; else dry_run=true; fi
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+
+      - name: Plan the tags
+        id: plan
+        env:
+          DRY_RUN_EFFECTIVE: ${{ steps.mode.outputs.dry_run }}
+        run: |
+          {
+            echo "## Service auto-tag"
+            echo
+            if [ "$DRY_RUN_EFFECTIVE" = "true" ]; then
+              echo "Dry run. No tag was pushed. The tags this run would push on the develop tip:"
+            else
+              echo "Tags on the develop tip:"
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          # The script appends its table to the run summary.
+          node scripts/service-auto-tag.mjs > "$RUNNER_TEMP/plan.json"
+          echo "tags=$(jq -c '[.tags[] | {service, tag}]' "$RUNNER_TEMP/plan.json")" >> "$GITHUB_OUTPUT"
+
+  tag:
+    name: Tag ${{ matrix.service }}
+    needs: plan
+    # Only develop is tagged: a dispatch from another branch is a rehearsal.
+    if: needs.plan.outputs.dry_run != 'true' && needs.plan.outputs.tags != '[]' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release-bots
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.tags) }}
+    # One run per service, newest wins. Each run names and tags the develop
+    # tip, not its own event commit, so the last run to finish tags the newest
+    # code and an older run finds nothing new.
+    concurrency:
+      group: service-auto-tag-${{ matrix.service }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      # Named again inside the concurrency group: an earlier run may have
+      # tagged this service since the plan job read the tags.
+      - name: Name the tag
+        id: name
+        shell: bash
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          tag=$(node scripts/service-auto-tag.mjs | jq -r --arg service "$SERVICE" '.tags[] | select(.service == $service) | .tag')
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ -z "$tag" ]; then
+            echo "$SERVICE has no change since its last tag. No tag."
+          fi
+
+      # The App token, so docker-push.yaml starts on the tag: a GITHUB_TOKEN
+      # push starts no workflow. The checkout persists no credential, so the
+      # push carries only this token.
+      # Scoped to what this job does: pushes one tag.
+      - name: Get an App token
+        id: app-token
+        if: steps.name.outputs.tag != ''
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      # A tag is never moved or reused: the push has no force, so a tag that
+      # exists fails the job.
+      - name: Push the tag
+        if: steps.name.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ steps.name.outputs.tag }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          git push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "${sha}:refs/tags/${TAG}"
+          echo "Pushed \`${TAG}\` at \`${sha}\`." >> "$GITHUB_STEP_SUMMARY"

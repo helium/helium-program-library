@@ -1,0 +1,260 @@
+name: Changeset Bot Commit
+
+# Commits the changesets changeset-bot.yaml wrote to the PR branch, under the
+# App token. That workflow runs the PR's code and holds no secret; this one
+# holds the App key and runs only default-branch code. The artifact is
+# attacker-written: a PR can edit changeset-bot.yaml, so every field and file
+# is checked against what GitHub sets on the event and the PR.
+env:
+  # Dry run until go-live. Go-live needs both this flag and
+  # changeset-bot.yaml's flag false. workflow_run reads this file from the
+  # default branch (master), so this flip takes effect only once it reaches
+  # master. A dispatch of changeset-bot.yaml overrides it.
+  DRY_RUN: true
+
+on:
+  workflow_run:
+    workflows: ["Changeset Bot"]
+    types: [completed]
+
+permissions: {}
+
+# One run per branch of this repo. A new push makes the older run's files
+# stale. A fork branch of the same name and dispatch runs get their own group,
+# since the group is set before the job's fork gate.
+concurrency:
+  group: changeset-bot-commit-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.event == 'workflow_dispatch' && github.event.workflow_run.id || github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  commit:
+    name: Commit the changesets
+    # Forks never reach the key: their runs stop here.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: release-bots
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # download-artifact reads the other run's artifact.
+      actions: read
+      # `gh pr view` reads the PR's head.
+      pull-requests: read
+    steps:
+      # workflow_run runs on the default branch, so no ref: every script this
+      # job runs comes from here.
+      - name: Checkout the default branch
+        uses: actions/checkout@v4
+        with:
+          path: trusted
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: trusted/.node-version
+
+      # No artifact when nothing was missing or the run wrote nothing.
+      - name: Download the changesets
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: changesets
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/changesets
+
+      - name: Find the changesets
+        id: artifact
+        run: |
+          if [ -f "$RUNNER_TEMP/changesets/meta.json" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No changesets to commit." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Validate the changesets
+        id: validate
+        if: steps.artifact.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event.workflow_run.event }}
+          EVENT_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+          root="$RUNNER_TEMP/changesets"
+          files_dir="$root/files"
+          parser="$GITHUB_WORKSPACE/trusted/scripts/missing-changesets.mjs"
+
+          # Checked before any read, so no read follows a link out of the
+          # artifact.
+          if [ -n "$(find "$root" ! -type f ! -type d -print -quit)" ]; then
+            fail "The artifact holds a symlink or another non-regular entry."
+          fi
+
+          number=$(jq -r '.number' "$root/meta.json")
+          head_ref=$(jq -r '.headRef' "$root/meta.json")
+          head_sha=$(jq -r '.headSha' "$root/meta.json")
+          meta_dry_run=$(jq -r '.dryRun' "$root/meta.json")
+          [[ "$number" =~ ^[1-9][0-9]*$ ]] || fail "meta.json holds a bad PR number."
+          [[ "$head_sha" =~ ^[0-9a-f]{40}$ ]] || fail "meta.json holds a bad head sha."
+
+          # A dispatch leaves these fields on the dispatch ref, so it skips
+          # them; it must run from develop or master, so the artifact comes
+          # from reviewed code.
+          if [ "$EVENT" != "workflow_dispatch" ]; then
+            [ "$head_sha" = "$EVENT_HEAD_SHA" ] || fail "headSha $head_sha is not the run's head $EVENT_HEAD_SHA."
+            [ "$head_ref" = "$EVENT_HEAD_BRANCH" ] || fail "headRef is not the run's branch $EVENT_HEAD_BRANCH."
+          else
+            case "$EVENT_HEAD_BRANCH" in
+              develop | master) ;;
+              *) fail "A dispatch runs only from develop or master, not $EVENT_HEAD_BRANCH." ;;
+            esac
+          fi
+
+          pr=$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json headRefName,headRefOid,isCrossRepository,state)
+          [ "$(jq -r '.isCrossRepository' <<< "$pr")" = "false" ] || fail "#$number comes from a fork."
+          [ "$(jq -r '.state' <<< "$pr")" = "OPEN" ] || fail "#$number is not open."
+          [ "$(jq -r '.headRefName' <<< "$pr")" = "$head_ref" ] || fail "#$number's head is not $head_ref."
+          if [ "$(jq -r '.headRefOid' <<< "$pr")" != "$head_sha" ]; then
+            echo "#$number moved past $head_sha. A newer run writes its changesets." >> "$GITHUB_STEP_SUMMARY"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          case "$head_ref" in
+            changeset-release/* | program-release/* | develop | master)
+              fail "The bot does not commit to $head_ref."
+              ;;
+          esac
+
+          paths=()
+          while IFS= read -r -d '' path; do
+            paths+=("$path")
+          done < <(cd "$files_dir" && find . -type f -print0 | sed -z 's|^\./||')
+          [ "${#paths[@]}" -gt 0 ] || fail "The artifact holds no changeset."
+
+          git -C trusted fetch --no-tags --depth=1 origin "$head_sha"
+          programs=$(git -C trusted ls-tree -d --name-only "$head_sha:programs")
+          # The workspace globs are `packages/*`, read from the head's tree
+          # and never checked out.
+          packages=$(
+            git -C trusted ls-tree -r --name-only "$head_sha" |
+              grep -E '^packages/[^/]+/package\.json$' |
+              while IFS= read -r manifest; do
+                git -C trusted show "$head_sha:$manifest" | jq -r '.name // empty'
+              done
+          )
+
+          for path in "${paths[@]}"; do
+            [[ "$path" =~ ^\.changeset(-programs)?/bot-([0-9a-f]{7})\.md$ ]] || fail "The artifact holds a path that is not a bot changeset."
+            [ "${BASH_REMATCH[2]}" = "${head_sha:0:7}" ] || fail "$path does not name head ${head_sha:0:7}."
+            [ "$(stat -c %s "$files_dir/$path")" -lt 65536 ] || fail "$path is 64 KiB or more."
+            names=$(PARSER="$parser" node --input-type=module -e '
+              import { readFileSync } from "node:fs";
+              import { pathToFileURL } from "node:url";
+              const { parseChangeset } = await import(pathToFileURL(process.env.PARSER).href);
+              const { releases } = parseChangeset(readFileSync(process.argv[1], "utf8"));
+              console.log(Object.keys(releases).join("\n"));
+            ' "$files_dir/$path") || fail "$path does not parse."
+            if [[ "$path" == .changeset-programs/* ]]; then
+              known="$programs"
+            else
+              known="$packages"
+            fi
+            while IFS= read -r name; do
+              [ -z "$name" ] && continue
+              grep -qxF -- "$name" <<< "$known" || fail "$path names $name, which is not in the workspace at ${head_sha:0:7}."
+            done <<< "$names"
+          done
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ "$meta_dry_run" = "false" ]; then dry_run=false; else dry_run=true; fi
+          else
+            if [ "$DRY_RUN" = "false" ] && [ "$meta_dry_run" = "false" ]; then dry_run=false; else dry_run=true; fi
+          fi
+          {
+            echo "proceed=true"
+            echo "head-ref=$head_ref"
+            echo "head-sha=$head_sha"
+            echo "paths=${paths[*]}"
+            echo "dry_run=$dry_run"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write the dry-run summary
+        if: steps.validate.outputs.proceed == 'true' && steps.validate.outputs.dry_run == 'true'
+        env:
+          PATHS: ${{ steps.validate.outputs.paths }}
+        run: |
+          {
+            echo "## Changeset bot commit (dry run)"
+            echo
+            echo "Nothing was committed."
+            for path in $PATHS; do
+              echo
+              echo "### $path"
+              echo
+              echo '```md'
+              cat "$RUNNER_TEMP/changesets/files/$path"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Data only: nothing under head/ runs.
+      - name: Checkout the PR head
+        if: steps.validate.outputs.proceed == 'true' && steps.validate.outputs.dry_run != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.validate.outputs.head-sha }}
+          path: head
+          persist-credentials: false
+          fetch-depth: 1
+
+      # A symlinked directory or file in the PR tree would send the copy
+      # outside head/, so neither is followed.
+      - name: Place the changesets
+        if: steps.validate.outputs.proceed == 'true' && steps.validate.outputs.dry_run != 'true'
+        env:
+          PATHS: ${{ steps.validate.outputs.paths }}
+        run: |
+          set -euo pipefail
+          for path in $PATHS; do
+            dir=$(dirname "$path")
+            if [ -L "head/$dir" ] || [ -e "head/$path" ] || [ -L "head/$path" ]; then
+              echo "::error::head/$path exists or sits under a symlink. The bot does not overwrite it."
+              exit 1
+            fi
+            mkdir -p "head/$dir"
+            cp "$RUNNER_TEMP/changesets/files/$path" "head/$path"
+          done
+
+      # The App token, so tests.yaml and the backstop start on the bot's
+      # commit. A GITHUB_TOKEN commit starts no workflow.
+      # Scoped to what this job does: commits to the PR branch.
+      - name: Get an App token
+        id: app-token
+        if: steps.validate.outputs.proceed == 'true' && steps.validate.outputs.dry_run != 'true'
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      # The payload is diffed in the head checkout, so it holds only the new
+      # files. The action comes from the default-branch checkout. A branch
+      # that moved past the head fails the commit.
+      - name: Commit to the PR branch
+        if: steps.validate.outputs.proceed == 'true' && steps.validate.outputs.dry_run != 'true'
+        uses: ./trusted/.github/actions/api-commit
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: ${{ steps.validate.outputs.head-ref }}
+          headline: "chore: add changesets"
+          expected-head-oid: ${{ steps.validate.outputs.head-sha }}
+          paths: ${{ steps.validate.outputs.paths }}
+          working-directory: head

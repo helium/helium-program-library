@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
-import { missingChangesets, parseChangeset } from "./missing-changesets.mjs";
+import {
+  missingChangesets,
+  missingFromArgv,
+  parseChangeset,
+} from "./missing-changesets.mjs";
 
 const changed = {
   packages: ["@helium/idls", "@helium/spl-utils"],
@@ -172,4 +180,69 @@ test("parseChangeset reads a file with CRLF line ends", () => {
       summary: "Text here.",
     },
   );
+});
+
+test("parseChangeset reads a closing --- with no trailing newline", () => {
+  const parsed = parseChangeset("---\nlazy-distributor: patch\n---");
+  assert.deepEqual(
+    { ...parsed, releases: { ...parsed.releases } },
+    { releases: { "lazy-distributor": "patch" }, summary: "" },
+  );
+});
+
+// missingFromArgv reads the known programs from the head tree; without that
+// wiring an unknown name would pass.
+test("missingFromArgv fails on a program changeset that names a program not in the head tree", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "missing-changesets-"));
+  const git = (...args) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
+      { cwd: root, encoding: "utf8" },
+    ).trim();
+  git("init", "-q");
+  mkdirSync(path.join(root, "programs/foo"), { recursive: true });
+  writeFileSync(path.join(root, "programs/foo/Cargo.toml"), "[package]\n");
+  git("add", ".");
+  git("commit", "-q", "-m", "base");
+  const base = git("rev-parse", "HEAD");
+  mkdirSync(path.join(root, ".changeset-programs"));
+  writeFileSync(
+    path.join(root, ".changeset-programs/x.md"),
+    "---\nbar: patch\n---\n\nText.\n",
+  );
+  git("add", ".");
+  git("commit", "-q", "-m", "head");
+  const head = git("rev-parse", "HEAD");
+  const packages = path.join(root, "packages.json");
+  const programs = path.join(root, "programs.json");
+  writeFileSync(packages, "[]");
+  writeFileSync(programs, "[]");
+
+  const cwd = process.cwd();
+  process.chdir(root);
+  try {
+    assert.throws(
+      () =>
+        missingFromArgv([
+          base,
+          head,
+          "--packages",
+          packages,
+          "--programs",
+          programs,
+        ]),
+      /unknown program "bar"/,
+    );
+  } finally {
+    process.chdir(cwd);
+  }
 });

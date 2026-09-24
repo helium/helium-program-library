@@ -9,4 +9,4 @@ If you're creating a lot of fanouts, it's cheaper to use this than full [fanout]
 
 Distributions are cranked by tuktuk's crank turner. Fanouts are created by [`welcome-pack`](../welcome-pack), `blockchain-api` and `helium-admin-cli`, and share a task queue with [`hpl-crons`](../hpl-crons). SDK: [`@helium/mini-fanout-sdk`](../../packages/mini-fanout-sdk).
 
-Release / upgrade: add a program changeset that names `mini-fanout` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/mini-fanout/Cargo.toml`. After the change reaches `master`, push the `program-mini-fanout-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).
+Release / upgrade: add a program changeset that names `mini-fanout` in [`.changeset-programs/`](../../.changeset-programs). The bots bump the version, push `program-mini-fanout-<version>`, and open the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

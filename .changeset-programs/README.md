@@ -56,13 +56,17 @@ reviewed up to in `skipped.json`, so the missing-bump check asks for a bump only
 when the program changed since both its tag and that commit. The program's next
 real release clears the entry.
 
-The changeset bot writes `none` only for a **dependent program** — one marked
-changed only through a workspace dependency, where the change cannot reach the
-binary. It never writes `none` for a program whose own `src/` changed. A person
-may write `none` anywhere.
+The changeset bot never writes `none`. A dependent program links the whole
+crate it depends on, so the bot gives it `patch`. A person sets `none` by hand
+when a change ships nothing on chain.
 
 ## Releasing
 
-The version step ships later. Until then, the author bumps the program's
-version in its `Cargo.toml` by hand. After the bump reaches `master`, the author
-pushes the `program-<name>-<version>` tag by hand. That tag starts the deploy.
+A push to `develop` with program changesets present runs
+`.github/workflows/version-programs.yaml`, which runs
+`node scripts/version-programs.mjs` and opens or updates the **program release
+PR** from `program-release/develop`. Merging it bumps each `Cargo.toml`, writes
+each `programs/<name>/CHANGELOG.md`, and deletes the files used here.
+
+No tag comes from this PR. The tag bot creates `program-<name>-<version>` when
+the bump reaches `master`, which is what starts the deploy.
