@@ -216,6 +216,8 @@ jobs:
             echo '```'
             echo
             echo "Merging this PR bumps each \`Cargo.toml\` and writes each changelog. It creates no tag: the tag bot tags each program once the bump reaches \`master\`."
+            echo
+            echo "Do not push to \`$BRANCH\`. Each push to develop force-moves it onto a fresh commit, which drops any commit pushed here and dismisses the approvals. Edit the changesets on develop instead."
           } > "$RUNNER_TEMP/body.md"
           number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base develop --state open --json number,isCrossRepository --jq 'map(select(.isCrossRepository | not))[0].number // empty')
           if [ -n "$number" ]; then
@@ -245,6 +247,12 @@ jobs:
           for manifest in $(git diff --name-only "$BASE_SHA" HEAD -- 'programs/*/Cargo.toml'); do
             name=$(basename "$(dirname "$manifest")")
             version=$(grep -m1 -E '^version = "' "$manifest" | sed -E 's/^version = "(.*)"$/\1/')
+            # An empty version would name the tag `program-<name>-`, which never exists.
+            if [ -z "$version" ]; then
+              echo "::error file=$manifest::$manifest has no literal version = \"x.y.z\". A tag names that version."
+              failed=1
+              continue
+            fi
             tag="program-$name-$version"
             if [ -n "$(git tag -l "$tag")" ]; then
               echo "::error file=$manifest::$tag already exists. A tag is never reused: set $name above every tag it already has."

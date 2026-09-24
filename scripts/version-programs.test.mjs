@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -8,6 +9,7 @@ import test from "node:test";
 import { versionPrograms } from "./version-programs.mjs";
 
 const HEAD_SHA = "0ae7a24507d2b4a1c9f6e8b3d5a7c1e9f0b2d4a6";
+const CHANGESET_SHA = "5c1e9f0b2d4a60ae7a24507d2b4a1c9f6e8b3d5a";
 
 /** A program manifest shaped like the real ones: version on line 3, comments after it. */
 const manifest = (name, version) => `[package]
@@ -104,7 +106,7 @@ test("the highest level across files wins and both notes land under one entry", 
   assert.deepEqual(calls, ["cargo update --workspace"]);
 });
 
-test("level none bumps nothing, writes no changelog, and records the head SHA", () => {
+test("level none bumps nothing, writes no changelog, and records the changeset's commit", () => {
   const root = makeRepo({
     programs: { "lazy-distributor": "0.3.11" },
     changesets: {
@@ -115,9 +117,20 @@ test("level none bumps nothing, writes no changelog, and records the head SHA", 
     },
   });
   const { calls, cargoUpdate } = recorder();
+  const looked = [];
+  const changesetCommit = (files) => {
+    looked.push(...files.map((file) => path.relative(root, file)));
+    return CHANGESET_SHA;
+  };
 
-  const result = versionPrograms({ root, headSha: HEAD_SHA, cargoUpdate });
+  const result = versionPrograms({
+    root,
+    headSha: HEAD_SHA,
+    cargoUpdate,
+    changesetCommit,
+  });
 
+  assert.deepEqual(looked, [".changeset-programs/handler-body-only.md"]);
   assert.equal(version(root, "lazy-distributor"), "0.3.11");
   assert.equal(
     existsSync(path.join(root, "programs", "lazy-distributor", "CHANGELOG.md")),
@@ -125,7 +138,7 @@ test("level none bumps nothing, writes no changelog, and records the head SHA", 
   );
   assert.equal(
     read(root, ".changeset-programs", "skipped.json"),
-    `{\n  "lazy-distributor": "${HEAD_SHA}"\n}\n`,
+    `{\n  "lazy-distributor": "${CHANGESET_SHA}"\n}\n`,
   );
   assert.equal(
     existsSync(path.join(root, ".changeset-programs", "handler-body-only.md")),
@@ -134,6 +147,39 @@ test("level none bumps nothing, writes no changelog, and records the head SHA", 
   assert.deepEqual(result.released, []);
   assert.deepEqual(result.skipped, ["lazy-distributor"]);
   assert.deepEqual(calls, []);
+});
+
+test("level none records the develop commit that added the changeset, or the head when none did", () => {
+  const root = makeRepo({
+    programs: { "lazy-distributor": "0.3.11", "mini-fanout": "0.1.8" },
+    changesets: {
+      "handler-body-only.md": changeset(
+        "lazy-distributor: none",
+        "A helper body changed; the binary is unaffected.",
+      ),
+    },
+  });
+  const git = (...args) =>
+    execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  git("init", "-q");
+  git("add", "-A");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "add");
+  const added = git("rev-parse", "HEAD");
+  writeFileSync(path.join(root, "later.txt"), "later\n");
+  git("add", "-A");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "later");
+  writeFileSync(
+    path.join(root, ".changeset-programs", "uncommitted.md"),
+    changeset("mini-fanout: none", "Not committed yet."),
+  );
+  const { cargoUpdate } = recorder();
+
+  versionPrograms({ root, headSha: HEAD_SHA, cargoUpdate });
+
+  assert.deepEqual(
+    JSON.parse(read(root, ".changeset-programs", "skipped.json")),
+    { "lazy-distributor": added, "mini-fanout": HEAD_SHA },
+  );
 });
 
 test("a real release clears the program's skip entry and leaves the others", () => {

@@ -10,7 +10,7 @@
  * 0.2.0. Level `none` bumps nothing and records the program in `skipped.json`
  * instead, so the missing-bump check knows the change was reviewed.
  */
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,7 +56,7 @@ const listChangesets = (root) =>
     .map((file) => path.join(root, CHANGESET_DIR, file));
 
 /**
- * program -> { level, notes: [{ level, text }] }, with every name and level
+ * program -> { level, notes: [{ level, text }], files }, with every name and level
  * validated. The whole plan is built before any write, so an unknown program or
  * level leaves the tree untouched.
  */
@@ -76,10 +76,11 @@ const plan = (programs, files) => {
         throw new Error(`${file}: unknown program "${name}"`);
       if (!LEVELS.includes(level))
         throw new Error(`${file}: unknown level "${level}"`);
-      releases[name] ??= { level: "none", notes: [] };
+      releases[name] ??= { level: "none", notes: [], files: [] };
       if (LEVELS.indexOf(level) > LEVELS.indexOf(releases[name].level))
         releases[name].level = level;
       releases[name].notes.push({ level, text });
+      releases[name].files.push(file);
     }
   }
   return releases;
@@ -144,23 +145,42 @@ const writeSkipped = (root, skipped) => {
 
 // cargo's progress goes to stderr, so stdout carries only the release report
 // the workflow puts in the PR body.
-const runCargoUpdate = () =>
+const runCargoUpdate = (root) =>
   execSync("cargo update --workspace", {
+    cwd: root,
     stdio: ["ignore", process.stderr, "inherit"],
   });
+
+/** The develop commit that last touched any of `files`, or empty when none did. */
+const lastChangesetCommit = (root, files) =>
+  execFileSync(
+    "git",
+    [
+      "log",
+      "-1",
+      "--first-parent",
+      "--format=%H",
+      "--",
+      ...files.map((file) => path.relative(root, file)),
+    ],
+    { cwd: root, encoding: "utf8" },
+  ).trim();
 
 /**
  * Applies every program changeset under `root` and deletes the files it used.
  *
- * @param {{ root: string, headSha: string, cargoUpdate?: () => void }} input
- *   `headSha` is the commit the changesets were reviewed up to; it is what a
- *   `none` level records in `skipped.json`.
+ * @param {{ root: string, headSha: string, cargoUpdate?: () => void, changesetCommit?: (files: string[]) => string }} input
+ *   A `none` level records in `skipped.json` the commit that last touched the
+ *   program's changeset files, as `changesetCommit` names it: the change was
+ *   reviewed up to there, not up to a later head. `headSha` stands in when no
+ *   commit touched them, as for a changeset not yet committed.
  * @returns {{ released: { name: string, from: string, to: string, level: string }[], skipped: string[] }}
  */
 export const versionPrograms = ({
   root,
   headSha,
-  cargoUpdate = runCargoUpdate,
+  cargoUpdate = () => runCargoUpdate(root),
+  changesetCommit = (files) => lastChangesetCommit(root, files),
 }) => {
   const programs = listPrograms(root);
   const files = listChangesets(root);
@@ -170,10 +190,12 @@ export const versionPrograms = ({
   const skipped = [];
   // program -> new SHA, or null to clear the entry a real release supersedes.
   const skipRecord = {};
-  for (const [name, { level, notes }] of Object.entries(releases)) {
+  for (const [name, { level, notes, files: used }] of Object.entries(
+    releases,
+  )) {
     if (level === "none") {
       skipped.push(name);
-      skipRecord[name] = headSha;
+      skipRecord[name] = changesetCommit(used) || headSha;
       continue;
     }
     skipRecord[name] = null;
