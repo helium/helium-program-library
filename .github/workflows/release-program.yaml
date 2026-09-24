@@ -13,9 +13,9 @@ permissions:
   contents: read
 
 # In this workflow the deployer key reaches `buffers` and `propose` only, and neither installs
-# the workspace. The key is a repository secret, so this holds for this file alone: the sweep
-# workflow holds it too. `@sqds/multisig` runs in `plan` and `wait`, which hold no key and no
-# write token.
+# the workspace. The key is a `mainnet-deploy` environment secret: only a job that names that
+# environment, on a `program-*` tag or master, can read it. The sweep workflow holds it too.
+# `@sqds/multisig` runs in `plan` and `wait`, which hold no key and no write token.
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -184,6 +184,7 @@ jobs:
   plan:
     needs: [build, release]
     runs-on: ubuntu-latest
+    environment: mainnet-deploy
     permissions:
       contents: read
     timeout-minutes: 30
@@ -225,6 +226,7 @@ jobs:
     needs: [build, plan]
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-latest
+    environment: mainnet-deploy
     # The program buffer write retries up to 3 x 55 minutes.
     timeout-minutes: 180
     outputs:
@@ -271,6 +273,7 @@ jobs:
   wait:
     needs: [build, buffers]
     runs-on: ubuntu-latest
+    environment: mainnet-deploy
     # Turnstyle lists this workflow's runs.
     permissions:
       contents: read
@@ -328,6 +331,7 @@ jobs:
     needs: [build, buffers, wait]
     if: needs.wait.outputs.skip != 'true'
     runs-on: ubuntu-latest
+    environment: mainnet-deploy
     timeout-minutes: 30
     steps:
       - name: Squads program upgrade
