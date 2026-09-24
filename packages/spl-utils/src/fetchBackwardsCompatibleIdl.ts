@@ -1,6 +1,6 @@
-import { Idl, Provider } from "@coral-xyz/anchor";
+import { Idl, Provider } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import circuitBreakerIdl from "./idl/circuit_breaker.json";
 import dataCreditsIdl from "./idl/data_credits.json";
 import fanoutIdl from "./idl/fanout.json";

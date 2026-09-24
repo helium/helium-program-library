@@ -1,4 +1,4 @@
-import type { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import type { AnchorProvider, Idl, Program } from "@anchor-lang/core";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import type { PublicKey } from "@solana/web3.js";
 

@@ -1,4 +1,4 @@
-import { IdlTypes, Program } from "@coral-xyz/anchor";
+import { IdlTypes, Program } from "@anchor-lang/core";
 import { WelcomePack } from "@helium/idls/lib/types/welcome_pack";
 import {
   recipientKey,

@@ -1,5 +1,5 @@
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
-import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+import { AnchorProvider, Program } from "@anchor-lang/core";
+import { bs58 } from "@anchor-lang/core/dist/cjs/utils/bytes";
 import { PROGRAM_ID, daoKey, init } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";

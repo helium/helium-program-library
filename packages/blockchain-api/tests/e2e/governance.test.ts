@@ -1,4 +1,4 @@
-import { BorshInstructionCoder } from "@coral-xyz/anchor";
+import { BorshInstructionCoder } from "@anchor-lang/core";
 import {
   delegatedPositionKey,
   EPOCH_LENGTH,

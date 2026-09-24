@@ -1,4 +1,4 @@
-import { AnchorProvider, BN } from "@coral-xyz/anchor";
+import { AnchorProvider, BN } from "@anchor-lang/core";
 import { VoteService, positionKey } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";

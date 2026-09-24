@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { toNumber } from "@helium/spl-utils";
 import fs from "fs";
 import os from "os";

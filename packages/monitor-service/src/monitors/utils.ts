@@ -1,6 +1,6 @@
 import { SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { provider } from "../solana";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import BN from "bn.js";
 
 let lastDriftCalc = 0;

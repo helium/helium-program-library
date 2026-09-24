@@ -1,4 +1,4 @@
-import { web3 } from "@coral-xyz/anchor";
+import { web3 } from "@anchor-lang/core";
 import { PROGRAM_ID } from "@helium/helium-sub-daos-sdk";
 import { useAsync, UseAsyncReturn } from "react-async-hook";
 import { useHeliumVsrState } from "../contexts/heliumVsrContext";

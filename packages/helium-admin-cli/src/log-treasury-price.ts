@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { HNT_MINT, amountAsNum, toNumber, toBN } from "@helium/spl-utils";
 import {
   init as initTreasuryManagement,

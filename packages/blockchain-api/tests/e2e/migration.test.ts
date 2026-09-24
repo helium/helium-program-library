@@ -13,7 +13,7 @@ import {
   NATIVE_MINT,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@anchor-lang/core";
 import { init as initWelcomePack } from "@helium/welcome-pack-sdk";
 import { positionKey } from "@helium/voter-stake-registry-sdk";
 import { delegatedPositionKey } from "@helium/helium-sub-daos-sdk";

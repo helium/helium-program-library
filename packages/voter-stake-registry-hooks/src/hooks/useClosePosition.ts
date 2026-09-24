@@ -1,4 +1,4 @@
-import { BN } from "@coral-xyz/anchor";
+import { BN } from "@anchor-lang/core";
 import { sendInstructions } from "@helium/spl-utils";
 import {
   getAssociatedTokenAddressSync,

@@ -1,5 +1,5 @@
 import { AccountFetchCache } from "@helium/account-fetch-cache";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { SOLANA_URL } from "./env";
 import { init } from "@helium/voter-stake-registry-sdk";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
@@ -14,7 +14,7 @@ import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
 import { init as initProposal } from "@helium/proposal-sdk";
 import fs from "fs";
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import { StateController } from "@helium/modular-governance-idls/lib/types/state_controller";
 import { init as initStateController } from "@helium/state-controller-sdk";
 

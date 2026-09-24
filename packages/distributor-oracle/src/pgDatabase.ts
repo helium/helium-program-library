@@ -1,5 +1,5 @@
 // @ts-ignore
-import { BN, Program } from "@coral-xyz/anchor";
+import { BN, Program } from "@anchor-lang/core";
 import {
   decodeEntityKey,
   entityCreatorKey,

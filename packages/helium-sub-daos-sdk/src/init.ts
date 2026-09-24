@@ -1,4 +1,4 @@
-import { Idl, Program, Provider } from "@coral-xyz/anchor";
+import { Idl, Program, Provider } from "@anchor-lang/core";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";

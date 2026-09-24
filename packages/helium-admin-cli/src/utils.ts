@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
+import * as anchor from "@anchor-lang/core";
+import { idlAddress } from "@anchor-lang/core/dist/cjs/idl";
 import {
   bulkSendTransactions,
   createAtaAndMintInstructions,

@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, IdlAccounts, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, IdlAccounts, Wallet } from "@anchor-lang/core";
 import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import {
   EPOCH_LENGTH,

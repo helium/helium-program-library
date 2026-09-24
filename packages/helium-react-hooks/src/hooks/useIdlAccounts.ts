@@ -1,6 +1,6 @@
-import { BorshAccountsCoder, Idl, IdlAccounts } from "@coral-xyz/anchor";
-import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
-import { AllAccountsMap } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
+import { BorshAccountsCoder, Idl, IdlAccounts } from "@anchor-lang/core";
+import { convertIdlToCamelCase } from "@anchor-lang/core/dist/cjs/idl";
+import { AllAccountsMap } from "@anchor-lang/core/dist/cjs/program/namespace/types";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
 import {
   UseAccountsState,

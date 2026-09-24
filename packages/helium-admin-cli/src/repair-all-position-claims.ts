@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { AccountFetchCache } from "@helium/account-fetch-cache";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import {
