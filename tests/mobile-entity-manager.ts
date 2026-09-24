@@ -26,7 +26,7 @@ import {
 } from "./utils/fixtures";
 const { expect } = chai;
 import chaiAsPromised from "chai-as-promised";
-import { getAccount } from "@solana/spl-token";
+import { getAccount, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { random } from "./utils/string";
 import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
@@ -50,6 +50,7 @@ describe("mobile-entity-manager", () => {
   let dao: PublicKey;
   let subDao: PublicKey;
   let dcMint: PublicKey;
+  let hntMint: PublicKey;
   let programApproval: PublicKey;
 
   before(async () => {
@@ -85,8 +86,9 @@ describe("mobile-entity-manager", () => {
 
     const dataCredits = await initTestDataCredits(dcProgram, provider);
     dcMint = dataCredits.dcMint;
-    const hntMint = await createMint(provider, 8, me, me);
-    await createAtaAndMint(provider, hntMint, new BN("10000000000000"), me);
+    hntMint = await createMint(provider, 8, me, me);
+    // two stakes: a couple of tests need a second carrier
+    await createAtaAndMint(provider, hntMint, new BN("20000000000000"), me);
     ({ dao } = await initTestDao(
       hsdProgram,
       provider,
@@ -209,6 +211,168 @@ describe("mobile-entity-manager", () => {
       expect(carrierAcc.approved).to.be.false;
     });
 
+    describe("closing the carrier", async () => {
+      const stake = new BN("10000000000000"); // CARRIER_STAKE_AMOUNT
+
+      it("refuses to close a carrier that is still approved", async () => {
+        await memProgram.methods
+          .approveCarrierV0()
+          .accountsPartial({ carrier })
+          .rpc({ skipPreflight: true });
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              carrier,
+              rentRefund: me,
+              destination: getAssociatedTokenAddressSync(hntMint, me),
+            })
+            .rpc()
+        ).to.be.rejectedWith(/CarrierApproved/);
+      });
+
+      it("returns the stake to the update authority and closes the accounts", async () => {
+        const carrierAcc = await memProgram.account.carrierV0.fetch(carrier);
+        const escrow = carrierAcc.escrow;
+        expect((await getAccount(provider.connection, escrow)).amount).to.eq(
+          BigInt(stake.toString())
+        );
+
+        const destination = getAssociatedTokenAddressSync(hntMint, me);
+        const before = (await getAccount(provider.connection, destination)).amount;
+
+        // destination is deliberately omitted: the SDK resolver derives it, and the
+        // balance check below asserts the address it should have produced.
+        await memProgram.methods
+          .closeCarrierV0()
+          .accountsPartial({ subDao, carrier, rentRefund: me })
+          .rpc({ skipPreflight: true });
+
+        const after = (await getAccount(provider.connection, destination)).amount;
+        expect(after - before).to.eq(BigInt(stake.toString()));
+        expect(await provider.connection.getAccountInfo(carrier)).to.be.null;
+        expect(await provider.connection.getAccountInfo(escrow)).to.be.null;
+      });
+
+      it("refuses a signer that is not the sub dao authority", async () => {
+        const stranger = Keypair.generate();
+        await provider.connection.requestAirdrop(stranger.publicKey, 1000000000);
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              authority: stranger.publicKey,
+              carrier,
+              rentRefund: me,
+              destination: getAssociatedTokenAddressSync(hntMint, me),
+            })
+            .signers([stranger])
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintHasOne/);
+
+        expect(await provider.connection.getAccountInfo(carrier)).to.not.be.null;
+      });
+
+      it("refuses a sub dao that is not the carrier's own", async () => {
+        // same authority (me), different sub dao -- isolates has_one = sub_dao on the carrier
+        const { subDao: otherSubDao } = await initTestSubdao({
+          hsdProgram,
+          provider,
+          authority: me,
+          dao,
+          numTokens: new anchor.BN("500000000000000"),
+        });
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao: otherSubDao,
+              carrier,
+              rentRefund: me,
+              destination: getAssociatedTokenAddressSync(hntMint, me),
+            })
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintHasOne/);
+
+        expect(await provider.connection.getAccountInfo(carrier)).to.not.be.null;
+      });
+
+      it("refuses an escrow that is not the carrier's own", async () => {
+        const otherAta = await createAtaAndMint(
+          provider,
+          hntMint,
+          new BN(0),
+          Keypair.generate().publicKey
+        );
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              carrier,
+              escrow: otherAta,
+              rentRefund: me,
+              destination: getAssociatedTokenAddressSync(hntMint, me),
+            })
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintHasOne/);
+
+        expect(await provider.connection.getAccountInfo(carrier)).to.not.be.null;
+      });
+
+      it("refuses a destination on a different mint than the escrow", async () => {
+        const otherMint = await createMint(provider, 8, me, me);
+        const otherAta = await createAtaAndMint(provider, otherMint, new BN(0), me);
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              carrier,
+              rentRefund: me,
+              destination: otherAta,
+            })
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintTokenMint/);
+
+        expect(await provider.connection.getAccountInfo(carrier)).to.not.be.null;
+      });
+
+      it("refuses a destination the update authority does not own", async () => {
+        const stranger = Keypair.generate().publicKey;
+        const strangerAta = await createAtaAndMint(
+          provider,
+          hntMint,
+          new BN(0),
+          stranger
+        );
+
+        await expect(
+          memProgram.methods
+            .closeCarrierV0()
+            .accountsPartial({
+              subDao,
+              carrier,
+              rentRefund: me,
+              destination: strangerAta,
+            })
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintTokenOwner/);
+
+        // the stake is still where it was
+        const carrierAcc = await memProgram.account.carrierV0.fetch(carrier);
+        expect(
+          (await getAccount(provider.connection, carrierAcc.escrow)).amount
+        ).to.eq(BigInt(stake.toString()));
+      });
+    });
+
     it("allows the carrier to issue itself a rewardable NFT", async () => {
       await memProgram.methods
         .issueCarrierNftV0({
@@ -293,6 +457,168 @@ describe("mobile-entity-manager", () => {
         expect(incentiveEscrowProgramAcc2.startTs.toNumber()).to.eq(10);
         expect(incentiveEscrowProgramAcc2.stopTs.toNumber()).to.eq(15);
         expect(incentiveEscrowProgramAcc2.shares).to.eq(200);
+      });
+
+      it("closes an incentive program once it has ended", async () => {
+        const name = random();
+        const {
+          pubkeys: { incentiveEscrowProgram },
+        } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: new BN(10), // already in the past
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accountsPartial({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        await memProgram.methods
+          .closeIncentiveProgramV0()
+          .accountsPartial({ carrier, incentiveEscrowProgram, rentRefund: me })
+          .rpc({ skipPreflight: true });
+
+        expect(
+          await provider.connection.getAccountInfo(incentiveEscrowProgram!)
+        ).to.be.null;
+      });
+
+      it("refuses to close an incentive program through a different carrier", async () => {
+        const name = random();
+        const {
+          pubkeys: { incentiveEscrowProgram },
+        } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: new BN(10),
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accountsPartial({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        // a second carrier, same issuing authority -- isolates has_one = carrier
+        const otherName = random();
+        const {
+          pubkeys: { carrier: otherCarrier },
+        } = await memProgram.methods
+          .initializeCarrierV0({
+            name: otherName,
+            issuingAuthority: me,
+            updateAuthority: me,
+            hexboostAuthority: me,
+            metadataUrl: "https://some/url",
+            incentiveEscrowFundBps: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accountsPartial({ subDao })
+          .rpcAndKeys({ skipPreflight: true });
+
+        await expect(
+          memProgram.methods
+            .closeIncentiveProgramV0()
+            .accountsPartial({
+              carrier: otherCarrier,
+              incentiveEscrowProgram,
+              rentRefund: me,
+            })
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintHasOne/);
+
+        expect(await provider.connection.getAccountInfo(incentiveEscrowProgram!))
+          .to.not.be.null;
+      });
+
+      it("refuses to close an incentive program for a signer that is not the issuing authority", async () => {
+        const name = random();
+        const {
+          pubkeys: { incentiveEscrowProgram },
+        } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: new BN(10), // already in the past
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accountsPartial({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        const stranger = Keypair.generate();
+        await expect(
+          memProgram.methods
+            .closeIncentiveProgramV0()
+            .accountsPartial({
+              issuingAuthority: stranger.publicKey,
+              carrier,
+              incentiveEscrowProgram,
+              rentRefund: me,
+            })
+            .signers([stranger])
+            .rpc()
+        ).to.be.rejectedWith(/ConstraintHasOne/);
+
+        expect(await provider.connection.getAccountInfo(incentiveEscrowProgram!))
+          .to.not.be.null;
+      });
+
+      it("refuses to close an incentive program that has not ended", async () => {
+        const name = random();
+        const future = new BN(Math.floor(Date.now() / 1000) + 86400);
+        const {
+          pubkeys: { incentiveEscrowProgram },
+        } = await memProgram.methods
+          .initializeIncentiveProgramV0({
+            metadataUrl: null,
+            name,
+            startTs: new BN(5),
+            stopTs: future,
+            shares: 100,
+          })
+          .preInstructions([
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+          ])
+          .accountsPartial({
+            carrier,
+            recipient: me,
+            keyToAsset: keyToAssetKey(dao, name, "utf-8")[0],
+          })
+          .rpcAndKeys({ skipPreflight: true });
+
+        await expect(
+          memProgram.methods
+            .closeIncentiveProgramV0()
+            .accountsPartial({ carrier, incentiveEscrowProgram, rentRefund: me })
+            .rpc()
+        ).to.be.rejectedWith(/IncentiveProgramNotEnded/);
+
+        expect(await provider.connection.getAccountInfo(incentiveEscrowProgram!))
+          .to.not.be.null;
       });
 
       it("can swap tree when it's full", async () => {

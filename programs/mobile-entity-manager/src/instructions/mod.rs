@@ -1,4 +1,6 @@
 pub mod approve_carrier_v0;
+pub mod close_carrier_v0;
+pub mod close_incentive_program_v0;
 pub mod initialize_carrier_v0;
 pub mod initialize_incentive_program_v0;
 pub mod initialize_subscriber_v0;
@@ -12,6 +14,8 @@ pub mod update_carrier_v0;
 pub mod update_incentive_program_v0;
 
 pub use approve_carrier_v0::*;
+pub use close_carrier_v0::*;
+pub use close_incentive_program_v0::*;
 pub use initialize_carrier_v0::*;
 pub use initialize_incentive_program_v0::*;
 pub use initialize_subscriber_v0::*;

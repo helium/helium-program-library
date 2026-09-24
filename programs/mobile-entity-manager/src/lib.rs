@@ -35,6 +35,14 @@ pub mod mobile_entity_manager {
     approve_carrier_v0::handler(ctx)
   }
 
+  pub fn close_carrier_v0(ctx: Context<CloseCarrierV0>) -> Result<()> {
+    close_carrier_v0::handler(ctx)
+  }
+
+  pub fn close_incentive_program_v0(ctx: Context<CloseIncentiveProgramV0>) -> Result<()> {
+    close_incentive_program_v0::handler(ctx)
+  }
+
   pub fn initialize_carrier_v0(
     ctx: Context<InitializeCarrierV0>,
     args: InitializeCarrierArgsV0,

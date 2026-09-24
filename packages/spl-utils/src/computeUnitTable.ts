@@ -329,6 +329,10 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:ddec50737de071a8": 182270,
   // mobile_entity_manager.update_incentive_program_v0 (n=1, med=3320, max=3320) [localnet]
   "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:c9012eb54fbf43f4": 3320,
+  // mobile_entity_manager.close_incentive_program_v0 (n=1, med=3414, max=3414) [localnet]
+  "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:6dfc7a8d96457ba9": 3414,
+  // mobile_entity_manager.close_carrier_v0 (n=1, med=18642, max=18642) [localnet]
+  "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:df262bb30be50e09": 18642,
   // hexboosting.close_boost_v1 (n=1, med=3130, max=3130) [localnet]
   "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ:dc96b2aac596d965": 3130,
   // dc_auto_top.close_auto_top_off_v0 (n=1, med=106264, max=106264)

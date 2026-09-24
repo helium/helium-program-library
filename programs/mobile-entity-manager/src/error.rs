@@ -10,4 +10,8 @@ pub enum ErrorCode {
   TreeNotFull,
   #[msg("Incentive escrow fund bps cannot be greater than 100%")]
   InvalidIncentiveEscrowFundBps,
+  #[msg("The carrier must be revoked before it can be closed")]
+  CarrierApproved,
+  #[msg("The incentive program has not ended")]
+  IncentiveProgramNotEnded,
 }
