@@ -42,6 +42,8 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:e10f950c9015525e": 17431,
   // tuktuk_dca.check_repay_v0 (n=4, med=44115, max=44115) [localnet]
   "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:98c73c1c865777ea": 44115,
+  // tuktuk_dca.swap_v0 (n=10, med=14523, max=14523) [localnet]
+  "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:40bf7037e883ce31": 14523,
   // circuit_breaker.update_mint_windowed_breaker_v0 (n=1, med=2118, max=2118) [localnet]
   "circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g:fa7a4d3065fef3a8": 2118,
   // circuit_breaker.remove_mint_authority_v0 (n=1, med=8245, max=8245) [localnet]

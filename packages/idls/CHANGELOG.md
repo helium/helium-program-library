@@ -1,5 +1,23 @@
 # Change Log
 
+## 0.11.32
+
+### Patch Changes
+
+- [#1332](https://github.com/helium/helium-program-library/pull/1332) [`d5f9a16`](https://github.com/helium/helium-program-library/commit/d5f9a167e99ee6797c31e0b91359d7993cb06305) Thanks [@madninja](https://github.com/madninja)! - Run a DCA's swap through tuktuk-dca rather than as an instruction `run_task_v0` invokes directly. `run_task_v0` reads the return data slot after each instruction it invokes and, when the program it invoked is the one that set it, requires the bytes to be a `RunTaskReturnV0`; a Jupiter route sets its own eight-byte out-amount, so a route invoked directly fails the run with `BorshIoError` after the swap has already executed. The new `swap_v0` CPIs a callee pinned by address, which makes the swap program a child whose return data `run_task_v0` ignores, leaving `check_repay_v0` as the only return the run makes. Adds the `swap_v0` instruction.
+
+## 0.11.31
+
+### Patch Changes
+
+- [#1328](https://github.com/helium/helium-program-library/pull/1328) [`5c26876`](https://github.com/helium/helium-program-library/commit/5c2687630c4dcd0e926b8aca82b30b3cc4daca80) Thanks [@madninja](https://github.com/madninja)! - Reject trailing instructions re-labelled as signer seeds in lazy-transactions `execute_transaction_v0`. Every caller-supplied signer seed set must derive an address the transaction actually uses, and seeds that do not derive a program address are a typed error rather than a panic. Adds the `InvalidSignerSeeds` and `UnusedSignerSeeds` error codes.
+
+## 0.11.30
+
+### Patch Changes
+
+- [#1323](https://github.com/helium/helium-program-library/pull/1323) [`74910dc`](https://github.com/helium/helium-program-library/commit/74910dcea4a8991b64479fa6c8f8181064b525c5) Thanks [@madninja](https://github.com/madninja)! - Bind the lazy-distributor RemoteV0 reward path to the running task and the signed reward. `set_current_rewards_v1` recomputes the tuktuk verification hash over the running task, its `queued_at`, and `run_task_v0`'s account list and requires it to equal the oracle-signed hash, then requires the signed transaction to carry an instruction ending in this call's `(oracle_index, current_rewards)`. A signature issued for another task, run over other accounts, or paired with a different amount is rejected. Adds the `RemoteTaskHashMismatch` and `RemoteRewardNotSigned` error codes.
+
 ## 0.11.29
 
 ### Patch Changes

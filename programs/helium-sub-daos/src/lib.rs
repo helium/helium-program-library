@@ -4,6 +4,19 @@ use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("hdaoVTCqhfHHo75XdAMxBKdUqvq1i5bF23sisBqVgGR");
 
+// A TESTING build substitutes test values for production ones, so it must never be
+// mistaken for a deployable program on any cluster. TESTING on its own can arrive from an
+// inherited environment; HELIUM_TEST_BUILD is set only by a build that means to be a test
+// build. A deployable program refuses to compile when the two disagree.
+#[cfg(all(not(feature = "no-entrypoint"), not(feature = "idl-build"), not(test)))]
+const _: () = {
+  if option_env!("TESTING").is_some() && option_env!("HELIUM_TEST_BUILD").is_none() {
+    panic!(
+      "TESTING is set without HELIUM_TEST_BUILD; a deployable program must not use test values. A deliberate test build sets both."
+    );
+  }
+};
+
 pub mod backstop;
 pub mod create_account;
 pub mod error;

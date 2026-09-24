@@ -19,6 +19,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
 import { dcaTaskBindingError } from "./binding";
+import { wrapRoute } from "./wrap";
 import {
   DCA_SIGNER,
   JUPITER_API_KEY,
@@ -276,8 +277,17 @@ server.post<{
       .accounts({ dca })
       .instruction();
 
-    // Combine all instructions: lend, Jupiter swap, check repay
-    const instructions = [lendIx, ...jupiterInstructions, checkRepayIx];
+    // Jupiter's route sets return data. `run_task_v0` reads the return data slot after each
+    // instruction it invokes and, when the program it invoked is the one that set it, requires
+    // the bytes to be a `RunTaskReturnV0` -- so a route invoked directly fails the whole run.
+    // Routed through `swap_v0` the route is a child of tuktuk-dca, whose return data is ignored,
+    // and `check_repay_v0` remains the only return the run makes.
+    const wrappedInstructions = await wrapRoute(
+      dcaProgram,
+      dca,
+      jupiterInstructions
+    );
+    const instructions = [lendIx, ...wrappedInstructions, checkRepayIx];
 
     // Compile transaction
     const { transaction, remainingAccounts } = await compileTransaction(

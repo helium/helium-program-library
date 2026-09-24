@@ -12,14 +12,21 @@ import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
 import {
   createTransferInstruction,
   getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
+import {
+  ComputeBudgetProgram,
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { TuktukDca } from "../../target/types/tuktuk_dca";
 import { sendInstructions } from "@helium/spl-utils";
 import { dcaTaskBindingError } from "../../packages/tuktuk-dca-service/src/binding";
+import { wrapRoute } from "../../packages/tuktuk-dca-service/src/wrap";
 
 // tuktuk-dca pins the remote task's signer and url. A TESTING build pins them to these,
 // so every suite that creates a DCA uses this keypair and serves from this url.
@@ -64,6 +71,15 @@ let repayBps = 10000;
 
 export function setDcaServerRepayBps(bps: number) {
   repayBps = bps;
+}
+
+// Whether the running server leaves `lend_v0` and `check_repay_v0` out of the run, so the swap
+// runs on its own. swap_v0's own LendNotCalled guard is only reachable that way: with
+// check_repay_v0 in the run, check_repay_v0's guard fires first and masks it.
+let skipLend = false;
+
+export function setDcaServerSkipLend(skip: boolean) {
+  skipLend = skip;
 }
 
 export interface DcaServerConfig {
@@ -196,12 +212,35 @@ export async function createDcaServer(
         expectedOutput.toNumber()
       );
 
+      // `GetAccountDataSize` (token instruction 21) sets return data: eight little-endian bytes,
+      // the same shape as the out-amount a Jupiter route returns. It stands in for a swap program
+      // that returns a value of its own, which is the case `swap_v0` exists to contain.
+      const returnsDataIx = new TransactionInstruction({
+        programId: TOKEN_PROGRAM_ID,
+        keys: [{ pubkey: outputMint, isSigner: false, isWritable: false }],
+        data: Buffer.from([21]),
+      });
+
+
       const checkRepayIx = await program.methods
         .checkRepayV0({})
         .accounts({ dca })
         .instruction();
 
-      const instructions = [lendIx, outputTransferIx, checkRepayIx];
+      // Built with the service's own `wrapRoute`, so this suite exercises the same pin-and-wrap
+      // path the service runs rather than a copy of it. Both run through `swap_v0`, making the
+      // token program a child of tuktuk-dca: return data a child set is ignored, where invoked
+      // directly those eight bytes are read as a `RunTaskReturnV0` and fail the whole run.
+      const instructions = skipLend
+        ? await wrapRoute(program, dca, [returnsDataIx])
+        : [
+            lendIx,
+            ...(await wrapRoute(program, dca, [
+              outputTransferIx,
+              returnsDataIx,
+            ])),
+            checkRepayIx,
+          ];
 
       const { transaction, remainingAccounts } = await compileTransaction(
         instructions,
@@ -270,7 +309,8 @@ export async function runAllTasks(
     }
   }
 
-  // Execute all tasks
+  // Execute all tasks, returning each run's signature so a caller can read its logs.
+  const signatures: string[] = [];
   for (const taskId of taskIds) {
     const task = taskKey(taskQueue, taskId)[0];
     const taskAcc = await tuktukProgram.account.taskV0.fetch(task);
@@ -288,16 +328,19 @@ export async function runAllTasks(
       task,
       crankTurner: crankTurner.publicKey,
     });
-    await sendInstructions(
-      provider,
-      [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-        ...runTaskIxs,
-      ],
-      [crankTurner],
-      crankTurner.publicKey
+    signatures.push(
+      await sendInstructions(
+        provider,
+        [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+          ...runTaskIxs,
+        ],
+        [crankTurner],
+        crankTurner.publicKey
+      )
     );
   }
+  return signatures;
 }
 
 export { calculateExpectedOutput };

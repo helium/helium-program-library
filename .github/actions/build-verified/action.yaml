@@ -6,7 +6,7 @@ inputs:
     required: false
     default: "false"
   testing:
-    description: "Whether to use devnet feature"
+    description: "Refused. A verified build cannot carry test values; see the build step."
     required: false
     default: "false"
   program:
@@ -43,7 +43,19 @@ runs:
     - run: cargo install solana-verify --version 0.5.0 --locked --force
       if: steps.cache-solana-verify.outputs.cache-hit != 'true'
       shell: bash
-    - run: ${{ inputs.testing == 'true' && 'TESTING=true' || '' }} ~/.cargo/bin/solana-verify build --library-name $PROGRAM ${{ inputs.devnet == 'true' && '-- --features devnet' || '' }}
+    # A verified build cannot be a test build: solana-verify compiles inside a container
+    # that receives neither TESTING nor HELIUM_TEST_BUILD, so the binary would carry
+    # production values under a test label.
+    - run: |
+        if [ "$TESTING_BUILD" = "true" ]; then
+          echo "::error::solana-verify builds in a container that does not receive TESTING, so a verified test build is not possible"
+          exit 1
+        fi
+        ARGS=()
+        if [ "$DEVNET" = "true" ]; then ARGS+=(-- --features devnet); fi
+        ~/.cargo/bin/solana-verify build --library-name "$PROGRAM" "${ARGS[@]}"
       shell: bash
       env:
+        DEVNET: ${{ inputs.devnet }}
+        TESTING_BUILD: ${{ inputs.testing }}
         PROGRAM: ${{ inputs.program }}

@@ -697,7 +697,7 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -713,7 +713,7 @@ dependencies = [
 
 [[package]]
 name = "dc-auto-top"
-version = "0.0.16"
+version = "0.0.17"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -905,7 +905,7 @@ dependencies = [
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.3.11"
+version = "0.3.12"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -928,7 +928,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.50"
+version = "0.2.51"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "hexboosting"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1093,7 +1093,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.3.10"
+version = "0.3.11"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-transactions"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3277,7 +3277,7 @@ dependencies = [
 
 [[package]]
 name = "tuktuk-dca"
-version = "0.0.7"
+version = "0.0.9"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3357,7 +3357,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
