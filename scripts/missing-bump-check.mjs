@@ -182,6 +182,21 @@ export const showFile = (head, file) => {
   }
 };
 
+/**
+ * The literal `version = "x.y.z"` in `name`'s `Cargo.toml`. A tag names that
+ * version, so a manifest without one (`version.workspace = true`) is an error
+ * rather than a program with no version.
+ */
+export const packageVersion = (name, cargo) => {
+  const match = cargo.match(PACKAGE_VERSION);
+  if (!match) {
+    throw new Error(
+      `programs/${name}/Cargo.toml has no literal version = "x.y.z"`,
+    );
+  }
+  return match[1];
+};
+
 /** The versions `name`'s `program-<name>-<x.y.z>` tags in `tags` name. */
 export const taggedVersions = (name, tags) =>
   tags
@@ -204,7 +219,7 @@ export const readPrograms = (head, skipped) =>
     .map((name) => {
       const cargo = showFile(head, `programs/${name}/Cargo.toml`);
       if (!cargo) return null;
-      const version = cargo.match(PACKAGE_VERSION)[1];
+      const version = packageVersion(name, cargo);
       const tags = taggedVersions(
         name,
         git("tag", "-l", `program-${name}-*`).split("\n"),
