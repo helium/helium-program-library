@@ -256,6 +256,10 @@ runs:
         max_attempts: 50
         shell: bash
         command: |
+          if [ "$(solana program show "$BUFFER" --url "$NETWORK" --output json | jq -r '.authority')" = "$AUTHORITY" ]; then
+            echo "Buffer authority is already $AUTHORITY"
+            exit 0
+          fi
           echo "Transferring buffer authority for $BUFFER to $AUTHORITY"
           solana program set-buffer-authority "$BUFFER" \
             --keypair ./deploy-keypair.json \

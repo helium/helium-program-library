@@ -11,9 +11,6 @@ describe("helium-sub-daos", () => {
   describe("with dao and subdao", () => {
     useDaoAndSubDaoWorld(ctx);
 
-    describeVehntCases(ctx, [
-      "Case 4 (Cliff 100 4 years)",
-      "Case 5 (Constant 100 4 years)",
-    ]);
+    describeVehntCases(ctx, "cases-4-5");
   });
 });

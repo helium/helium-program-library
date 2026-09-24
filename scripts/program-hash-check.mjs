@@ -2,7 +2,7 @@
  * Compare each program's on-chain hash with its release hashes.
  *
  * A read-only witness, run on a schedule. It takes no action: it reports
- * deployed, pending, rolled back, unknown binary, or error (a failed lookup) per program,
+ * deployed, pending, rolled back, unknown binary, error (a failed lookup), or skipped per program,
  * and prints one JSON object for the workflow to turn into a run summary and annotations.
  *
  * A program whose releases carry no `<name>.so.sha256` asset is skipped, not
