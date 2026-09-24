@@ -4,7 +4,11 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { missingBumpCheck, taggedVersions } from "./missing-bump-check.mjs";
+import {
+  missingBumpCheck,
+  packageVersion,
+  taggedVersions,
+} from "./missing-bump-check.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -233,5 +237,20 @@ test("only exact program-<name>-<x.y.z> tags of the program name its versions", 
       "",
     ]),
     ["0.1.0"],
+  );
+});
+
+test("the package version is the literal version, and a workspace-inherited one throws by name", () => {
+  assert.equal(
+    packageVersion("fanout", '[package]\nname = "fanout"\nversion = "0.1.3"\n'),
+    "0.1.3",
+  );
+  assert.throws(
+    () =>
+      packageVersion(
+        "fanout",
+        '[package]\nname = "fanout"\nversion.workspace = true\n',
+      ),
+    /programs\/fanout\/Cargo.toml has no literal version/,
   );
 });
