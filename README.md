@@ -313,16 +313,18 @@ Mainnet program upgrades go through Squads (multisig) — this repo only builds 
 3. [`release-program.yaml`](.github/workflows/release-program.yaml) runs:
    - builds the IDL with `anchor idl build`,
    - runs a **verifiable** Solana build (`solana-verify`) so the on-chain hash is reproducible,
-   - publishes the GitHub release with the IDL and the release hash, only after that build succeeds,
+   - publishes the GitHub release with the IDL and the release hash, only after that build succeeds, from a job that runs no build scripts,
    - deploys the `.so` and IDL to a buffer account owned by the multisig vault,
    - opens a Squads proposal to upgrade the program to the new buffer.
 4. Sign and execute the Squads proposal.
 
-The deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key.
+A re-run skips a program only when both its on-chain hash and its on-chain IDL match the build. An IDL-only change upgrades the program to the same bytes and sets the new IDL. A pending proposal stops the run only when it names the same program buffer and its IDL buffer holds the build IDL.
+
+In the release workflow, the deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key. The weekly sweep also holds the key.
 
 A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. A runner that dies there leaves the buffers with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
 
-[`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) runs each day and compares each program's on-chain hash with its release hashes. Each program reads as deployed, pending, unknown binary, rolled back, or error when a lookup fails. A pending program gets a warning when its newest tag is more than 3 days old. An unknown binary, a rollback, or a lookup error fails the run. To quiet a rejected proposal, delete that release's `.so.sha256` asset.
+[`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) runs each day and compares each program's on-chain hash with its release hashes. Each program reads as deployed, pending, unknown binary, rolled back, or error when a lookup fails. A program with no `.so.sha256` release asset is skipped and named in the summary. A pending program gets a warning when its newest tag is more than 3 days old. An unknown binary, a rollback, or a lookup error fails the run. To quiet a rejected proposal, delete that release's `.so.sha256` asset.
 
 **`helium-admin close-buffers`: run it only when no upgrade proposal is pending.**
 

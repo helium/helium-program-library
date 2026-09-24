@@ -12,14 +12,16 @@ on:
 permissions:
   contents: read
 
-# The deployer key reaches two jobs only, `buffers` and `propose`, and neither installs the
-# workspace. `@sqds/multisig` runs in `plan` and `wait`, which hold no key and no write token.
+# In this workflow the deployer key reaches `buffers` and `propose` only, and neither installs
+# the workspace. The key is a repository secret, so this holds for this file alone: the sweep
+# workflow holds it too. `@sqds/multisig` runs in `plan` and `wait`, which hold no key and no
+# write token.
 jobs:
   build:
     runs-on: ubuntu-latest
-    # The release uploads need `contents: write`.
+    # The build runs crate build scripts, so it holds no write token. `release` uploads.
     permissions:
-      contents: write
+      contents: read
     timeout-minutes: 120
     outputs:
       program: ${{ steps.tag.outputs.PROGRAM }}
@@ -27,6 +29,7 @@ jobs:
       program-id: ${{ steps.tag.outputs.PROGRAM_ID }}
       program-name: ${{ steps.tag.outputs.PROGRAM_NAME }}
       artifact-sha256: ${{ steps.hash.outputs.artifact-sha256 }}
+      release-hash: ${{ steps.hash.outputs.release-hash }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -34,8 +37,6 @@ jobs:
           # The master ancestry guard in "Set tag information" needs `origin/master` and the
           # history between it and the tag.
           fetch-depth: 0
-          # This job has `contents: write`. The uploads pass their token themselves, so the
-          # checkout keeps none in `.git/config`.
           persist-credentials: false
 
       # This job decides the released bytes, so it installs its CLIs fresh, not from a cache
@@ -113,33 +114,21 @@ jobs:
           cache: false
           setup-anchor: false
 
-      # The release hash. The scheduled hash check compares the on-chain program with it. The
-      # release carries it before `plan-deploy`, so a run that the hash-match skip stops still has it.
+      # The release hash. The scheduled hash check compares the on-chain program with it.
       # `artifact-sha256` covers the two files the build artifact stores, taken before `plan-deploy`.
-      - name: Write the release hash
+      - name: Take the release hash
         id: hash
         run: |
-          HASH=$(~/.cargo/bin/solana-verify get-executable-hash "target/deploy/${PROGRAM_NAME}.so")
-          echo "$HASH" > "target/deploy/${PROGRAM_NAME}.so.sha256"
+          HASH=$(~/.cargo/bin/solana-verify get-executable-hash "target/deploy/${PROGRAM_NAME}.so" | tail -n 1)
           echo "Release hash: $HASH"
+          echo "release-hash=${HASH}" >> "$GITHUB_OUTPUT"
           ARTIFACT_SHA256=$(sha256sum "target/deploy/${PROGRAM_NAME}.so" "target/idl/${PROGRAM_NAME}.json" | sha256sum | cut -d' ' -f1)
           echo "Artifact hash: $ARTIFACT_SHA256"
           echo "artifact-sha256=${ARTIFACT_SHA256}" >> "$GITHUB_OUTPUT"
 
-      # The release is made only after the verified build and its hash, so a failed build leaves
-      # no release. A re-run replaces the assets.
-      - name: Publish the release
-        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
-        with:
-          files: |
-            target/idl/${{ env.PROGRAM_NAME }}.json
-            target/deploy/${{ env.PROGRAM_NAME }}.so.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # The `plan` and `buffers` jobs take the build from this artifact. `plan` runs workspace
-      # JavaScript, and that code can replace the artifact, so `buffers` checks it against the
-      # hash taken here.
+      # The `release`, `plan` and `buffers` jobs take the build from this artifact. `plan` runs
+      # workspace JavaScript, and that code can replace the artifact, so `buffers` checks it
+      # against the hash taken here.
       - name: Store the build
         uses: actions/upload-artifact@v4
         with:
@@ -148,10 +137,52 @@ jobs:
             ./target/deploy/${{ env.PROGRAM_NAME }}.so
             ./target/idl/${{ env.PROGRAM_NAME }}.json
 
+  # The only job with `contents: write`. It runs no checkout and no project code: it uploads
+  # the IDL from the build artifact and the release hash from the build job's output.
+  # `plan` waits for it, so a run that the hash-match skip stops still has the release hash.
+  # A failed build leaves no release. A re-run replaces the assets.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 15
+    steps:
+      - name: Download the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build
+          path: ./target/
+      - name: Check the build and write the release hash
+        env:
+          PROGRAM_NAME: ${{ needs.build.outputs.program-name }}
+          EXPECTED: ${{ needs.build.outputs.artifact-sha256 }}
+          RELEASE_HASH: ${{ needs.build.outputs.release-hash }}
+        # The file names are part of the hashed text, so they are spelled as in the build job.
+        run: |
+          ACTUAL=$(sha256sum "target/deploy/${PROGRAM_NAME}.so" "target/idl/${PROGRAM_NAME}.json" | sha256sum | cut -d' ' -f1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::build artifact hash ${ACTUAL} does not match '${EXPECTED}' from the build job"
+            exit 1
+          fi
+          if [[ ! "$RELEASE_HASH" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::release hash '${RELEASE_HASH}' from the build job is not a sha256"
+            exit 1
+          fi
+          echo "$RELEASE_HASH" > "target/deploy/${PROGRAM_NAME}.so.sha256"
+      - name: Publish the release
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        with:
+          files: |
+            target/idl/${{ needs.build.outputs.program-name }}.json
+            target/deploy/${{ needs.build.outputs.program-name }}.so.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # `plan-deploy` installs and runs workspace JavaScript, so it runs apart from the release
   # upload's write token.
   plan:
-    needs: build
+    needs: [build, release]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -271,6 +302,12 @@ jobs:
         with:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      # The pending proposal read compares IDL buffers with the build IDL.
+      - name: Download the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build
+          path: ./target/
 
       # The read in `plan-deploy` ran before the wait, so a run that finished during it is
       # missing from that list. Read the older proposals again now that earlier runs are done.
@@ -284,6 +321,7 @@ jobs:
           program-id: ${{ needs.build.outputs.program-id }}
           multisig: ${{ secrets.MULTISIG }}
           spill: ${{ secrets.DEPLOYER_ADDRESS }}
+          idl: ./target/idl/${{ needs.build.outputs.program-name }}.json
           buffer: ${{ needs.buffers.outputs.buffer }}
 
   propose:

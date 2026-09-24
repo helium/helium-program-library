@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { deflateSync } from "node:zlib";
 
 import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
@@ -373,4 +374,70 @@ test("an Upgrade with the buffer and program but another ProgramData makes the p
       [163, PENDING_BUFFER, true],
     ],
   );
+});
+
+// An IDL account as Anchor stores it: discriminator, authority, u32 LE length,
+// zlib-compressed JSON.
+const idlAccountData = (idl) => {
+  const compressed = deflateSync(Buffer.from(JSON.stringify(idl)));
+  const length = Buffer.alloc(4);
+  length.writeUInt32LE(compressed.length);
+  return Buffer.concat([Buffer.alloc(8 + 32), length, compressed]);
+};
+const BUILD_IDL = {
+  address: LAZY_TRANSACTIONS,
+  metadata: { version: "0.2.2" },
+};
+// The IDL buffer the recorded SetBuffer at index 163 names: its account 0.
+const recordedIdlBuffer = (() => {
+  const { accountKeys, instructions } = recordedTransaction.message;
+  const setBuffer = instructions.find((ix) =>
+    Buffer.from(ix.data).subarray(0, 8).equals(IDL_IX_TAG),
+  );
+  return accountKeys[setBuffer.accountIndexes[0]].toBase58();
+})();
+const readWithIdl = (idlBufferData) =>
+  pendingUpgrades({
+    getMultipleAccountsInfo: async (keys) =>
+      (await getMultipleAccountsInfo(keys)).map((account, i) =>
+        keys[i].toBase58() === recordedIdlBuffer && idlBufferData
+          ? { data: idlBufferData }
+          : account,
+      ),
+    multisigPda,
+    programId: new PublicKey(LAZY_TRANSACTIONS),
+    spill: SPILL,
+    idl: BUILD_IDL,
+  });
+
+test("a same-buffer proposal whose IDL buffer holds the build IDL stops the run", async () => {
+  // Key order does not matter.
+  const pending = await readWithIdl(
+    idlAccountData({
+      metadata: { version: "0.2.2" },
+      address: LAZY_TRANSACTIONS,
+    }),
+  );
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: 163,
+    older: [],
+  });
+});
+
+test("a same-buffer proposal whose IDL buffer holds another IDL is an older one", async () => {
+  const pending = await readWithIdl(
+    idlAccountData({ ...BUILD_IDL, metadata: { version: "0.2.1" } }),
+  );
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: null,
+    older: [163],
+  });
+});
+
+test("a same-buffer proposal whose IDL buffer is gone is an older one", async () => {
+  const pending = await readWithIdl(null);
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: null,
+    older: [163],
+  });
 });

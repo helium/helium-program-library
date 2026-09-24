@@ -20,6 +20,9 @@ inputs:
   spill:
     description: "The spill address the Squads step passes"
     required: true
+  idl:
+    description: "The build IDL file. A pending proposal whose IDL buffer holds another IDL does not stop the run"
+    required: true
   buffer:
     description: "The buffer this run proposes. Empty when there is none yet"
     required: false
@@ -43,7 +46,7 @@ runs:
       id: read
       shell: bash
       run: |
-        ARGS=(--multisig "$MULTISIG" --program-id "$PROGRAM_ID" --spill "$SPILL")
+        ARGS=(--multisig "$MULTISIG" --program-id "$PROGRAM_ID" --spill "$SPILL" --idl "$IDL")
         if [ -n "$BUFFER" ]; then ARGS+=(--buffer "$BUFFER"); fi
         RESULT=$(SOLANA_URL="$NETWORK" node scripts/pending-upgrade-proposals.mjs "${ARGS[@]}")
         echo "$RESULT"
@@ -53,7 +56,7 @@ runs:
         echo "same=$SAME" >> "$GITHUB_OUTPUT"
         if [ -n "$SAME" ]; then
           echo "skip=true" >> "$GITHUB_OUTPUT"
-          echo "- \`$PROGRAM\`: pending proposal $SAME already names buffer \`$BUFFER\`. Stopped: no new proposal." >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`$PROGRAM\`: pending proposal $SAME already names buffer \`$BUFFER\` and the build IDL. Stopped: no new proposal." >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
         echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -63,5 +66,6 @@ runs:
         PROGRAM_ID: ${{ inputs.program-id }}
         MULTISIG: ${{ inputs.multisig }}
         SPILL: ${{ inputs.spill }}
+        IDL: ${{ inputs.idl }}
         BUFFER: ${{ inputs.buffer }}
         NETWORK: ${{ inputs.network }}

@@ -1,8 +1,10 @@
 # The deploy re-run rules, in front of `deploy-buffers`. All three deploy workflows call
 # this action, so devnet and mainnet follow the same rules:
-# - the on-chain program already matches the build: stop, write nothing;
+# - the on-chain program and IDL already match the build: stop, write nothing. A program
+#   that matches with an IDL that does not goes on: the proposal upgrades it to the same
+#   bytes and sets the new IDL;
 # - the vault already owns a buffer with the build's bytes: reuse it;
-# - a pending proposal already names the reused buffer: stop;
+# - a pending proposal already names the reused buffer and the build IDL: stop;
 # - an older pending proposal for the program: go on and report its index.
 # Every compare is against ./target/deploy/<program>.so as the caller built it, so a
 # `devnet` feature build compares like any other.
@@ -13,7 +15,8 @@
 # A stop is a success. The caller skips `deploy-buffers` and its Squads step on
 # `outputs.skip == 'true'`, because a skipped run has no buffers to pass.
 #
-# The caller installs the Solana CLI first (`setup-anchor` does it).
+# The caller installs the Solana CLI first (`setup-anchor` does it), and has the build IDL at
+# ./target/idl/<program>.json.
 name: "Plan Deploy"
 description: "Decides whether a deploy writes buffers, reuses a vault buffer, or stops"
 inputs:
@@ -64,7 +67,7 @@ runs:
       with:
         cache: ${{ inputs.cache }}
 
-    - name: Skip when the on-chain program matches the build
+    - name: Skip when the on-chain program and IDL match the build
       id: hash-match
       shell: bash
       run: |
@@ -89,12 +92,34 @@ runs:
           NOTE=" This is a devnet build. Do not compare its hash with a mainnet hash or with the committed source."
         fi
 
-        if [ "$ONCHAIN_HASH" = "$BUILD_HASH" ]; then
-          echo "skip=true" >> "$GITHUB_OUTPUT"
-          echo "- \`$PROGRAM\`: the on-chain program already has the build hash \`$BUILD_HASH\`. Skipped: no buffer, no proposal.$NOTE" >> "$GITHUB_STEP_SUMMARY"
-        else
+        if [ "$ONCHAIN_HASH" != "$BUILD_HASH" ]; then
           echo "skip=false" >> "$GITHUB_OUTPUT"
           echo "- \`$PROGRAM\`: build hash \`$BUILD_HASH\`, on-chain hash \`$ONCHAIN_HASH\`.$NOTE" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        # The same bytes can ship a new IDL: the Squads step always proposes a program upgrade
+        # with the IDL, so an IDL-only change re-upgrades to the bytes the program already has.
+        IDL_BASE=$(solana find-program-derived-address "$PROGRAM_ID")
+        IDL_ADDRESS=$(solana create-address-with-seed anchor:idl "$PROGRAM_ID" --from "$IDL_BASE")
+        set +e
+        IDL_OUT=$(SOLANA_URL="$NETWORK" node scripts/idl-account.mjs --address "$IDL_ADDRESS" --idl "./target/idl/$PROGRAM.json" 2>&1)
+        EXIT_CODE=$?
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          echo "$IDL_OUT"
+          echo "::error::Could not read the on-chain IDL of $PROGRAM_ID at $IDL_ADDRESS"
+          exit 1
+        fi
+        # A parse failure must stop the run, not read as a match.
+        IDL_MATCH=$(echo "$IDL_OUT" | jq -er '.match')
+
+        if [ "$IDL_MATCH" = "true" ]; then
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          echo "- \`$PROGRAM\`: the on-chain program already has the build hash \`$BUILD_HASH\` and the build IDL. Skipped: no buffer, no proposal.$NOTE" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "- \`$PROGRAM\`: the on-chain program already has the build hash \`$BUILD_HASH\`, but its IDL differs from the build. The proposal upgrades to the same bytes and sets the new IDL.$NOTE" >> "$GITHUB_STEP_SUMMARY"
         fi
       env:
         DEVNET: ${{ inputs.devnet }}
@@ -167,6 +192,7 @@ runs:
         program-id: ${{ inputs.program-id }}
         multisig: ${{ inputs.multisig }}
         spill: ${{ inputs.spill }}
+        idl: ./target/idl/${{ inputs.program }}.json
         buffer: ${{ steps.reuse.outputs.buffer }}
 
     - name: Report older pending proposals
