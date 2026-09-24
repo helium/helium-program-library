@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anchor-lang = "0.31.2"
-anchor-client = "0.31.0"
+anchor-client = "0.31.2"
 clap = { version = "4", features = ["derive"]}
 reqwest = "0"
 serde = { version = "*", features = ["derive"] }
