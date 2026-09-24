@@ -19,8 +19,28 @@ runs:
           path: |
             ~/.cache/solana/
             ~/.local/share/solana/
-          key: solana-${{ runner.os }}-v0000-${{ env.SOLANA_CLI_VERSION || inputs.solana_cli_version }}
-      - run: sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_CLI_VERSION}/install)"
+          key: solana-${{ runner.os }}-v0001-${{ env.SOLANA_CLI_VERSION || inputs.solana_cli_version }}
+      # The release tarball is checked against a pinned sha256 before it runs, so a changed
+      # download cannot reach a job that holds the deployer key. A new version needs its hash
+      # added here: the same file from release.anza.xyz and the GitHub release must agree.
+      - name: Install the Solana CLI
+        run: |
+          set -euo pipefail
+          case "$SOLANA_CLI_VERSION" in
+            2.1.6) SHA256=f8a380288a36554d3e8489f158fec08cfae750e54411bfbe86b172db930078c7 ;;
+            *)
+              echo "::error::No pinned sha256 for Solana CLI ${SOLANA_CLI_VERSION}. Add it to .github/actions/setup-solana/action.yaml."
+              exit 1
+              ;;
+          esac
+          TARBALL=$(mktemp)
+          curl -sSfL -o "$TARBALL" "https://release.anza.xyz/v${SOLANA_CLI_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          echo "${SHA256}  ${TARBALL}" | sha256sum -c -
+          RELEASE_DIR="$HOME/.local/share/solana/install/releases/${SOLANA_CLI_VERSION}"
+          mkdir -p "$RELEASE_DIR"
+          tar -xjf "$TARBALL" -C "$RELEASE_DIR"
+          rm -f "$TARBALL"
+          ln -sfn "${RELEASE_DIR}/solana-release" "$HOME/.local/share/solana/install/active_release"
         shell: bash
         env:
           SOLANA_CLI_VERSION: ${{ env.SOLANA_CLI_VERSION || inputs.solana_cli_version }}

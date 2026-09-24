@@ -10,6 +10,10 @@ inputs:
     description: "The solana-verify version"
     required: false
     default: "0.5.0"
+  cache:
+    description: "Restore and save the solana-verify cache"
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
@@ -17,6 +21,7 @@ runs:
     - uses: actions/cache@v4
       name: Cache Solana Verify
       id: cache-solana-verify
+      if: inputs.cache == 'true'
       with:
         path: |
           ~/.cargo/bin/solana-verify

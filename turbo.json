@@ -11,6 +11,12 @@
       "outputs": ["lib/**", "dist/**", ".next/**", "!.next/cache/**"],
       "cache": true
     },
+    "@helium/idls#build": {
+      "dependsOn": ["prebuild", "^build"],
+      "outputs": ["lib/**"],
+      "cache": true,
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/target/types/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

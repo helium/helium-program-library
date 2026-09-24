@@ -27,20 +27,6 @@ const run = (command, args) =>
 
 const git = (...args) => run("git", args);
 
-/**
- * The later of two commits: `b` when `a` is its ancestor, else `a`. A
- * `skipped.json` SHA that is not a descendant of the tag (a rewritten branch,
- * a hand edit) leaves the base on the tag, which is the stricter answer.
- */
-const laterOf = (a, b) => {
-  try {
-    git("merge-base", "--is-ancestor", a, b);
-    return b;
-  } catch {
-    return a;
-  }
-};
-
 // The programs with no base to diff from ask `changedProgramsForBases` for a
 // ref that has no files, so one call answers for the candidates alone.
 const NO_BASE = Symbol("no base");
@@ -64,45 +50,49 @@ const markingFiles = ({ crateDirs }, { name, via }, files) =>
  * - `bumped`: no tag for the current version. The next tag bot run tags it.
  * - `clean`: the current version is tagged and nothing has changed since.
  * - `missing-bump`: the current version is tagged and the source moved. Fails.
+ *   A program with a `skipped.json` SHA fails only when its source moved since
+ *   the tag and also since that SHA.
  *
  * @param {{
  *   metadata: object,
  *   programs: { name: string, version: string, tags: string[], tagCommit?: string, skippedSha?: string }[],
  *   changedFiles: (base: string) => string[],
- *   laterCommit?: (a: string, b: string) => string,
  * }} input `programs` carries each program's current version, the versions its
  *   `program-<name>-*` tags name, the commit of the tag for the current version
  *   and the program's `skipped.json` SHA. `changedFiles` gives the paths a base
  *   changed against HEAD.
  * @returns {{ ok: boolean, results: object[], failing: object[] }}
  */
-export const missingBumpCheck = ({
-  metadata,
-  programs,
-  changedFiles,
-  laterCommit = laterOf,
-}) => {
+export const missingBumpCheck = ({ metadata, programs, changedFiles }) => {
   const graph = buildGraph(metadata);
 
   const bases = {};
+  const skippedBases = {};
   for (const { name, version, tags, tagCommit, skippedSha } of programs) {
     if (!tags.includes(version)) continue;
-    // A `none` level reviewed the program up to the SHA in `skipped.json`, so
-    // the base moves there when that commit is the later of the two.
-    bases[name] = skippedSha ? laterCommit(tagCommit, skippedSha) : tagCommit;
+    bases[name] = tagCommit;
+    // A `none` level reviewed the program up to the SHA in `skipped.json`. Tags
+    // sit on master merge commits that develop never contains, so neither
+    // commit is reliably the later one, and a change must show against both.
+    if (skippedSha) skippedBases[name] = skippedSha;
   }
 
   const filesByBase = {};
-  for (const base of new Set(Object.values(bases))) {
+  for (const base of new Set([
+    ...Object.values(bases),
+    ...Object.values(skippedBases),
+  ])) {
     filesByBase[base] = changedFiles(base);
   }
 
-  const changed = changedProgramsForBases({
-    metadata,
-    defaultBase: NO_BASE,
-    filesByBase,
-    programBases: bases,
-  });
+  const changedFrom = (programBases) =>
+    changedProgramsForBases({
+      metadata,
+      defaultBase: NO_BASE,
+      filesByBase,
+      programBases,
+    });
+  const changedSinceTag = changedFrom(bases);
 
   const results = programs.map(({ name, version, tags }) => {
     if (!tags.length) {
@@ -119,14 +109,22 @@ export const missingBumpCheck = ({
       };
     }
     const base = bases[name];
-    const entry = changed.find((program) => program.name === name);
+    const skippedBase = skippedBases[name];
+    const tagEntry = changedSinceTag.find((program) => program.name === name);
+    // A skipped SHA clears a file only when the file has not changed since it.
+    const files = tagEntry
+      ? markingFiles(graph, tagEntry, filesByBase[base]).filter(
+          (file) => !skippedBase || filesByBase[skippedBase].includes(file),
+        )
+      : [];
+    const failing = tagEntry && (!skippedBase || files.length > 0);
     return {
       name,
       version,
-      status: entry ? "missing-bump" : "clean",
+      status: failing ? "missing-bump" : "clean",
       base,
-      via: entry?.via ?? [],
-      files: entry ? markingFiles(graph, entry, filesByBase[base]) : [],
+      via: failing ? tagEntry.via : [],
+      files: failing ? files : [],
     };
   });
 
@@ -251,8 +249,8 @@ const main = (argv) => {
     metadata,
     programs: readPrograms(head, skipped),
     changedFiles: (base) =>
-      git("diff", "--name-only", "--no-renames", base, head)
-        .split("\n")
+      git("diff", "--name-only", "-z", "--no-renames", base, head)
+        .split("\0")
         .filter(Boolean),
   });
 

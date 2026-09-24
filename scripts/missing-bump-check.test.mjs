@@ -98,31 +98,79 @@ test("a change only in a direct dependency fails the dependent", () => {
   ]);
 });
 
-test("a skipped.json SHA later than the tag moves the base", () => {
-  const asked = [];
+const PRICE_ORACLE_SKIPPED = {
+  name: "price-oracle",
+  version: "0.2.2",
+  tags: ["0.2.2"],
+  tagCommit: "price-oracle-tag",
+  skippedSha: "reviewed-sha",
+};
+
+test("a change since the tag but not since the skipped.json SHA passes", () => {
   const { ok, results } = missingBumpCheck({
     metadata,
-    programs: [
-      {
-        name: "price-oracle",
-        version: "0.2.2",
-        tags: ["0.2.2"],
-        tagCommit: "price-oracle-tag",
-        skippedSha: "reviewed-sha",
-      },
-    ],
-    laterCommit: (a, b) => {
-      asked.push([a, b]);
-      return "reviewed-sha";
-    },
+    programs: [PRICE_ORACLE_SKIPPED],
     changedFiles: (base) =>
       base === "price-oracle-tag" ? ["programs/price-oracle/src/lib.rs"] : [],
   });
 
-  assert.deepEqual(asked, [["price-oracle-tag", "reviewed-sha"]]);
   assert.equal(ok, true);
   assert.equal(results[0].status, "clean");
-  assert.equal(results[0].base, "reviewed-sha");
+});
+
+test("a change since both the tag and the skipped.json SHA fails", () => {
+  const { ok, failing } = missingBumpCheck({
+    metadata,
+    programs: [PRICE_ORACLE_SKIPPED],
+    changedFiles: (base) =>
+      ({
+        "price-oracle-tag": [
+          "programs/price-oracle/src/lib.rs",
+          "programs/price-oracle/src/state.rs",
+        ],
+        "reviewed-sha": ["programs/price-oracle/src/state.rs"],
+      })[base],
+  });
+
+  assert.equal(ok, false);
+  assert.deepEqual(failing, [
+    {
+      name: "price-oracle",
+      version: "0.2.2",
+      status: "missing-bump",
+      base: "price-oracle-tag",
+      via: [],
+      files: ["programs/price-oracle/src/state.rs"],
+    },
+  ]);
+});
+
+test("a change since the tag and a different change since the skipped.json SHA passes", () => {
+  const { ok, results } = missingBumpCheck({
+    metadata,
+    programs: [PRICE_ORACLE_SKIPPED],
+    changedFiles: (base) =>
+      ({
+        "price-oracle-tag": ["programs/price-oracle/src/lib.rs"],
+        "reviewed-sha": ["programs/price-oracle/src/state.rs"],
+      })[base],
+  });
+
+  assert.equal(ok, true);
+  assert.equal(results[0].status, "clean");
+});
+
+test("a change since the tag with no skipped.json SHA fails on the tag diff alone", () => {
+  const { ok, failing } = missingBumpCheck({
+    metadata,
+    programs: [{ ...PRICE_ORACLE_SKIPPED, skippedSha: undefined }],
+    changedFiles: (base) =>
+      base === "price-oracle-tag" ? ["programs/price-oracle/src/lib.rs"] : [],
+  });
+
+  assert.equal(ok, false);
+  assert.equal(failing[0].status, "missing-bump");
+  assert.deepEqual(failing[0].files, ["programs/price-oracle/src/lib.rs"]);
 });
 
 test("a program with no tag at all is skipped, and nothing is diffed for it", () => {

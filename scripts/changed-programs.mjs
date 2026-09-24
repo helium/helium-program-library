@@ -140,7 +140,7 @@ export const changedPrograms = ({ metadata, files }) => {
 
 /**
  * The same answer when a program has its own base ref. The missing-bump check
- * asks per program, from the later of that program's tag and its recorded skip.
+ * asks per program, once from each program's tag and once from its recorded skip.
  *
  * @param {{ metadata: object, defaultBase: string, filesByBase: Record<string, string[]>, programBases?: Record<string, string> }} input
  */
@@ -179,8 +179,8 @@ const run = (command, args) =>
   });
 
 const diffFiles = (base, head) =>
-  run("git", ["diff", "--name-only", "--no-renames", base, head])
-    .split("\n")
+  run("git", ["diff", "--name-only", "-z", "--no-renames", base, head])
+    .split("\0")
     .filter(Boolean);
 
 const parseArgs = (argv) => {

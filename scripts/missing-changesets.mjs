@@ -116,6 +116,7 @@ const addedChangesets = (base, head, dir) =>
   run("git", [
     "diff",
     "--name-only",
+    "-z",
     "--no-renames",
     "--diff-filter=A",
     base,
@@ -123,7 +124,7 @@ const addedChangesets = (base, head, dir) =>
     "--",
     `${dir}/*.md`,
   ])
-    .split("\n")
+    .split("\0")
     .filter((file) => file && path.basename(file) !== "README.md")
     .map((file) => ({
       file,

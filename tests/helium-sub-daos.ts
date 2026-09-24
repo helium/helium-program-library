@@ -320,7 +320,7 @@ describe("helium-sub-daos", () => {
       });
     });
 
-    describeVehntCases(ctx, ["Case 1"]);
+    describeVehntCases(ctx, "main");
 
     describe("with genesis config", () => {
       before(async () => {

@@ -40,7 +40,7 @@ jobs:
             ~/.cargo/bin/toml
           key: toml-cli-${{ runner.os }}-v0002
 
-      - run: (cargo install toml-cli || true)
+      - run: (cargo install toml-cli --version 0.2.3 || true)
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
 
@@ -72,6 +72,7 @@ jobs:
           devnet: true
           program: ${{ env.PROGRAM_NAME }}
           program-id: ${{ env.PROGRAM_ID }}
+          setup-anchor: false
 
       - uses: ./.github/actions/setup-anchor/
 

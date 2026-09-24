@@ -228,22 +228,22 @@ Every leaf under `programs/`, `packages/`, and `utils/` has its own README that 
 
 Three things leave this repo: npm packages, service images, and Solana programs. Bots drive all three. A person reviews, merges, and votes on Squads. Every hand path below stays valid, and each is the fallback when a bot is down.
 
-| Workflow                                                                         | Trigger                                                                     | What it does                                                                                                                                 |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`tests.yaml`](.github/workflows/tests.yaml)                                     | Every PR, and push to `develop` or `master`                                 | Tests and lint, plus two release gates: **Release Declaration** (the backstop check) and **Program Version Bumps** (the missing-bump check). |
-| [`changeset-bot.yaml`](.github/workflows/changeset-bot.yaml)                     | PR to `develop` or `master`; manual dispatch                                | Writes the changeset and the program changeset a PR is missing.                                                                              |
-| [`version-programs.yaml`](.github/workflows/version-programs.yaml)               | Push to `develop`; PR to `develop`; manual dispatch                         | Turns `.changeset-programs/` into `Cargo.toml` bumps and changelogs on the program release PR.                                               |
-| [`npm-publish.yaml`](.github/workflows/npm-publish.yaml)                         | Push to `develop`                                                           | Opens the "Version Packages" PR, and publishes to npm when that PR merges.                                                                   |
-| [`promotion-pr.yaml`](.github/workflows/promotion-pr.yaml)                       | Push to `develop`; manual dispatch                                          | Keeps one `develop` to `master` **Promotion PR** open while develop is ahead.                                                                |
-| [`back-merge-pr.yaml`](.github/workflows/back-merge-pr.yaml)                     | Push to `master`; manual dispatch                                           | Opens the `master` to `develop` back-merge PR after a hotfix.                                                                                |
-| [`program-auto-tag.yaml`](.github/workflows/program-auto-tag.yaml)               | Push to `master`; manual dispatch                                           | Creates `program-<name>-<version>` for every version on master that has no tag yet.                                                          |
-| [`release-program.yaml`](.github/workflows/release-program.yaml)                 | Git tag `program-<name>-<version>`                                          | Builds the program, uploads the IDL and the release hash, writes the buffers, and opens the Squads proposal.                                 |
-| [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) | Push to `develop` touching `programs/*`, or the `deploy-to-devnet` PR label | The same deploy against devnet. It creates no tag.                                                                                           |
-| [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml)       | Manual dispatch                                                             | One program to devnet from any branch.                                                                                                       |
-| [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml)           | Daily at 13:17 UTC; manual dispatch                                         | Compares each mainnet program with the hash its newest release published.                                                                    |
-| [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml)   | Weekly on Monday at 14:43 UTC; manual dispatch                              | Closes the program and IDL buffers the deployer key still owns, and returns the rent.                                                        |
-| [`service-auto-tag.yaml`](.github/workflows/service-auto-tag.yaml)               | Push to `develop`; manual dispatch                                          | Pushes the next `docker-<env>-<service>-<version>` tag for each opted-in service that changed.                                               |
-| [`docker-push.yaml`](.github/workflows/docker-push.yaml)                         | Git tag `docker-<env>-<service>-<version>`                                  | Builds the service image and pushes it to ECR.                                                                                               |
+| Workflow                                                                         | Trigger                                                                                                                                            | What it does                                                                                                                                 |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`tests.yaml`](.github/workflows/tests.yaml)                                     | Every PR, and push to `develop` or `master`                                                                                                        | Tests and lint, plus two release gates: **Release Declaration** (the backstop check) and **Program Version Bumps** (the missing-bump check). |
+| [`changeset-bot.yaml`](.github/workflows/changeset-bot.yaml)                     | PR to `develop` or `master`; manual dispatch                                                                                                       | Writes the changeset and the program changeset a PR is missing.                                                                              |
+| [`version-programs.yaml`](.github/workflows/version-programs.yaml)               | Push to `develop`; PR to `develop`; manual dispatch                                                                                                | Turns `.changeset-programs/` into `Cargo.toml` bumps and changelogs on the program release PR.                                               |
+| [`npm-publish.yaml`](.github/workflows/npm-publish.yaml)                         | Push to `develop`                                                                                                                                  | Opens the "Version Packages" PR, and publishes to npm when that PR merges.                                                                   |
+| [`promotion-pr.yaml`](.github/workflows/promotion-pr.yaml)                       | Push to `develop`; manual dispatch                                                                                                                 | Keeps one `develop` to `master` **Promotion PR** open while develop is ahead.                                                                |
+| [`back-merge-pr.yaml`](.github/workflows/back-merge-pr.yaml)                     | Push to `master`; manual dispatch                                                                                                                  | Opens the `master` to `develop` back-merge PR after a hotfix.                                                                                |
+| [`program-auto-tag.yaml`](.github/workflows/program-auto-tag.yaml)               | Push to `master`; manual dispatch                                                                                                                  | Creates `program-<name>-<version>` for every version on master that has no tag yet.                                                          |
+| [`release-program.yaml`](.github/workflows/release-program.yaml)                 | Git tag `program-<name>-<version>`                                                                                                                 | Builds the program, uploads the IDL and the release hash, writes the buffers, and opens the Squads proposal.                                 |
+| [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) | Push to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate it depends on, or the `deploy-to-devnet` PR label | The same deploy against devnet. It creates no tag.                                                                                           |
+| [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml)       | Manual dispatch                                                                                                                                    | One program to devnet from any branch.                                                                                                       |
+| [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml)           | Daily at 13:17 UTC; manual dispatch                                                                                                                | Compares each mainnet program with the hash its newest release published.                                                                    |
+| [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml)   | Weekly on Monday at 14:43 UTC; manual dispatch                                                                                                     | Closes the program and IDL buffers the deployer key still owns, and returns the rent.                                                        |
+| [`service-auto-tag.yaml`](.github/workflows/service-auto-tag.yaml)               | Push to `develop`; manual dispatch                                                                                                                 | Pushes the next `docker-<env>-<service>-<version>` tag for each opted-in service that changed.                                               |
+| [`docker-push.yaml`](.github/workflows/docker-push.yaml)                         | Git tag `docker-<env>-<service>-<version>`                                                                                                         | Builds the service image and pushes it to ECR.                                                                                               |
 
 **Where a bot reports.** No bot sends a message off GitHub. A bot that needs a person writes on its own run: an annotation at the top of the run, and a line in the run summary. A run that must not stay green is red. Read them in the [Actions tab](../../actions), filtered by workflow: `release-program.yaml` for a deploy or a hand tag, `program-hash-check.yaml` for the daily check, `program-auto-tag.yaml` for a program that changed with no version bump.
 
@@ -318,13 +318,13 @@ The tag starts `release-program.yaml`, which:
 - refuses the tag when its version differs from `programs/<name>/Cargo.toml` at the tagged commit, or when the commit is not an ancestor of `origin/master`;
 - builds the IDL with `anchor idl build`;
 - runs a verifiable `solana-verify` build;
-- publishes the GitHub release with the IDL and `<name>.so.sha256`, the **release hash**, only after that build succeeds;
+- publishes the GitHub release with the IDL and `<name>.so.sha256`, the **release hash**, only after that build succeeds, from a job that runs no build scripts;
 - writes the program and IDL buffers with the Squads vault as their authority;
 - opens the Squads proposal to upgrade the program to the new buffer.
 
 Then sign and execute the proposal in Squads. That step stays manual.
 
-The deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key.
+In the release workflow, the deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key. The weekly sweep also holds the key.
 
 Push a tag by hand when the tag bot is down:
 
@@ -339,9 +339,10 @@ A tag is never deleted, moved, or reused. A version is never reused. To correct 
 
 Re-run the failed workflow run. The [`plan-deploy`](.github/actions/plan-deploy) action holds the rules, and all three deploy workflows use it, so devnet behaves like mainnet:
 
-- The on-chain program already matches the build: the run stops with success and writes nothing.
+- The on-chain program hash and the on-chain IDL both match the build: the run stops with success and writes nothing.
+- Only the IDL changed: the run upgrades the program to the same bytes and sets the new IDL.
 - The Squads vault already owns a buffer whose bytes match the build: the run reuses that buffer, so a re-run pays the write once.
-- A pending proposal already names the reused buffer: the run stops with success. Vote on the proposal that is open.
+- A pending proposal already names the reused program buffer, and its IDL buffer holds the build IDL: the run stops with success. Vote on the proposal that is open.
 - An older pending proposal names a different buffer for the program: the run goes on, and prints an `Older pending proposal` notice annotation naming its index, plus the same line in the run summary, so the signers reject it. An execute of the older one after the newer would roll the program back.
 - This run's own program buffer and IDL buffer are closed when the run fails or is cancelled before the vault takes them.
 - A runner that dies before the authority transfer runs no close step, and the buffers stay with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
@@ -356,12 +357,13 @@ IDL buffers are never reused. Each run that goes on writes a new one.
 
 ### The daily hash check
 
-`program-hash-check.yaml` compares each mainnet program with the release hash of its newest release. It takes no action, holds no state, and holds no deploy secret. Each program gets one of four results:
+`program-hash-check.yaml` compares each mainnet program with the release hash of its newest release. It takes no action, holds no state, and holds no deploy secret. Each program gets one of five results:
 
 - **deployed**: the chain holds the newest release's binary. Silent.
 - **pending**: the chain holds an older release of this repo. This is normal while a proposal waits for votes. Once the newest tag is more than 3 days old, the run prints a `Pending upgrade` warning annotation and a summary line, and stays green: the vote is still open.
 - **unknown binary**: the chain holds a binary no release of this repo published. The run prints an `Unknown binary` error annotation and fails, so the check does not stay green while the question is open.
 - **rolled back**: the chain holds an older release, and its last upgrade came after the newest tag. An older proposal executed after a newer release reads the same way. The run prints a `Rolled back` error annotation and fails, so a person looks at it.
+- **error**: a release, chain or upgrade-time lookup failed, so the program has no result. The run prints a `Lookup error` annotation and fails. The other programs still get their results.
 
 A program whose releases carry no `<name>.so.sha256` asset is skipped and named in the run summary. A `Skipped programs` warning annotation counts them. A program enters the check at its first release through this flow.
 
@@ -372,7 +374,8 @@ When a release is rejected in Squads and will never deploy, delete that release'
 `release-program.yaml` builds every mainnet program through `solana-verify` and publishes the build's hash as the `<name>.so.sha256` release asset, the **release hash**. The daily hash check compares the chain with it. To repeat that build by hand, install [`solana-verify`](https://github.com/Ellipsis-Labs/solana-verifiable-build) and run it against the tagged commit:
 
 ```bash
-solana-verify verify-from-repo https://github.com/helium/helium-program-library \
+solana-verify verify-from-repo -u https://api.mainnet-beta.solana.com \
+  https://github.com/helium/helium-program-library \
   --program-id <program-id> \
   --library-name <library_name> \
   --commit-hash "$(git rev-list -n 1 program-<name>-<version>)"
@@ -381,6 +384,8 @@ solana-verify verify-from-repo https://github.com/helium/helium-program-library 
 The library name is the program directory name with underscores, for example `helium_sub_daos`. The program id is its entry in `[programs.localnet]` of [`Anchor.toml`](Anchor.toml).
 
 Pass no `-b` image. Without one, `solana-verify` picks the build image from the Rust version in `Cargo.lock`, which is what CI does in [`build-verified`](.github/actions/build-verified). A pinned image gives a different hash.
+
+Answer no when it asks to write verify data on chain, and do not pass `-y`.
 
 The run builds the program in a container and prints the hash it got beside the hash the chain holds. To compare it with the release instead, read the `<name>.so.sha256` asset of the `program-<name>-<version>` release. Nothing is submitted anywhere: the build is local, and the release hash is the only published record.
 

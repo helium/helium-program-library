@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { deflateSync } from "node:zlib";
 
 import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
@@ -350,4 +351,133 @@ test("an otherwise exact proposal at vault index 1 is not exact", async () => {
       [163, PENDING_BUFFER, true],
     ],
   );
+});
+
+test("an Upgrade with the buffer and program but another ProgramData makes the proposal not exact", async () => {
+  // The recorded Upgrade's accounts, with account 0 moved to index 8, which is
+  // not the program's ProgramData.
+  const pending = await withProposal(150, "Approved", (message) => ({
+    ...message,
+    instructions: message.instructions.map((ix) =>
+      Buffer.from(ix.data).equals(Buffer.from([3, 0, 0, 0]))
+        ? {
+            ...ix,
+            accountIndexes: new Uint8Array([8, ...ix.accountIndexes.slice(1)]),
+          }
+        : ix,
+    ),
+  }))(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => [p.index, p.buffer, p.exact]),
+    [
+      [150, PENDING_BUFFER, false],
+      [163, PENDING_BUFFER, true],
+    ],
+  );
+});
+
+// An IDL account as Anchor stores it: discriminator, authority, u32 LE length,
+// zlib-compressed JSON.
+const idlAccountData = (idl) => {
+  const compressed = deflateSync(Buffer.from(JSON.stringify(idl)));
+  const length = Buffer.alloc(4);
+  length.writeUInt32LE(compressed.length);
+  return Buffer.concat([Buffer.alloc(8 + 32), length, compressed]);
+};
+const BUILD_IDL = {
+  address: LAZY_TRANSACTIONS,
+  metadata: { version: "0.2.2" },
+};
+// The IDL buffer the recorded SetBuffer at index 163 names: its account 0.
+const recordedIdlBuffer = (() => {
+  const { accountKeys, instructions } = recordedTransaction.message;
+  const setBuffer = instructions.find((ix) =>
+    Buffer.from(ix.data).subarray(0, 8).equals(IDL_IX_TAG),
+  );
+  return accountKeys[setBuffer.accountIndexes[0]].toBase58();
+})();
+// With `edit`, index 163's vault transaction carries the edited message.
+const readWithIdl = (idlBufferData, edit) => {
+  const transactionKey = multisig
+    .getTransactionPda({ multisigPda, index: 163n })[0]
+    .toBase58();
+  return pendingUpgrades({
+    getMultipleAccountsInfo: async (keys) =>
+      (await getMultipleAccountsInfo(keys)).map((account, i) => {
+        if (keys[i].toBase58() === recordedIdlBuffer && idlBufferData) {
+          return { data: idlBufferData };
+        }
+        if (keys[i].toBase58() === transactionKey && edit) {
+          return {
+            data: multisig.accounts.VaultTransaction.fromArgs({
+              ...recordedTransaction,
+              message: edit(recordedTransaction.message),
+            }).serialize()[0],
+          };
+        }
+        return account;
+      }),
+    multisigPda,
+    programId: new PublicKey(LAZY_TRANSACTIONS),
+    spill: SPILL,
+    idl: BUILD_IDL,
+  });
+};
+
+test("a same-buffer proposal whose IDL buffer holds the build IDL stops the run", async () => {
+  // Key order does not matter.
+  const pending = await readWithIdl(
+    idlAccountData({
+      metadata: { version: "0.2.2" },
+      address: LAZY_TRANSACTIONS,
+    }),
+  );
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: 163,
+    older: [],
+  });
+});
+
+test("a same-buffer proposal whose IDL buffer holds another IDL is an older one", async () => {
+  const pending = await readWithIdl(
+    idlAccountData({ ...BUILD_IDL, metadata: { version: "0.2.1" } }),
+  );
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: null,
+    older: [163],
+  });
+});
+
+test("a same-buffer proposal whose IDL buffer is gone is an older one", async () => {
+  const pending = await readWithIdl(null);
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: null,
+    older: [163],
+  });
+});
+
+test("an IDL Close to the vault ahead of the SetBuffer does not change the IDL buffer read", async () => {
+  // Close's accounts are (idl, authority, sol_destination). It closes the
+  // recorded SetBuffer's IDL account, so a read of that account would miss
+  // the build IDL.
+  const pending = await readWithIdl(idlAccountData(BUILD_IDL), (message) => {
+    const setBuffer = message.instructions.find((ix) =>
+      Buffer.from(ix.data).subarray(0, 8).equals(IDL_IX_TAG),
+    );
+    const [, idl, vault] = setBuffer.accountIndexes;
+    const close = {
+      ...withIdlVariant(5)(setBuffer),
+      accountIndexes: new Uint8Array([idl, vault, vault]),
+    };
+    return {
+      ...message,
+      instructions: message.instructions.flatMap((ix) =>
+        ix === setBuffer ? [close, ix] : [ix],
+      ),
+    };
+  });
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: 163,
+    older: [],
+  });
 });

@@ -100,7 +100,7 @@ export const me = provider.wallet.publicKey;
 /**
  * Everything the helium-sub-daos suites share. The fields are filled in by the
  * hooks `useSubDaoPrograms` and `useDaoAndSubDaoWorld` register, so a shard file
- * reads them from the context rather than from a closure it no longer owns.
+ * reads them from the context rather than from a closure it does not own.
  */
 export interface SubDaoTestContext {
   program: Program<HeliumSubDaos>;
@@ -1333,12 +1333,40 @@ const describeVehntCase = (
 };
 
 /**
- * Registers the parameterized veHNT suite for the named cases. The cases are
- * split across shard files, so an unknown name has to fail loudly rather than
- * silently drop a suite.
+ * Assigns each veHNT case to the shard file that registers it. The check below
+ * fails at load when a case is in no shard, in two, or does not exist, so a new
+ * vehntOptions entry cannot go unregistered.
  */
-export const describeVehntCases = (ctx: SubDaoTestContext, names: string[]) => {
-  names.forEach((name) => {
+export const VEHNT_SHARDS = {
+  main: ["Case 1"],
+  "cases-2-3": ["Case 2", "Case 3"],
+  "cases-4-5": ["Case 4 (Cliff 100 4 years)", "Case 5 (Constant 100 4 years)"],
+};
+
+const shardedVehntNames = Object.values(VEHNT_SHARDS).flat();
+const vehntNames = vehntOptions.map((option) => option.name);
+if (
+  new Set(shardedVehntNames).size !== shardedVehntNames.length ||
+  shardedVehntNames.length !== vehntNames.length ||
+  !vehntNames.every((name) => shardedVehntNames.includes(name))
+) {
+  throw new Error(
+    `VEHNT_SHARDS must name every vehnt case exactly once: shards ${JSON.stringify(
+      shardedVehntNames,
+    )}, cases ${JSON.stringify(vehntNames)}`,
+  );
+}
+
+/**
+ * Registers the parameterized veHNT suite for the cases in one shard. The cases
+ * are split across shard files, so an unknown name has to fail loudly rather
+ * than silently drop a suite.
+ */
+export const describeVehntCases = (
+  ctx: SubDaoTestContext,
+  shard: keyof typeof VEHNT_SHARDS,
+) => {
+  VEHNT_SHARDS[shard].forEach((name) => {
     const vehntCase = vehntOptions.find((option) => option.name === name);
     if (!vehntCase) {
       throw new Error(`Unknown vehnt case: ${name}`);

@@ -2,11 +2,11 @@
  * Compare each program's on-chain hash with its release hashes.
  *
  * A read-only witness, run on a schedule. It takes no action: it reports
- * deployed, pending, rolled back, or unknown binary per program, and prints one JSON object
- * for the workflow to turn into a run summary and annotations.
+ * deployed, pending, rolled back, unknown binary, error (a failed lookup), or skipped per program,
+ * and prints one JSON object for the workflow to turn into a run summary and annotations.
  *
  * A program whose releases carry no `<name>.so.sha256` asset is skipped, not
- * failed: a program enters the check at its first release through the new flow.
+ * failed: a program enters the check at its first release that carries one.
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -117,7 +117,8 @@ const localnetPrograms = (anchorToml) => {
 
 /**
  * Every `program-<name>-<x.y.z>` tag with its creator date. For a lightweight
- * tag that is the commit date, so `main` prefers the release's `created_at`.
+ * tag that is the commit date. A release's `created_at` is the same date, so
+ * `checkProgram` prefers `published_at`, the time the release went out.
  */
 const programTags = () =>
   execFileSync(
@@ -203,11 +204,12 @@ const rpc = async (url, method, params) => {
 const UPGRADEABLE_LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
 
 /**
- * Whether a `jsonParsed` transaction upgrades or first deploys a program. Pure.
+ * Whether a `jsonParsed` transaction upgrades or first deploys the program whose
+ * ProgramData is `programData`. Pure.
  * Squads executes the upgrade as a CPI, so the inner instructions count too.
  * An ExtendProgram alone is not an upgrade.
  */
-export const isUpgradeTransaction = (tx) =>
+export const isUpgradeTransaction = (tx, programData) =>
   [
     ...(tx?.transaction?.message?.instructions ?? []),
     ...(tx?.meta?.innerInstructions ?? []).flatMap(
@@ -216,11 +218,12 @@ export const isUpgradeTransaction = (tx) =>
   ].some(
     (ix) =>
       ix.programId === UPGRADEABLE_LOADER &&
-      ["upgrade", "deployWithMaxDataLen"].includes(ix.parsed?.type),
+      ["upgrade", "deployWithMaxDataLen"].includes(ix.parsed?.type) &&
+      ix.parsed?.info?.programDataAccount === programData,
   );
 
 /**
- * When the program was last upgraded, or null. The ProgramData header slot is
+ * When the program was last upgraded. The ProgramData header slot is
  * not used: `solana program extend` before the vote rewrites it. The last
  * upgrade transaction touches the ProgramData account, so its signatures hold it.
  */
@@ -230,7 +233,9 @@ export const lastUpgradeTime = async (url, programId, since) => {
     { encoding: "jsonParsed" },
   ]);
   const programData = program?.value?.data?.parsed?.info?.programData;
-  if (!programData) return null;
+  if (!programData) {
+    throw new Error(`${programId}: no ProgramData address`);
+  }
   let before;
   let seen = 0;
   for (;;) {
@@ -238,7 +243,11 @@ export const lastUpgradeTime = async (url, programId, since) => {
       programData,
       { limit: 50, ...(before ? { before } : {}) },
     ]);
-    if (!signatures.length) return null;
+    if (!signatures.length) {
+      throw new Error(
+        `${programId}: ProgramData history ended with no deploy or upgrade found`,
+      );
+    }
     for (const { signature, err, blockTime } of signatures) {
       if (++seen > 1000) {
         throw new Error(
@@ -262,31 +271,50 @@ export const lastUpgradeTime = async (url, programId, since) => {
           `${programId}: getTransaction returned null for ${signature}`,
         );
       }
-      if (isUpgradeTransaction(tx)) {
-        return tx.blockTime == null ? null : new Date(tx.blockTime * 1000);
+      if (isUpgradeTransaction(tx, programData)) {
+        if (tx.blockTime == null) {
+          throw new Error(
+            `${programId}: upgrade transaction ${signature} has no blockTime`,
+          );
+        }
+        return new Date(tx.blockTime * 1000);
       }
     }
     before = signatures[signatures.length - 1].signature;
   }
 };
 
-const main = async () => {
-  const url = process.env.SOLANA_URL || DEFAULT_RPC;
-  const now = new Date();
-  const releases = await releasesByTag();
-  const tags = programTags();
-
-  const results = [];
-  for (const program of localnetPrograms(readFileSync("Anchor.toml", "utf8"))) {
-    const published = [];
-    let hasUnhashedTags = false;
+/**
+ * One program's result. The release, chain and upgrade-time lookups default to
+ * the reads above; a test passes its own.
+ */
+export const checkProgram = async (
+  program,
+  {
+    tags,
+    releases,
+    url,
+    now,
+    releaseHash: readReleaseHash = releaseHash,
+    onChainHash: readOnChainHash = onChainHash,
+    lastUpgradeTime: readLastUpgradeTime = lastUpgradeTime,
+  },
+) => {
+  const published = [];
+  let hasUnhashedTags = false;
+  // A null time means the upgrade time was not looked up, so an
+  // older-release match stays pending.
+  let deployedAt = null;
+  let newest;
+  // One program's failed lookup must not blank the report for the others.
+  try {
     for (const tag of tags.filter((t) => t.name === program.name)) {
       const release = releases.get(tag.tag);
-      const hash = await releaseHash(release, program.key);
+      const hash = await readReleaseHash(release, program.key);
       if (hash) {
         published.push({
           ...tag,
-          taggedAt: release.created_at ?? tag.taggedAt,
+          taggedAt: release.published_at ?? release.created_at ?? tag.taggedAt,
           hash,
         });
       } else {
@@ -295,29 +323,28 @@ const main = async () => {
     }
     // No release hash to compare with, so the chain is not read either.
     const chainHash = published.length
-      ? onChainHash(program.programId, url)
+      ? readOnChainHash(program.programId, url)
       : null;
-    const [newest] = [...published].sort(byVersionDesc);
+    [newest] = [...published].sort(byVersionDesc);
     const matchesOlder =
       chainHash !== null &&
       chainHash !== newest.hash &&
       published.some((release) => release.hash === chainHash);
-    // A null time means no upgrade was found in the whole history, so an
-    // older-release match stays pending.
-    const deployedAt =
-      published.length && (hasUnhashedTags || matchesOlder)
-        ? await lastUpgradeTime(
-            url,
-            program.programId,
-            new Date(
-              Math.min(
-                ...published.map((release) =>
-                  new Date(release.taggedAt).getTime(),
-                ),
-              ),
-            ),
-          )
-        : null;
+    if (
+      published.length &&
+      chainHash !== newest.hash &&
+      (hasUnhashedTags || matchesOlder)
+    ) {
+      deployedAt = await readLastUpgradeTime(
+        url,
+        program.programId,
+        new Date(
+          Math.min(
+            ...published.map((release) => new Date(release.taggedAt).getTime()),
+          ),
+        ),
+      );
+    }
     const preHashDeploy =
       deployedAt !== null &&
       published.every(
@@ -333,11 +360,31 @@ const main = async () => {
           deployedAt,
         })
       : { status: "skipped" };
-    results.push({
+    return {
       program: program.name,
       programId: program.programId,
       ...result,
-    });
+    };
+  } catch (error) {
+    return {
+      program: program.name,
+      programId: program.programId,
+      status: "error",
+      version: newest?.version,
+      message: String(error?.message ?? error),
+    };
+  }
+};
+
+const main = async () => {
+  const url = process.env.SOLANA_URL || DEFAULT_RPC;
+  const now = new Date();
+  const releases = await releasesByTag();
+  const tags = programTags();
+
+  const results = [];
+  for (const program of localnetPrograms(readFileSync("Anchor.toml", "utf8"))) {
+    results.push(await checkProgram(program, { tags, releases, url, now }));
   }
 
   console.log(

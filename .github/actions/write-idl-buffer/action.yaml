@@ -59,6 +59,30 @@ runs:
         PROGRAM_ID: ${{ inputs.program-id }}
         NETWORK: ${{ inputs.network }}
 
+    # The later "Set Program IDL Authority" step needs the deployer key or the vault to hold
+    # the program IDL authority. Once the buffer moves to the vault, a failure there leaves it
+    # for a multisig proposal to close, so a wrong authority stops the run before a buffer exists.
+    - name: Require a program IDL authority this run can use
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        shell: bash
+        command: |
+          set -euo pipefail
+          CURRENT=$(anchor idl authority "$PROGRAM_ID" --provider.cluster "$NETWORK")
+          DEPLOYER=$(solana-keygen pubkey ./deploy-keypair.json)
+          if ! grep -qF "$AUTHORITY" <<<"$CURRENT" && ! grep -qF "$DEPLOYER" <<<"$CURRENT"; then
+            echo "::error title=$PROGRAM IDL authority::The program IDL authority is not the vault or the deployer key: $CURRENT"
+            exit 1
+          fi
+          echo "Program IDL authority: $CURRENT"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+
     - name: Write IDL buffer
       id: write-buffer
       uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0

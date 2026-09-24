@@ -9,14 +9,21 @@
  * Pending is Approved at any index, or Active above the multisig's stale
  * transaction index. An Approved vault transaction still executes after it goes
  * stale; a stale Active proposal can no longer be approved.
+ *
+ * A proposal on the reused buffer is the same upgrade only when its IDL buffer
+ * also holds the build IDL. Otherwise it would ship the old IDL, and the run
+ * goes on to propose the new one.
  */
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 
+import { idlMatches } from "./idl-account.mjs";
+
 const USAGE =
-  "Usage: SOLANA_URL=<rpc> node scripts/pending-upgrade-proposals.mjs --multisig <address> --program-id <address> --spill <address> [--buffer <address>]";
+  "Usage: SOLANA_URL=<rpc> node scripts/pending-upgrade-proposals.mjs --multisig <address> --program-id <address> --spill <address> --idl <path> [--buffer <address>]";
 
 const BPF_LOADER_UPGRADEABLE = "BPFLoaderUpgradeab1e11111111111111111111111";
 // The loader's Upgrade instruction: a u32 LE enum tag and nothing else.
@@ -40,8 +47,9 @@ const isVaultTransaction = (account) =>
   );
 
 /**
- * The buffer a vault transaction upgrades `programId` from, or null, and
- * whether its message matches this workflow's upgrade: only the loader Upgrade
+ * The buffer a vault transaction upgrades `programId` from, or null, the IDL
+ * buffer its IDL SetBuffer names, or null, and whether its message matches
+ * this workflow's upgrade: only the loader Upgrade
  * with this program's programData, the program, the buffer, `spill` and the
  * vault 0 authority, and IDL instructions to the program. An IDL SetAuthority,
  * or a SetBuffer or Close whose authority or rent destination is not the vault,
@@ -56,7 +64,7 @@ const upgradeBuffer = (message, programId, multisigPda, spill) => {
     key(ix.accountIndexes[1]) === programId.toBase58();
   const upgrade = message.instructions.find(isUpgrade);
   const buffer = upgrade ? (key(upgrade.accountIndexes[2]) ?? null) : null;
-  if (!buffer) return { buffer: null, exact: false };
+  if (!buffer) return { buffer: null, idlBuffer: null, exact: false };
 
   const programData = PublicKey.findProgramAddressSync(
     [programId.toBuffer()],
@@ -87,20 +95,31 @@ const upgradeBuffer = (message, programId, multisigPda, spill) => {
         key(ix.accountIndexes[6]) === vault) ||
       isExactIdl(ix),
   );
-  return { buffer, exact };
+  const setBuffer = message.instructions.find(
+    (ix) =>
+      key(ix.programIdIndex) === programId.toBase58() &&
+      IDL_IX_TAG.equals(Buffer.from(ix.data).subarray(0, 8)) &&
+      Buffer.from(ix.data)[8] === IDL_SET_BUFFER,
+  );
+  const idlBuffer = setBuffer
+    ? (key(setBuffer.accountIndexes[0]) ?? null)
+    : null;
+  return { buffer, idlBuffer, exact };
 };
 
 /**
  * Pending upgrade proposals for `programId`, oldest first.
  *
  * `getMultipleAccountsInfo` is `Connection.getMultipleAccountsInfo`, taken as an
- * argument so a test can serve recorded accounts.
+ * argument so a test can serve recorded accounts. With `idl`, an exact proposal
+ * stays exact only when its IDL buffer holds `idl`.
  */
 export const pendingUpgrades = async ({
   getMultipleAccountsInfo,
   multisigPda,
   programId,
   spill,
+  idl,
 }) => {
   const [multisigAccount] = await getMultipleAccountsInfo([multisigPda]);
   if (!multisigAccount) {
@@ -128,7 +147,7 @@ export const pendingUpgrades = async ({
     );
   }
 
-  return indexes.flatMap((index, i) => {
+  const pending = indexes.flatMap((index, i) => {
     const proposal = accounts[2 * i];
     const transaction = accounts[2 * i + 1];
     if (!proposal || !transaction || !isVaultTransaction(transaction))
@@ -143,7 +162,7 @@ export const pendingUpgrades = async ({
 
     const [{ message, vaultIndex }] =
       multisig.accounts.VaultTransaction.fromAccountInfo(transaction);
-    const { buffer, exact } = upgradeBuffer(
+    const { buffer, idlBuffer, exact } = upgradeBuffer(
       message,
       programId,
       multisigPda,
@@ -152,9 +171,28 @@ export const pendingUpgrades = async ({
     // The message names vault 0 as the upgrade authority, so it only executes
     // as vault 0; at another vault index it still counts as an older release.
     return buffer
-      ? [{ index, status, buffer, exact: exact && vaultIndex === 0 }]
+      ? [{ index, status, buffer, idlBuffer, exact: exact && vaultIndex === 0 }]
       : [];
   });
+
+  if (idl !== undefined) {
+    const withIdl = pending.filter((p) => p.exact && p.idlBuffer);
+    const idlAccounts = [];
+    for (let start = 0; start < withIdl.length; start += BATCH) {
+      idlAccounts.push(
+        ...(await getMultipleAccountsInfo(
+          withIdl
+            .slice(start, start + BATCH)
+            .map((p) => new PublicKey(p.idlBuffer)),
+        )),
+      );
+    }
+    const sameIdl = new Set(
+      withIdl.filter((p, i) => idlMatches(idlAccounts[i]?.data, idl)),
+    );
+    for (const p of pending) p.exact = p.exact && sameIdl.has(p);
+  }
+  return pending.map(({ idlBuffer, ...p }) => p);
 };
 
 /**
@@ -179,14 +217,16 @@ const parseArgs = (argv) => {
     const name = argv[i];
     const value = argv[i + 1];
     if (
-      !["--multisig", "--program-id", "--spill", "--buffer"].includes(name) ||
+      !["--multisig", "--program-id", "--spill", "--idl", "--buffer"].includes(
+        name,
+      ) ||
       value === undefined
     ) {
       throw new Error(USAGE);
     }
     args[name.slice(2)] = value;
   }
-  if (!args.multisig || !args["program-id"] || !args.spill) {
+  if (!args.multisig || !args["program-id"] || !args.spill || !args.idl) {
     throw new Error(USAGE);
   }
   return args;
@@ -205,6 +245,7 @@ const main = async () => {
       multisigPda: new PublicKey(args.multisig),
       programId: new PublicKey(args["program-id"]),
       spill: new PublicKey(args.spill),
+      idl: JSON.parse(readFileSync(args.idl, "utf8")),
     });
     console.log(
       JSON.stringify({ pending, ...classifyPending(pending, args.buffer) }),

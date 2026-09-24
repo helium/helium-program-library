@@ -24,5 +24,8 @@ runs:
       shell: bash
     - run: echo "ANCHOR_SHA=3e8bc76d72e2bfdb3962868b5066" >> $GITHUB_ENV
       shell: bash
+    # The commit of the `v$ANCHOR_VERSION` tag. A tag can move; a commit cannot.
+    - run: echo "ANCHOR_VERSION_REV=47284f8f0b9844c6b83234aa90f556bad00e12ed" >> $GITHUB_ENV
+      shell: bash
     - run: git submodule update --init --recursive --depth 1
       shell: bash

@@ -8,14 +8,21 @@ inputs:
   program:
     description: "The program to build the IDL for (snake_case, as in Anchor.toml)"
     required: true
+  cache:
+    description: "Restore and save the Anchor, Solana CLI, toml and Cargo registry caches"
+    required: false
+    default: "true"
 runs:
   using: "composite"
   steps:
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-anchor/
+      with:
+        cache: ${{ inputs.cache }}
 
     - uses: actions/cache@v4
       name: Cache Cargo registry + index
+      if: inputs.cache == 'true'
       with:
         path: |
           ~/.cargo/registry/index/
