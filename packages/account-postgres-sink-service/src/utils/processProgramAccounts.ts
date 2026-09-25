@@ -27,6 +27,7 @@ export const processProgramAccounts = async (
     async () => {
       // Count per attempt: batches of an abandoned attempt may still commit.
       let attemptCount = 0;
+      let activeBatches: Promise<void>[] = [];
       try {
         console.log(
           `Making RPC call for ${accountType} with filters:`,
@@ -62,7 +63,6 @@ export const processProgramAccounts = async (
           pubkey: anchor.web3.PublicKey;
         }[] = [];
         const concurrentBatchLimit = 5;
-        let activeBatches: Promise<void>[] = [];
 
         let accountsReceived = 0;
         await streamAccounts(result.data, async (account) => {
@@ -170,6 +170,9 @@ export const processProgramAccounts = async (
         );
       } catch (err: any) {
         console.error(`RPC call error for ${accountType}:`, err.message);
+        // Let this attempt's batches settle so an old-snapshot write cannot
+        // land after the retry commits.
+        await Promise.allSettled(activeBatches);
         throw err;
       }
     },
