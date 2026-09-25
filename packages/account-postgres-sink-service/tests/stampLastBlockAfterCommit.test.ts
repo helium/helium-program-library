@@ -53,7 +53,7 @@ describe("stampLastBlockAfterCommit", () => {
     expect(transactions).to.equal(1);
   });
 
-  it("does not throw when the restamp fails, since the rows are already committed", async () => {
+  it("does not throw when the restamp fails, since the rows are already committed, and does not retry a non-deadlock error", async () => {
     let transactions = 0;
     await stampLastBlockAfterCommit({
       connection: { getSlot: async () => 500 } as any,
@@ -72,6 +72,32 @@ describe("stampLastBlockAfterCommit", () => {
     });
 
     expect(transactions).to.equal(1);
+  });
+
+  it("bails on a getSlot failure without retrying the restamp", async () => {
+    let slotReads = 0;
+    let transactions = 0;
+    await stampLastBlockAfterCommit({
+      connection: {
+        getSlot: async () => {
+          slotReads++;
+          throw new Error("rpc down");
+        },
+      } as any,
+      model: {
+        sequelize: {
+          transaction: async (fn: any) => {
+            transactions++;
+            return fn({});
+          },
+        },
+        update: async () => {},
+      } as any,
+      addresses: ["addr0"],
+    });
+
+    expect(slotReads).to.equal(4);
+    expect(transactions).to.equal(0);
   });
 
   it("retries a deadlocked restamp with a fresh slot", async () => {
