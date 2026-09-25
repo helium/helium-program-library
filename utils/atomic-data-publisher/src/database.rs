@@ -53,9 +53,9 @@ fn calculate_target_block(last_processed_block: u64, max_available_block: u64) -
 /// The reward destination job also emits asset_owners.owner, and in
 /// ClaimWelcomePackV0 account_sink commits the recipient before asset_ownership
 /// writes the claimer, so that job waits for asset_ownership too.
-/// asset_ownership writes its cursor before it commits on a tree update, and
-/// still advances it past a block that failed and rolled back, so that bound
-/// does not cover those two paths.
+/// On a tree update, asset_ownership writes its cursor before it commits.
+/// It also advances its cursor past a block that failed and rolled back.
+/// The asset_ownership bound does not cover these two paths.
 fn bounding_cursor_services(query_name: &str) -> &'static [&'static str] {
   match query_name {
     "construct_entity_reward_destination_changes" => &["account_sink", "asset_ownership"],
