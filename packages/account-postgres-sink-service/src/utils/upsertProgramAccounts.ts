@@ -83,6 +83,8 @@ export const upsertProgramAccounts = async ({
 
     await retry(
       async () => {
+        // Count per attempt: batches of an abandoned attempt may still commit.
+        let attemptCount = 0;
         try {
           console.log(
             `Making RPC call for ${accountType} with filters:`,
@@ -156,7 +158,7 @@ export const upsertProgramAccounts = async ({
                   }
                   await processChunk(currentBatch, t, lastBlock);
                   await t.commit();
-                  processedCount += currentBatch.length;
+                  attemptCount += currentBatch.length;
                   console.log(
                     `Processing ${currentBatch.length} ${accountType} accounts (block: ${lastBlock})`
                   );
@@ -172,12 +174,14 @@ export const upsertProgramAccounts = async ({
 
               activeBatches.push(batchPromise);
 
-              batchPromise.finally(() => {
+              const removeBatch = () => {
                 const index = activeBatches.indexOf(batchPromise);
                 if (index > -1) {
                   activeBatches.splice(index, 1);
                 }
-              });
+              };
+              // then(), not finally(): the derived promise must not reject unhandled.
+              batchPromise.then(removeBatch, removeBatch);
             }
           });
 
@@ -204,7 +208,7 @@ export const upsertProgramAccounts = async ({
                 }
                 await processChunk(batch, t, lastBlock);
                 await t.commit();
-                processedCount += batch.length;
+                attemptCount += batch.length;
                 console.log(
                   `Processing ${batch.length} ${accountType} accounts (block: ${lastBlock})`
                 );
@@ -217,6 +221,7 @@ export const upsertProgramAccounts = async ({
           }
 
           await Promise.all(activeBatches);
+          processedCount = attemptCount;
           console.log(
             `Stream processing complete for ${accountType}. Accounts received: ${accountsReceived}, Accounts processed: ${processedCount}`
           );
