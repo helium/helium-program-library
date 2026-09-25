@@ -334,6 +334,11 @@ jobs:
           - packages/geocoder-service
           - packages/recent-helium-transactions-service
           - packages/blockchain-api
+          - packages/asset-ownership-service
+          - packages/helium-vote-service
+          - packages/migration-service
+          - packages/tuktuk-dca-service
+          - packages/tuktuk-pyth-service
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/build-anchor/

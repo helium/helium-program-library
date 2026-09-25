@@ -2,7 +2,7 @@ import { Keypair } from "@solana/web3.js";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
-import { stopNextServer } from "./helpers/next";
+import { stopServer } from "./helpers/server";
 import { stopSurfpool } from "./helpers/surfpool";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import { setupTestCtx, TestCtx } from "./helpers/context";
@@ -21,7 +21,7 @@ describe("hotspot-transfer", () => {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

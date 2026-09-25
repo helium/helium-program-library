@@ -47,7 +47,11 @@ export async function getTokenDecimals(mint: string): Promise<number> {
   const cached = decimalsCache.get(mint);
   if (cached !== undefined) return cached;
 
-  const { env } = await import("@/lib/env");
+  // A dynamic import() is resolved as ESM at runtime, which needs the file
+  // extension, and @swc-node/register cannot resolve an aliased specifier that
+  // carries one. require() resolves the alias in both the built output and a
+  // source run, and env is CommonJS either way.
+  const { env } = require("@/lib/env") as typeof import("@/lib/env.js");
   const connection = new Connection(env.SOLANA_RPC_URL);
   const mintInfo = await getMint(connection, new PublicKey(mint));
   decimalsCache.set(mint, mintInfo.decimals);
