@@ -49,8 +49,9 @@ fn calculate_target_block(last_processed_block: u64, max_available_block: u64) -
   std::cmp::min(last_processed_block + chunk_size, max_available_block)
 }
 
-/// account_sink writes its cursor only after a block's rows commit, so every
-/// partner row (key_to_assets, recipients, ...) at or below it is visible.
+/// account_sink's substream writer commits a block's rows before it writes the
+/// cursor, so every partner row it writes at or below the cursor is visible.
+/// Batch writers (integrity check, /refresh-accounts) are not covered.
 /// None means hold: the cursor row is missing (a reset deletes it briefly),
 /// "0", or unparseable.
 fn bound_by_account_sink_cursor(
@@ -582,7 +583,7 @@ impl DatabaseClient {
   ) -> Result<Vec<ChangeRecord>, AtomicDataError> {
     let (last_processed_block_opt, max_available_block) = self.get_polling_bounds(job).await?;
     let should_skip = match last_processed_block_opt {
-      None => false,
+      None => max_available_block == 0,
       Some(last_processed) => max_available_block <= last_processed as u64,
     };
 
@@ -1922,6 +1923,14 @@ mod tests {
     let records = client.execute_job_polling(&job).await.unwrap();
     assert!(records.is_empty());
     assert!(last_processed_block(&pool, &job.name).await.unwrap() < 200);
+    let last_max_block: Option<i64> =
+      sqlx::query("SELECT last_max_block FROM atomic_data_polling_state WHERE job_name = $1")
+        .bind(&job.name)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .get("last_max_block");
+    assert_eq!(last_max_block, Some(199));
 
     // account_sink commits the key_to_assets partner at 200, then its cursor.
     sqlx::query(
@@ -1937,5 +1946,49 @@ mod tests {
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].atomic_data["asset"], "asset_race");
     assert_eq!(records[0].atomic_data["pub_key"], "abcdef");
+  }
+
+  #[sqlx::test(migrations = "tests/migrations")]
+  async fn fresh_job_holds_without_account_sink_cursor(pool: PgPool) {
+    let job = make_polling_job(
+      "entity_ownership_changes",
+      "construct_entity_ownership_changes",
+      json!({"change_type": "entity_ownership"}),
+    );
+    let client = DatabaseClient {
+      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      config: valid_test_db_config(),
+      polling_jobs: vec![job.clone()],
+      dry_run: false,
+    };
+    client.init_polling_state().await.unwrap();
+
+    sqlx::query(
+      "INSERT INTO asset_owners (asset, owner, last_block) VALUES ('asset_hold', 'wallet_hold', 0)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+      "INSERT INTO key_to_assets (address, entity_key, asset, key_serialization) \
+       VALUES ('kta_hold', '\\xabcdef', 'asset_hold', '\"b58\"'::jsonb)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert!(records.is_empty());
+    assert!(last_processed_block(&pool, &job.name).await.is_none());
+
+    set_account_sink_cursor(&pool, "0").await;
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert!(records.is_empty());
+    assert!(last_processed_block(&pool, &job.name).await.is_none());
+
+    set_account_sink_cursor(&pool, "abc").await;
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert!(records.is_empty());
+    assert!(last_processed_block(&pool, &job.name).await.is_none());
   }
 }
