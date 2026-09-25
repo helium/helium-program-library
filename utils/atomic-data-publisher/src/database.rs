@@ -52,9 +52,10 @@ fn calculate_target_block(last_processed_block: u64, max_available_block: u64) -
 /// Sinks whose cursor bounds a job. account_sink writes every partner table.
 /// The reward destination job also emits asset_owners.owner, and in
 /// ClaimWelcomePackV0 account_sink commits the recipient before asset_ownership
-/// writes the claimer, so that job waits for asset_ownership too. On a tree
-/// update asset_ownership writes its cursor before it commits, so that bound
-/// does not cover that path.
+/// writes the claimer, so that job waits for asset_ownership too.
+/// asset_ownership writes its cursor before it commits on a tree update, and
+/// still advances it past a block that failed and rolled back, so that bound
+/// does not cover those two paths.
 fn bounding_cursor_services(query_name: &str) -> &'static [&'static str] {
   match query_name {
     "construct_entity_reward_destination_changes" => &["account_sink", "asset_ownership"],
@@ -2058,6 +2059,24 @@ mod tests {
     .execute(&pool)
     .await
     .unwrap();
+
+    // account_sink still bounds this job when asset_ownership is ahead.
+    set_account_sink_cursor(&pool, "199").await;
+    set_cursor(&pool, "asset_ownership", "300").await;
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert!(records.is_empty());
+    assert!(last_processed_block(&pool, &job.name).await.unwrap_or(0) < 200);
+
+    // A missing asset_ownership cursor holds the job even when account_sink is past the row.
+    sqlx::query("DELETE FROM cursors WHERE service = 'asset_ownership'")
+      .execute(&pool)
+      .await
+      .unwrap();
+    set_account_sink_cursor(&pool, "200").await;
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert!(records.is_empty());
+    assert!(last_processed_block(&pool, &job.name).await.unwrap_or(0) < 200);
+
     set_account_sink_cursor(&pool, "200").await;
     set_cursor(&pool, "asset_ownership", "199").await;
 
