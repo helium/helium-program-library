@@ -9,6 +9,7 @@ export const streamAccounts = async (
 ) => {
   return new Promise<void>((resolve, reject) => {
     let hasReceivedData = false;
+    let inFlight: Promise<void> = Promise.resolve();
     // .pipe() drops source errors, so a reset socket would never settle.
     const accountStream = pipeline(
       stream,
@@ -29,22 +30,26 @@ export const streamAccounts = async (
       }
     });
 
-    accountStream.on("data", async ({ value }) => {
+    accountStream.on("data", ({ value }) => {
       accountStream.pause();
-      try {
-        await onAccount(value);
-        accountStream.resume();
-      } catch (err) {
-        accountStream.destroy(err as Error);
-        reject(err);
-      }
+      inFlight = (async () => {
+        try {
+          await onAccount(value);
+          accountStream.resume();
+        } catch (err) {
+          reject(err);
+          // No error argument: after the pipeline finishes nothing listens for "error".
+          accountStream.destroy();
+        }
+      })();
     });
 
     accountStream.on("end", () => {
       if (!hasReceivedData) {
         console.log("Stream ended without receiving any data");
       }
-      resolve();
+      // "end" can fire while the last onAccount is still awaiting.
+      inFlight.then(() => resolve());
     });
   });
 };

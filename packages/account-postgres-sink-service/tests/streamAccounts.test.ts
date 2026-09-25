@@ -16,7 +16,10 @@ const startServer = (handler: http.RequestListener) =>
     server.listen(0, "127.0.0.1", () => resolve(server));
   });
 
-const streamFrom = async (server: http.Server) => {
+const streamFrom = async (
+  server: http.Server,
+  onAccount?: (value: any) => Promise<void>
+) => {
   const { port } = server.address() as AddressInfo;
   const res = await axios.post(
     `http://127.0.0.1:${port}`,
@@ -25,9 +28,13 @@ const streamFrom = async (server: http.Server) => {
   );
   const received: string[] = [];
   const outcome = await Promise.race([
-    streamAccounts(res.data, async (value) => {
-      received.push(value.pubkey);
-    }).then(
+    streamAccounts(
+      res.data,
+      onAccount ??
+        (async (value) => {
+          received.push(value.pubkey);
+        })
+    ).then(
       () => "resolved",
       (err: Error) => err
     ),
@@ -85,21 +92,9 @@ describe("streamAccounts", () => {
       );
     });
 
-    const { port } = server.address() as AddressInfo;
-    const res = await axios.post(
-      `http://127.0.0.1:${port}`,
-      {},
-      { responseType: "stream" }
-    );
-    const outcome = await Promise.race([
-      streamAccounts(res.data, async () => {
-        throw new Error("db down");
-      }).then(
-        () => "resolved",
-        (err: Error) => err
-      ),
-      new Promise((resolve) => setTimeout(() => resolve("hung"), 2000)),
-    ]);
+    const { outcome } = await streamFrom(server, async () => {
+      throw new Error("db down");
+    });
 
     expect(outcome).to.be.instanceOf(Error);
     expect((outcome as Error).message).to.equal("db down");
@@ -109,5 +104,42 @@ describe("streamAccounts", () => {
       new Promise((resolve) => setTimeout(() => resolve("open"), 1000)),
     ]);
     expect(closed).to.equal("closed");
+  });
+
+  it("rejects when the last onAccount throws after the body ends", async () => {
+    server = await startServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)},${account(2)}]}`
+      );
+    });
+
+    const received: string[] = [];
+    const { outcome } = await streamFrom(server, async (value) => {
+      received.push(value.pubkey);
+      if (value.pubkey === "acc2") {
+        await new Promise((r) => setTimeout(r, 100));
+        throw new Error("db down");
+      }
+    });
+
+    expect(outcome).to.be.instanceOf(Error);
+    expect((outcome as Error).message).to.equal("db down");
+  });
+
+  it("rejects without an unhandled error when a one-account body's onAccount throws late", async () => {
+    server = await startServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(`{"jsonrpc":"2.0","id":1,"result":[${account(0)}]}`);
+    });
+
+    const { outcome } = await streamFrom(server, async () => {
+      await new Promise((r) => setTimeout(r, 100));
+      throw new Error("db down");
+    });
+
+    expect(outcome).to.be.instanceOf(Error);
+    expect((outcome as Error).message).to.equal("db down");
+    await new Promise((r) => setTimeout(r, 50));
   });
 });
