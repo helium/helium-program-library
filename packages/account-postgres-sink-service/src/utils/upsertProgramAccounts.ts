@@ -12,10 +12,8 @@ import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { lowerFirstChar } from "@helium/spl-utils";
 import axios from "axios";
-import { isDeepStrictEqual } from "util";
 import { streamAccounts } from "./streamAccounts";
-import _omit from "lodash/omit";
-import { OMIT_KEYS } from "../constants";
+import { hasAccountChanged } from "./hasAccountChanged";
 
 interface UpsertProgramAccountsArgs {
   programId: PublicKey;
@@ -390,12 +388,10 @@ export const upsertProgramAccounts = async ({
                   };
 
                   const existingRecord = existingRecordMap.get(publicKey);
-                  const existingClean = _omit(existingRecord || {}, OMIT_KEYS);
-                  const newClean = _omit(newRecord, OMIT_KEYS);
-
-                  const shouldUpdate =
-                    !existingRecord ||
-                    !isDeepStrictEqual(newClean, existingClean);
+                  const shouldUpdate = hasAccountChanged(
+                    newRecord,
+                    existingRecord
+                  );
 
                   if (shouldUpdate) {
                     return {
