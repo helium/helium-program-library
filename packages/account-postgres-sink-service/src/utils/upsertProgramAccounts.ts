@@ -11,12 +11,9 @@ import { defineIdlModels } from "./defineIdlModels";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { truthy } from "./truthy";
 import { lowerFirstChar } from "@helium/spl-utils";
-import { decompress as fzstdDecompress } from "fzstd";
 import axios from "axios";
-import { parser } from "stream-json";
-import { pick } from "stream-json/filters/Pick";
-import { streamArray } from "stream-json/streamers/StreamArray";
-import deepEqual from "deep-equal";
+import { isDeepStrictEqual } from "util";
+import { streamAccounts } from "./streamAccounts";
 import _omit from "lodash/omit";
 import { OMIT_KEYS } from "../constants";
 
@@ -68,47 +65,6 @@ export const upsertProgramAccounts = async ({
     throw e;
   }
 
-  const streamAccounts = async (
-    stream: NodeJS.ReadableStream,
-    onAccount: (account: any) => Promise<void>
-  ) => {
-    return new Promise<void>((resolve, reject) => {
-      let hasReceivedData = false;
-      const pipeline = stream
-        .pipe(parser())
-        .pipe(pick({ filter: "result" }))
-        .pipe(streamArray());
-
-      stream.on("data", (chunk) => {
-        if (!hasReceivedData) {
-          hasReceivedData = true;
-        }
-      });
-
-      pipeline.on("data", async ({ value }) => {
-        pipeline.pause();
-        try {
-          await onAccount(value);
-          pipeline.resume();
-        } catch (err) {
-          reject(err);
-        }
-      });
-
-      pipeline.on("end", () => {
-        if (!hasReceivedData) {
-          console.log("Stream ended without receiving any data");
-        }
-        resolve();
-      });
-
-      pipeline.on("error", (err: any) => {
-        console.error("Stream processing error:", err);
-        reject(err);
-      });
-    });
-  };
-
   const processProgramAccounts = async (
     connection: anchor.web3.Connection,
     programId: anchor.web3.PublicKey,
@@ -143,7 +99,7 @@ export const upsertProgramAccounts = async ({
                 programId.toBase58(),
                 {
                   commitment: "confirmed",
-                  encoding: "base64+zstd",
+                  encoding: "base64",
                   filters,
                 },
               ],
@@ -347,16 +303,7 @@ export const upsertProgramAccounts = async ({
                     try {
                       const data =
                         Array.isArray(account.data) &&
-                        account.data[1] === "base64+zstd"
-                          ? Buffer.from(
-                              fzstdDecompress(
-                                new Uint8Array(
-                                  Buffer.from(account.data[0], "base64")
-                                )
-                              )
-                            )
-                          : Array.isArray(account.data) &&
-                            account.data[1] === "base64"
+                        account.data[1] === "base64"
                           ? Buffer.from(account.data[0], "base64")
                           : account.data;
 
@@ -441,7 +388,8 @@ export const upsertProgramAccounts = async ({
                   const newClean = _omit(newRecord, OMIT_KEYS);
 
                   const shouldUpdate =
-                    !existingRecord || !deepEqual(newClean, existingClean);
+                    !existingRecord ||
+                    !isDeepStrictEqual(newClean, existingClean);
 
                   if (shouldUpdate) {
                     return {
