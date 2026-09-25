@@ -49,6 +49,21 @@ fn calculate_target_block(last_processed_block: u64, max_available_block: u64) -
   std::cmp::min(last_processed_block + chunk_size, max_available_block)
 }
 
+/// account_sink writes its cursor only after a block's rows commit, so every
+/// partner row (key_to_assets, recipients, ...) at or below it is visible.
+/// None means hold: the cursor row is missing (a reset deletes it briefly),
+/// "0", or unparseable.
+fn bound_by_account_sink_cursor(
+  query_max_block: u64,
+  account_sink_cursor: Option<&str>,
+) -> Option<u64> {
+  let cursor_block = account_sink_cursor?.parse::<u64>().ok()?;
+  if cursor_block == 0 {
+    return None;
+  }
+  Some(std::cmp::min(query_max_block, cursor_block))
+}
+
 impl DatabaseClient {
   async fn get_pool(&self) -> Arc<PgPool> {
     Arc::clone(&*self.pool.read().await)
@@ -667,6 +682,25 @@ impl DatabaseClient {
         return Ok((last_processed_block, 0));
       }
     };
+
+    // A partner row can commit after its driving row; polling past the
+    // account_sink cursor would move the job cursor past a row not yet joinable.
+    let account_sink_cursor: Option<String> =
+      sqlx::query_scalar("SELECT block_height FROM cursors WHERE service = 'account_sink'")
+        .fetch_optional(&*pool)
+        .await?
+        .flatten();
+    let current_max_block =
+      match bound_by_account_sink_cursor(current_max_block, account_sink_cursor.as_deref()) {
+        Some(block) => block,
+        None => {
+          debug!(
+            "Holding job '{}': account_sink cursor unusable ({:?})",
+            job.name, account_sink_cursor
+          );
+          return Ok((last_processed_block, 0));
+        }
+      };
 
     self
       .update_max_block_tracking(&job.name, &job.query_name, current_max_block)
@@ -1670,6 +1704,23 @@ mod tests {
     assert_eq!(result, 500_000);
   }
 
+  // --- account_sink Cursor Bound ---
+
+  #[test]
+  fn sink_cursor_bound_takes_the_lower_block() {
+    assert_eq!(bound_by_account_sink_cursor(500, Some("400")), Some(400));
+    assert_eq!(bound_by_account_sink_cursor(400, Some("500")), Some(400));
+  }
+
+  #[test]
+  fn sink_cursor_bound_holds_without_a_usable_cursor() {
+    assert_eq!(bound_by_account_sink_cursor(500, None), None);
+    assert_eq!(bound_by_account_sink_cursor(500, Some("0")), None);
+    assert_eq!(bound_by_account_sink_cursor(500, Some("")), None);
+    assert_eq!(bound_by_account_sink_cursor(500, Some("not-a-block")), None);
+    assert_eq!(bound_by_account_sink_cursor(500, Some("-5")), None);
+  }
+
   // --- Record Hashing ---
 
   #[test]
@@ -1822,5 +1873,69 @@ mod tests {
       json!({"change_type": "mobile_hotspot", "hotspot_type": "mobile"}),
     )];
     assert!(DatabaseClient::validate_polling_jobs(&jobs).is_ok());
+  }
+
+  // --- Join Race ---
+
+  async fn set_account_sink_cursor(pool: &PgPool, block: &str) {
+    sqlx::query(
+      "INSERT INTO cursors (cursor, service, block_height) VALUES ('c', 'account_sink', $1) \
+       ON CONFLICT (service) DO UPDATE SET block_height = EXCLUDED.block_height",
+    )
+    .bind(block)
+    .execute(pool)
+    .await
+    .expect("set account_sink cursor");
+  }
+
+  async fn last_processed_block(pool: &PgPool, job_name: &str) -> Option<i64> {
+    sqlx::query("SELECT last_processed_block FROM atomic_data_polling_state WHERE job_name = $1")
+      .bind(job_name)
+      .fetch_one(pool)
+      .await
+      .expect("read polling state")
+      .get("last_processed_block")
+  }
+
+  #[sqlx::test(migrations = "tests/migrations")]
+  async fn ownership_waits_for_key_to_asset_behind_account_sink_cursor(pool: PgPool) {
+    let job = make_polling_job(
+      "entity_ownership_changes",
+      "construct_entity_ownership_changes",
+      json!({"change_type": "entity_ownership"}),
+    );
+    let client = DatabaseClient {
+      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      config: valid_test_db_config(),
+      polling_jobs: vec![job.clone()],
+      dry_run: false,
+    };
+    client.init_polling_state().await.unwrap();
+
+    // asset_ownership landed block 200; account_sink has only committed up to 199.
+    sqlx::query("INSERT INTO asset_owners (asset, owner, last_block) VALUES ('asset_race', 'wallet_race', 200)")
+      .execute(&pool)
+      .await
+      .unwrap();
+    set_account_sink_cursor(&pool, "199").await;
+
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert!(records.is_empty());
+    assert!(last_processed_block(&pool, &job.name).await.unwrap() < 200);
+
+    // account_sink commits the key_to_assets partner at 200, then its cursor.
+    sqlx::query(
+      "INSERT INTO key_to_assets (address, entity_key, asset, key_serialization) \
+       VALUES ('kta_race', '\\xabcdef', 'asset_race', '\"b58\"'::jsonb)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    set_account_sink_cursor(&pool, "200").await;
+
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].atomic_data["asset"], "asset_race");
+    assert_eq!(records[0].atomic_data["pub_key"], "abcdef");
   }
 }
