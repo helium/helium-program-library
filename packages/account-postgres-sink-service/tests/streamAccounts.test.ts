@@ -80,6 +80,27 @@ describe("streamAccounts", () => {
     expect(outcome).to.be.instanceOf(Error);
   });
 
+  it("rejects on a socket reset only after the parked onAccount finishes", async () => {
+    server = await startServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write(`{"jsonrpc":"2.0","id":1,"result":[${account(0)},`);
+      setTimeout(() => res.socket?.destroy(), 50);
+    });
+
+    let done = false;
+    let doneAtReject: boolean | undefined;
+    const { outcome } = await streamFrom(server, async () => {
+      await new Promise((r) => setTimeout(r, 200));
+      done = true;
+    }).then((result) => {
+      doneAtReject = done;
+      return result;
+    });
+
+    expect(outcome).to.be.instanceOf(Error);
+    expect(doneAtReject).to.equal(true);
+  });
+
   it("rejects and closes the gPA socket when onAccount throws", async () => {
     let socketClosed!: Promise<string>;
     server = await startServer((req, res) => {

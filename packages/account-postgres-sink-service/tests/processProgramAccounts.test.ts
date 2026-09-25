@@ -112,6 +112,46 @@ describe("processProgramAccounts", () => {
     );
   });
 
+  it("retries when a batch fails and settles before the stream ends", async () => {
+    let attempt = 0;
+    handler = (_req, res) => {
+      attempt++;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write(`{"jsonrpc":"2.0","id":1,"result":[${account("a0")},`);
+      // The rest arrives after the first batch has already failed.
+      setTimeout(() => res.end(`${account("a1")},${account("a2")}]}`), 100);
+    };
+
+    const sequelize: any = {
+      models: {},
+      transaction: async () => ({
+        commit: async () => {},
+        rollback: async () => {},
+      }),
+    };
+    const connection: any = { getSlot: async () => 1 };
+    let thrown = false;
+
+    const processed = await processProgramAccounts(
+      sequelize,
+      connection,
+      PublicKey.default,
+      "TestAccountV0",
+      [],
+      1,
+      async (chunk) => {
+        if (!thrown) {
+          thrown = true;
+          throw new Error("db down");
+        }
+        return [];
+      },
+    );
+
+    expect(attempt).to.equal(2);
+    expect(processed).to.equal(3);
+  });
+
   it("restamps changed rows with a slot read after the batch commits", async () => {
     handler = (_req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
@@ -131,6 +171,7 @@ describe("processProgramAccounts", () => {
     };
     const updates: { values: any; where: any }[] = [];
     const model = {
+      sequelize: { transaction: async (fn: any) => fn({}) },
       update: async (values: any, { where }: any) => {
         updates.push({ values, where });
       },

@@ -19,7 +19,8 @@ export const streamAccounts = async (
       (err) => {
         if (err) {
           console.error("Stream processing error:", err);
-          reject(err);
+          // Let a parked onAccount finish so the caller's allSettled sees its batch.
+          inFlight.then(() => reject(err));
         }
       }
     );
