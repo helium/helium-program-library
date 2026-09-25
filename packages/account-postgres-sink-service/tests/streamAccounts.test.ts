@@ -72,4 +72,42 @@ describe("streamAccounts", () => {
     expect(received).to.deep.equal(["acc0", "acc1"]);
     expect(outcome).to.be.instanceOf(Error);
   });
+
+  it("rejects and closes the gPA socket when onAccount throws", async () => {
+    let socketClosed!: Promise<string>;
+    server = await startServer((req, res) => {
+      socketClosed = new Promise((resolve) =>
+        req.socket.on("close", () => resolve("closed"))
+      );
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write(
+        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)},`
+      );
+    });
+
+    const { port } = server.address() as AddressInfo;
+    const res = await axios.post(
+      `http://127.0.0.1:${port}`,
+      {},
+      { responseType: "stream" }
+    );
+    const outcome = await Promise.race([
+      streamAccounts(res.data, async () => {
+        throw new Error("db down");
+      }).then(
+        () => "resolved",
+        (err: Error) => err
+      ),
+      new Promise((resolve) => setTimeout(() => resolve("hung"), 2000)),
+    ]);
+
+    expect(outcome).to.be.instanceOf(Error);
+    expect((outcome as Error).message).to.equal("db down");
+
+    const closed = await Promise.race([
+      socketClosed,
+      new Promise((resolve) => setTimeout(() => resolve("open"), 1000)),
+    ]);
+    expect(closed).to.equal("closed");
+  });
 });

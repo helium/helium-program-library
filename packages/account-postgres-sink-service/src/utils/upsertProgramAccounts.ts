@@ -180,8 +180,9 @@ export const upsertProgramAccounts = async ({
                   activeBatches.splice(index, 1);
                 }
               };
-              // then(), not finally(): the derived promise must not reject unhandled.
-              batchPromise.then(removeBatch, removeBatch);
+              // A rejected batch stays in activeBatches so Promise.race/all surface it;
+              // the no-op handler only keeps this derived promise from rejecting unhandled.
+              batchPromise.then(removeBatch, () => {});
             }
           });
 
