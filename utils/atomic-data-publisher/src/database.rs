@@ -1964,7 +1964,7 @@ mod tests {
     client.init_polling_state().await.unwrap();
 
     sqlx::query(
-      "INSERT INTO asset_owners (asset, owner, last_block) VALUES ('asset_hold', 'wallet_hold', 0)",
+      "INSERT INTO asset_owners (asset, owner, last_block) VALUES ('asset_hold', 'wallet_hold', 100)",
     )
     .execute(&pool)
     .await
@@ -1990,5 +1990,17 @@ mod tests {
     let records = client.execute_job_polling(&job).await.unwrap();
     assert!(records.is_empty());
     assert!(last_processed_block(&pool, &job.name).await.is_none());
+
+    sqlx::query("UPDATE cursors SET block_height = NULL WHERE service = 'account_sink'")
+      .execute(&pool)
+      .await
+      .unwrap();
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert!(records.is_empty());
+    assert!(last_processed_block(&pool, &job.name).await.is_none());
+
+    set_account_sink_cursor(&pool, "150").await;
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert_eq!(records.len(), 1);
   }
 }
