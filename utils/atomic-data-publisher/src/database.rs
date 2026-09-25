@@ -707,14 +707,16 @@ impl DatabaseClient {
       current_max_block = match bound_by_sink_cursor(current_max_block, sink_cursor.as_deref()) {
         Some(block) => block,
         None => {
-          debug!(
+          warn!(
             "Holding job '{}': {} cursor unusable ({:?})",
             job.name, service, sink_cursor
           );
+          metrics::set_job_held(&job.name, true);
           return Ok((last_processed_block, 0));
         }
       };
     }
+    metrics::set_job_held(&job.name, false);
 
     self
       .update_max_block_tracking(&job.name, &job.query_name, current_max_block)

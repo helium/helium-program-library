@@ -7,11 +7,11 @@ import { Sequelize, Transaction } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import database, { limit } from "./database";
+import { getFinalizedSlot } from "./getFinalizedSlot";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
 import { OMIT_KEYS } from "../constants";
 import { lowerFirstChar } from "@helium/spl-utils";
-import retry from "async-retry";
 
 interface HandleAccountWebhookArgs {
   fastify: FastifyInstance;
@@ -120,15 +120,7 @@ export const handleAccountWebhook = async ({
 
       if (hasPlugins && lastBlock === 0) {
         try {
-          lastBlock = await retry(
-            () => provider.connection.getSlot("finalized"),
-            {
-              retries: 3,
-              factor: 2,
-              minTimeout: 1000,
-              maxTimeout: 5000,
-            }
-          );
+          lastBlock = await getFinalizedSlot(provider.connection);
         } catch (error) {
           console.warn("Failed to fetch block for plugins:", error);
         }
@@ -166,15 +158,7 @@ export const handleAccountWebhook = async ({
       if (shouldUpdate) {
         if (lastBlock === 0) {
           try {
-            lastBlock = await retry(
-              () => provider.connection.getSlot("finalized"),
-              {
-                retries: 3,
-                factor: 2,
-                minTimeout: 1000,
-                maxTimeout: 5000,
-              }
-            );
+            lastBlock = await getFinalizedSlot(provider.connection);
           } catch (error) {
             console.warn("Failed to fetch block after retries:", error);
           }

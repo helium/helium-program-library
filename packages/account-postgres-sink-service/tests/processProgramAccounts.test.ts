@@ -152,7 +152,7 @@ describe("processProgramAccounts", () => {
     expect(processed).to.equal(3);
   });
 
-  it("restamps changed rows with a slot read after the batch commits", async () => {
+  it("restamps changed rows with a slot read just before the batch commits, in its transaction", async () => {
     handler = (_req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
@@ -169,11 +169,11 @@ describe("processProgramAccounts", () => {
         return s;
       },
     };
-    const updates: { values: any; where: any }[] = [];
+    const updates: { values: any; where: any; transaction: any }[] = [];
     const model = {
-      sequelize: { transaction: async (fn: any) => fn({}) },
-      update: async (values: any, { where }: any) => {
-        updates.push({ values, where });
+      update: async (values: any, { where, transaction }: any) => {
+        events.push(`update ${where.address}`);
+        updates.push({ values, where, transaction });
       },
     };
     const sequelize: any = {
@@ -187,6 +187,7 @@ describe("processProgramAccounts", () => {
       },
     };
     const stamped: Record<string, number> = {};
+    const transactions: Record<string, any> = {};
 
     // Batch size 2 covers a full batch (a, b) and the final partial batch (c).
     await processProgramAccounts(
@@ -198,7 +199,11 @@ describe("processProgramAccounts", () => {
       2,
       async (chunk, t: any, lastBlock) => {
         t.pubkeys = chunk.map((c: any) => c.pubkey).join(",");
-        chunk.forEach((c: any) => (stamped[c.pubkey] = lastBlock));
+        chunk.forEach((c: any) => {
+          stamped[c.pubkey] = lastBlock;
+          transactions[c.pubkey] = t;
+        });
+        events.push(`write ${t.pubkeys}`);
         // "b" is unchanged, so only "a" and "c" were written with lastBlock.
         return chunk.map((c: any) => c.pubkey).filter((p) => p !== "b");
       },
@@ -214,14 +219,96 @@ describe("processProgramAccounts", () => {
       ["a", "a,b"],
       ["c", "c"],
     ]) {
-      const { values, where } = byAddress(address);
+      const { values, where, transaction } = byAddress(address);
       const restamp = values.lastBlock;
       expect(restamp).to.be.greaterThan(stamped[address]);
       expect(where.lastBlock[Op.lt]).to.equal(restamp);
-      expect(
-        events.indexOf(`slot ${restamp}`),
-        events.join(", "),
-      ).to.be.greaterThan(events.indexOf(`commit ${batch}`));
+      expect(transaction).to.equal(transactions[address]);
+      const log = events.join(", ");
+      expect(events.indexOf(`slot ${restamp}`), log).to.be.greaterThan(
+        events.indexOf(`write ${batch}`),
+      );
+      expect(events.indexOf(`update ${address}`), log).to.be.lessThan(
+        events.indexOf(`commit ${batch}`),
+      );
     }
+    expect(events.filter((e) => e.startsWith("rollback"))).to.deep.equal([]);
+  });
+
+  it("rolls the batch back and retries when the restamp fails", async () => {
+    handler = (_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(`{"jsonrpc":"2.0","id":1,"result":[${account("a")}]}`);
+    };
+
+    const events: string[] = [];
+    let updates = 0;
+    const sequelize: any = {
+      models: {
+        TestAccountV0: {
+          update: async () => {
+            if (++updates === 1) throw new Error("connection lost");
+          },
+        },
+      },
+      transaction: async () => ({
+        commit: async () => events.push("commit"),
+        rollback: async () => events.push("rollback"),
+      }),
+    };
+
+    await processProgramAccounts(
+      sequelize,
+      { getSlot: async () => 1 } as any,
+      PublicKey.default,
+      "TestAccountV0",
+      [],
+      1,
+      async () => ["a"],
+    );
+
+    expect(events).to.deep.equal(["rollback", "commit"]);
+    expect(updates).to.equal(2);
+  });
+
+  it("rolls the batch back instead of writing lastBlock 0 when the slot read fails", async () => {
+    handler = (_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(`{"jsonrpc":"2.0","id":1,"result":[${account("a")}]}`);
+    };
+
+    const events: string[] = [];
+    let slotReads = 0;
+    const connection: any = {
+      getSlot: async () => {
+        // The first read and its 3 retries fail.
+        if (++slotReads <= 4) throw new Error("rpc down");
+        return 100;
+      },
+    };
+    const sequelize: any = {
+      models: { TestAccountV0: { update: async () => {} } },
+      transaction: async () => ({
+        commit: async () => events.push("commit"),
+        rollback: async () => events.push("rollback"),
+      }),
+    };
+    const stamps: number[] = [];
+
+    await processProgramAccounts(
+      sequelize,
+      connection,
+      PublicKey.default,
+      "TestAccountV0",
+      [],
+      1,
+      async (_chunk, _t, lastBlock) => {
+        stamps.push(lastBlock);
+        return ["a"];
+      },
+    );
+
+    expect(events).to.deep.equal(["rollback", "commit"]);
+    expect(stamps).to.deep.equal([100]);
   });
 });

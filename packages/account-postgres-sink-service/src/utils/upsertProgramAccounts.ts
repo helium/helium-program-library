@@ -1,10 +1,10 @@
 import * as anchor from "@coral-xyz/anchor";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
 import retry from "async-retry";
-import { Op, Sequelize } from "sequelize";
+import { ModelStatic, Op, Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { initPlugins } from "../plugins";
-import { IAccountConfig } from "../types";
+import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import { database } from "./database";
 import { defineIdlModels } from "./defineIdlModels";
@@ -19,6 +19,174 @@ interface UpsertProgramAccountsArgs {
   accounts: IAccountConfig[];
   sequelize?: Sequelize;
 }
+
+export const makeUpsertChunk =
+  ({
+    model,
+    decode,
+    plugins,
+    now,
+    type,
+  }: {
+    model: ModelStatic<any>;
+    decode: (data: Buffer) => any;
+    plugins: (IInitedPlugin | undefined)[];
+    now: string;
+    type: string;
+  }) =>
+  async (
+    chunk: anchor.web3.GetProgramAccountsResponse,
+    transaction: Transaction,
+    lastBlock: number
+  ): Promise<string[]> => {
+    let decodeErrors = 0;
+
+    const accs = (
+      await Promise.all(
+        chunk.map(async ({ pubkey, account }) => {
+          try {
+            const data =
+              Array.isArray(account.data) &&
+              account.data[1] === "base64"
+                ? Buffer.from(account.data[0], "base64")
+                : account.data;
+
+            const decodedAcc = decode(data);
+
+            return {
+              publicKey: pubkey,
+              account: decodedAcc,
+            };
+          } catch (_e) {
+            decodeErrors++;
+            if (decodeErrors <= 3) {
+              // Only log first 3 decode errors to avoid spam
+              console.error(`Decode error ${pubkey}:`, _e);
+            }
+            return null;
+          }
+        })
+      )
+    ).filter(truthy);
+
+    if (decodeErrors > 0) {
+      console.log(
+        `${type} batch: ${accs.length} successful decodes, ${decodeErrors} decode errors out of ${chunk.length} accounts`
+      );
+    }
+
+    // Skip processing if no accounts were successfully decoded
+    if (accs.length === 0) {
+      console.warn(
+        `Skipping batch processing for ${type} - no accounts successfully decoded`
+      );
+      return [];
+    }
+
+    const updateOnDuplicateFields: string[] = [
+      ...Object.keys(accs[0].account),
+      ...new Set(
+        plugins
+          .map((plugin) => plugin?.updateOnDuplicateFields || [])
+          .flat()
+      ),
+    ];
+
+    // Fetch existing records to compare
+    const addresses = accs.map(({ publicKey }) => publicKey);
+    const existingRecords = await model.findAll({
+      where: { address: addresses },
+      transaction,
+      raw: true,
+    });
+
+    const existingRecordMap = new Map(
+      existingRecords.map((record: any) => [record.address, record])
+    );
+
+    const results = await Promise.all(
+      accs.map(async ({ publicKey, account }) => {
+        let sanitizedAccount = sanitizeAccount(account);
+
+        for (const plugin of plugins) {
+          if (plugin?.processAccount) {
+            sanitizedAccount = await plugin.processAccount(
+              { ...sanitizedAccount, address: publicKey },
+              transaction,
+              lastBlock
+            );
+          }
+        }
+
+        const newRecord = {
+          address: publicKey,
+          refreshedAt: now,
+          ...sanitizedAccount,
+        };
+
+        const existingRecord = existingRecordMap.get(publicKey);
+        const shouldUpdate = hasAccountChanged(
+          newRecord,
+          existingRecord
+        );
+
+        if (shouldUpdate) {
+          return {
+            record: {
+              ...newRecord,
+              lastBlock,
+            },
+            shouldUpdate: true,
+          };
+        } else {
+          return {
+            record: {
+              ...newRecord,
+              lastBlock: existingRecord?.lastBlock || lastBlock,
+            },
+            shouldUpdate: false,
+          };
+        }
+      })
+    );
+
+    const toUpdate = results
+      .filter((r) => r.shouldUpdate)
+      .map((r) => r.record);
+
+    const toTouch = results
+      .filter((r) => !r.shouldUpdate)
+      .map((r) => r.record);
+
+    if (toUpdate.length > 0) {
+      const UPSERT_CHUNK_SIZE = 5000;
+      for (let i = 0; i < toUpdate.length; i += UPSERT_CHUNK_SIZE) {
+        await model.bulkCreate(
+          toUpdate.slice(i, i + UPSERT_CHUNK_SIZE),
+          {
+            updateOnDuplicate: [
+              "address",
+              "refreshedAt",
+              "lastBlock",
+              ...updateOnDuplicateFields,
+            ],
+            transaction,
+          }
+        );
+      }
+    }
+
+    if (toTouch.length > 0) {
+      await model.bulkCreate(toTouch, {
+        transaction,
+        updateOnDuplicate: ["address", "refreshedAt"],
+      });
+    }
+
+    // Only changed rows take the new stamp; restamping touched rows
+    // would republish rows that did not change.
+    return toUpdate.map((r) => r.address.toString());
+  };
 
 export const upsertProgramAccounts = async ({
   programId,
@@ -101,6 +269,8 @@ export const upsertProgramAccounts = async ({
       }
 
       const now = new Date().toISOString();
+      const decode = (data: Buffer) =>
+        program.coder.accounts.decode(lowerFirstChar(type), data);
       // Add retry wrapper for the entire account processing
       const processedCount = await retry(
         async () => {
@@ -111,158 +281,7 @@ export const upsertProgramAccounts = async ({
             type,
             coderFilters,
             effectiveBatchSize,
-            async (chunk, transaction, lastBlock) => {
-              let decodeErrors = 0;
-
-              const accs = (
-                await Promise.all(
-                  chunk.map(async ({ pubkey, account }) => {
-                    try {
-                      const data =
-                        Array.isArray(account.data) &&
-                        account.data[1] === "base64"
-                          ? Buffer.from(account.data[0], "base64")
-                          : account.data;
-
-                      const decodedAcc = program.coder.accounts.decode(
-                        lowerFirstChar(type),
-                        data
-                      );
-
-                      return {
-                        publicKey: pubkey,
-                        account: decodedAcc,
-                      };
-                    } catch (_e) {
-                      decodeErrors++;
-                      if (decodeErrors <= 3) {
-                        // Only log first 3 decode errors to avoid spam
-                        console.error(`Decode error ${pubkey}:`, _e);
-                      }
-                      return null;
-                    }
-                  })
-                )
-              ).filter(truthy);
-
-              if (decodeErrors > 0) {
-                console.log(
-                  `${type} batch: ${accs.length} successful decodes, ${decodeErrors} decode errors out of ${chunk.length} accounts`
-                );
-              }
-
-              // Skip processing if no accounts were successfully decoded
-              if (accs.length === 0) {
-                console.warn(
-                  `Skipping batch processing for ${type} - no accounts successfully decoded`
-                );
-                return [];
-              }
-
-              const updateOnDuplicateFields: string[] = [
-                ...Object.keys(accs[0].account),
-                ...new Set(
-                  plugins
-                    .map((plugin) => plugin?.updateOnDuplicateFields || [])
-                    .flat()
-                ),
-              ];
-
-              // Fetch existing records to compare
-              const addresses = accs.map(({ publicKey }) => publicKey);
-              const existingRecords = await model.findAll({
-                where: { address: addresses },
-                transaction,
-                raw: true,
-              });
-
-              const existingRecordMap = new Map(
-                existingRecords.map((record: any) => [record.address, record])
-              );
-
-              const results = await Promise.all(
-                accs.map(async ({ publicKey, account }) => {
-                  let sanitizedAccount = sanitizeAccount(account);
-
-                  for (const plugin of plugins) {
-                    if (plugin?.processAccount) {
-                      sanitizedAccount = await plugin.processAccount(
-                        { ...sanitizedAccount, address: publicKey },
-                        transaction,
-                        lastBlock
-                      );
-                    }
-                  }
-
-                  const newRecord = {
-                    address: publicKey,
-                    refreshedAt: now,
-                    ...sanitizedAccount,
-                  };
-
-                  const existingRecord = existingRecordMap.get(publicKey);
-                  const shouldUpdate = hasAccountChanged(
-                    newRecord,
-                    existingRecord
-                  );
-
-                  if (shouldUpdate) {
-                    return {
-                      record: {
-                        ...newRecord,
-                        lastBlock,
-                      },
-                      shouldUpdate: true,
-                    };
-                  } else {
-                    return {
-                      record: {
-                        ...newRecord,
-                        lastBlock: existingRecord?.lastBlock || lastBlock,
-                      },
-                      shouldUpdate: false,
-                    };
-                  }
-                })
-              );
-
-              const toUpdate = results
-                .filter((r) => r.shouldUpdate)
-                .map((r) => r.record);
-
-              const toTouch = results
-                .filter((r) => !r.shouldUpdate)
-                .map((r) => r.record);
-
-              if (toUpdate.length > 0) {
-                const UPSERT_CHUNK_SIZE = 5000;
-                for (let i = 0; i < toUpdate.length; i += UPSERT_CHUNK_SIZE) {
-                  await model.bulkCreate(
-                    toUpdate.slice(i, i + UPSERT_CHUNK_SIZE),
-                    {
-                      updateOnDuplicate: [
-                        "address",
-                        "refreshedAt",
-                        "lastBlock",
-                        ...updateOnDuplicateFields,
-                      ],
-                      transaction,
-                    }
-                  );
-                }
-              }
-
-              if (toTouch.length > 0) {
-                await model.bulkCreate(toTouch, {
-                  transaction,
-                  updateOnDuplicate: ["address", "refreshedAt"],
-                });
-              }
-
-              // Only changed rows take the new stamp; restamping touched rows
-              // would republish rows that did not change.
-              return toUpdate.map((r) => r.address.toString());
-            }
+            makeUpsertChunk({ model, decode, plugins, now, type })
           );
 
           // Throw error if no accounts processed to trigger retry

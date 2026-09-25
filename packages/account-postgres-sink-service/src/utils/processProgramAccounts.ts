@@ -4,7 +4,8 @@ import axios from "axios";
 import { Sequelize, Transaction } from "sequelize";
 import { SOLANA_URL } from "../env";
 import { limit } from "./database";
-import { stampLastBlockAfterCommit } from "./stampLastBlockAfterCommit";
+import { getFinalizedSlot } from "./getFinalizedSlot";
+import { stampLastBlockBeforeCommit } from "./stampLastBlockBeforeCommit";
 import { streamAccounts } from "./streamAccounts";
 
 export const processProgramAccounts = async (
@@ -64,6 +65,35 @@ export const processProgramAccounts = async (
           pubkey: anchor.web3.PublicKey;
         }[] = [];
         const concurrentBatchLimit = 5;
+        const runBatch = (chunk: typeof batch) =>
+          limit(async () => {
+            const t = await sequelize.transaction({
+              isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+            });
+            try {
+              // Get current slot at start of transaction
+              const lastBlock = await getFinalizedSlot(connection);
+              const changedAddresses = await processChunk(chunk, t, lastBlock);
+              await stampLastBlockBeforeCommit({
+                connection,
+                model: sequelize.models[accountType],
+                addresses: changedAddresses,
+                transaction: t,
+              });
+              await t.commit();
+              attemptCount += chunk.length;
+              console.log(
+                `Processing ${chunk.length} ${accountType} accounts (block: ${lastBlock})`
+              );
+            } catch (err) {
+              await t.rollback();
+              throw err;
+            }
+
+            if (global.gc) {
+              global.gc();
+            }
+          });
 
         let accountsReceived = 0;
         await streamAccounts(result.data, async (account) => {
@@ -79,51 +109,7 @@ export const processProgramAccounts = async (
               await Promise.race(activeBatches);
             }
 
-            const batchPromise = limit(async () => {
-              const t = await sequelize.transaction({
-                isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-              });
-              let changedAddresses: string[];
-              try {
-                // Get current slot at start of transaction
-                let lastBlock: number = 0;
-                try {
-                  lastBlock = await retry(
-                    () => connection.getSlot("finalized"),
-                    {
-                      retries: 3,
-                      factor: 2,
-                      minTimeout: 1000,
-                      maxTimeout: 5000,
-                    }
-                  );
-                } catch (error) {
-                  console.warn("Failed to fetch block after retries:", error);
-                }
-                changedAddresses = await processChunk(
-                  currentBatch,
-                  t,
-                  lastBlock
-                );
-                await t.commit();
-                attemptCount += currentBatch.length;
-                console.log(
-                  `Processing ${currentBatch.length} ${accountType} accounts (block: ${lastBlock})`
-                );
-              } catch (err) {
-                await t.rollback();
-                throw err;
-              }
-              await stampLastBlockAfterCommit({
-                connection,
-                model: sequelize.models[accountType],
-                addresses: changedAddresses,
-              });
-
-              if (global.gc) {
-                global.gc();
-              }
-            });
+            const batchPromise = runBatch(currentBatch);
 
             activeBatches.push(batchPromise);
 
@@ -140,43 +126,7 @@ export const processProgramAccounts = async (
         });
 
         if (batch.length > 0) {
-          const batchPromise = limit(async () => {
-            const t = await sequelize.transaction({
-              isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-            });
-            let changedAddresses: string[];
-            try {
-              // Get current slot at start of transaction
-              let lastBlock: number = 0;
-              try {
-                lastBlock = await retry(
-                  () => connection.getSlot("finalized"),
-                  {
-                    retries: 3,
-                    factor: 2,
-                    minTimeout: 1000,
-                    maxTimeout: 5000,
-                  }
-                );
-              } catch (error) {
-                console.warn("Failed to fetch block after retries:", error);
-              }
-              changedAddresses = await processChunk(batch, t, lastBlock);
-              await t.commit();
-              attemptCount += batch.length;
-              console.log(
-                `Processing ${batch.length} ${accountType} accounts (block: ${lastBlock})`
-              );
-            } catch (err) {
-              await t.rollback();
-              throw err;
-            }
-            await stampLastBlockAfterCommit({
-              connection,
-              model: sequelize.models[accountType],
-              addresses: changedAddresses,
-            });
-          });
+          const batchPromise = runBatch(batch);
           activeBatches.push(batchPromise);
         }
 

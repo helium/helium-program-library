@@ -60,6 +60,14 @@ pub fn observe_publish_duration(duration: f64) {
   histogram!("atomic_data_publisher_publish_duration_seconds").record(duration);
 }
 
+pub fn set_job_held(job_name: &str, held: bool) {
+  gauge!("atomic_data_publisher_job_held", "job" => job_name.to_string()).set(if held {
+    1.0
+  } else {
+    0.0
+  });
+}
+
 pub fn update_uptime() {
   let uptime = START_TIME.elapsed().as_secs() as f64;
   gauge!("atomic_data_publisher_uptime_seconds").set(uptime);

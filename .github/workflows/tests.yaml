@@ -310,6 +310,19 @@ jobs:
       - uses: ./.github/actions/setup-ts/
       - run: pnpm --filter @helium/migration-service test
 
+  test-account-postgres-sink-service:
+    needs: build
+    name: Test Account Postgres Sink Service
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+      - uses: ./.github/actions/setup-ts/
+      - run: pnpm --filter @helium/account-postgres-sink-service test
+
   test-docker-builds:
     needs: build
     name: Test Docker Builds
