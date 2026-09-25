@@ -24,30 +24,12 @@ COPY tsconfig*.json ./
 COPY packages/idls/lib/ packages/idls/lib/
 RUN mkdir -p target/types && echo 'export {}' > target/types/_placeholder.ts
 
-ARG SENTRY_AUTH_TOKEN
-ARG SENTRY_ORG
-ARG SENTRY_PROJECT
-ARG SENTRY_RELEASE
-
-# NEXT_PUBLIC_ vars are inlined by webpack at compile time; placeholders
-# get replaced at runtime by docker-entrypoint.sh
-ENV NEXT_PUBLIC_PRIVY_APP_ID="__NEXT_PUBLIC_PRIVY_APP_ID__" \
-    NEXT_PUBLIC_SOLANA_CLUSTER="__NEXT_PUBLIC_SOLANA_CLUSTER__" \
-    NEXT_PUBLIC_SOLANA_URL="__NEXT_PUBLIC_SOLANA_URL__" \
-    NEXT_PUBLIC_WORLD_HELIUM_URL="__NEXT_PUBLIC_WORLD_HELIUM_URL__" \
-    SENTRY_DSN="__SENTRY_DSN__" \
-    NODE_ENV=production \
+ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=4096"
 
-ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN} \
-    SENTRY_ORG=${SENTRY_ORG} \
-    SENTRY_PROJECT=${SENTRY_PROJECT} \
-    SENTRY_RELEASE=${SENTRY_RELEASE}
-
-# The build needs no server env vars: env validation is skipped during the
-# build phase (see src/lib/env.ts) and re-runs at server startup.
+# The build needs no server env vars: src/lib/env.ts is only parsed when the
+# server starts, never at compile time.
 RUN --mount=type=cache,id=turbo,target=/app/.turbo \
-    --mount=type=cache,id=nextjs,target=/app/packages/blockchain-api/.next/cache \
     pnpm turbo run build --filter=@helium/blockchain-api-service
 
 # Production image
@@ -60,32 +42,12 @@ ARG SENTRY_RELEASE
 ENV NODE_ENV=production
 ENV SENTRY_RELEASE=${SENTRY_RELEASE}
 
-RUN apk add --no-cache jq sed
-
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs && \
-    mkdir -p /app/.next/cache && \
-    chown -R nextjs:nodejs /app
+    adduser --system --uid 1001 apiuser
 
-# Standalone output: in a monorepo, server.js is nested under the package path
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/public ./public
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone/packages/blockchain-api/ ./
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/static ./.next/static
-
-# Sentry source maps only — copy .map files without overwriting standalone server chunks
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/server/*.js.map ./.next/server/
-
-# Standalone node_modules for Next.js runtime
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.next/standalone/node_modules ./node_modules
-# Full workspace node_modules overlay for sequelize-cli migrations
-COPY --from=build --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# Migration files (sequelize-cli reads these via .sequelizerc)
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/.sequelizerc ./.sequelizerc
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/src/lib/config ./src/lib/config
-COPY --from=build --chown=nextjs:nodejs /app/packages/blockchain-api/src/lib/migrations ./src/lib/migrations
-
-RUN chmod -R 755 /app/.next/static
+# Copy node_modules and packages wholesale so pnpm's symlink layout survives
+COPY --from=build --chown=apiuser:nodejs /app/node_modules ./node_modules
+COPY --from=build --chown=apiuser:nodejs /app/packages ./packages
 
 COPY --from=build /app/packages/blockchain-api/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
@@ -93,8 +55,16 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 EXPOSE 3000
 
 ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
 
-USER nextjs
+# pnpm uses node-linker=hoisted, so dependency bins (sequelize-cli) live in the
+# workspace root node_modules; keep the package-local bin dir first anyway
+ENV PATH="/app/packages/blockchain-api/node_modules/.bin:/app/node_modules/.bin:$PATH"
+
+USER apiuser
+
+# sequelize-cli resolves .sequelizerc paths against the working directory, so
+# the entrypoint's migrations need the package root as cwd
+WORKDIR /app/packages/blockchain-api
+
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["node", "server.js"]
+CMD ["node", "--import", "./lib/instrument.js", "lib/server.js"]

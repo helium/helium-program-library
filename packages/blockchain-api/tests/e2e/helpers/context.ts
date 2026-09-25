@@ -6,7 +6,7 @@ import type { RouterClient } from "@orpc/server";
 import fs from "fs";
 import { applyMinimalServerEnv } from "./env";
 import { ensureSurfpool, getSurfpoolRpcUrl } from "./surfpool";
-import { ensureNextServer } from "./next";
+import { ensureServer, rpcUrl } from "./server";
 import { ensureFunds, loadKeypairFromEnv } from "./wallet";
 
 export interface TestCtx {
@@ -48,7 +48,7 @@ export async function setupTestCtx(
     process.env.SOLANA_RPC_URL = options.serverRpcUrl;
   }
   await ensureSurfpool();
-  await ensureNextServer();
+  await ensureServer();
 
   const payer = loadKeypairFromEnv();
 
@@ -71,7 +71,7 @@ export async function setupTestCtx(
   await ensureFunds(payer.publicKey, 0.05 * LAMPORTS_PER_SOL);
 
   const link = new RPCLink({
-    url: "http://127.0.0.1:3000/rpc",
+    url: rpcUrl(),
   });
   const client: RouterClient<typeof appRouter> = createORPCClient(link);
   const safeClient = createSafeClient(client);
