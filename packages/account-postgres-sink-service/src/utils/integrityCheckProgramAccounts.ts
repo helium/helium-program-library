@@ -14,6 +14,7 @@ import database from "./database";
 import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
 import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
 import { sanitizeAccount } from "./sanitizeAccount";
+import { stampLastBlockAfterCommit } from "./stampLastBlockAfterCommit";
 import { truthy } from "./truthy";
 import { OMIT_KEYS } from "../constants";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
@@ -259,6 +260,8 @@ export const integrityCheckProgramAccounts = async ({
             const t = await sequelize.transaction({
               isolationLevel: Transaction.ISOLATION_LEVELS.READ_COMMITTED,
             });
+            const upserts: any[] = [];
+            const model = sequelize.models[accName];
 
             try {
               let lastBlock: number = 0;
@@ -273,8 +276,6 @@ export const integrityCheckProgramAccounts = async ({
                 console.warn("Failed to fetch block after retries:", error);
               }
 
-              const upserts: any[] = [];
-              const model = sequelize.models[accName];
               const pubkeys = accounts.map((c) => c.pubkey);
               const existingAccs = await model.findAll({
                 where: { address: pubkeys },
@@ -437,6 +438,11 @@ export const integrityCheckProgramAccounts = async ({
               );
               throw err;
             }
+            await stampLastBlockAfterCommit({
+              connection,
+              model,
+              addresses: upserts.map((u) => u.address),
+            });
           })
         );
       })

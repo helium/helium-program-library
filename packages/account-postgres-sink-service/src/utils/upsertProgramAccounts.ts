@@ -156,7 +156,7 @@ export const upsertProgramAccounts = async ({
                 console.warn(
                   `Skipping batch processing for ${type} - no accounts successfully decoded`
                 );
-                return;
+                return [];
               }
 
               const updateOnDuplicateFields: string[] = [
@@ -258,6 +258,10 @@ export const upsertProgramAccounts = async ({
                   updateOnDuplicate: ["address", "refreshedAt"],
                 });
               }
+
+              // Only changed rows take the new stamp; restamping touched rows
+              // would republish rows that did not change.
+              return toUpdate.map((r) => r.address.toString());
             }
           );
 

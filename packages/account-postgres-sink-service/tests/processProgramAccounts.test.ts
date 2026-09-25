@@ -3,6 +3,7 @@ import axios from "axios";
 import { expect } from "chai";
 import http from "http";
 import { AddressInfo } from "net";
+import { Op } from "sequelize";
 import { processProgramAccounts } from "../src/utils/processProgramAccounts";
 
 const account = (pubkey: string) =>
@@ -59,6 +60,7 @@ describe("processProgramAccounts", () => {
     let oldAttemptCommitted!: () => void;
     const oldAttemptDone = new Promise<void>((r) => (oldAttemptCommitted = r));
     const sequelize: any = {
+      models: {},
       transaction: async () => {
         const t: any = {
           commit: async () => {
@@ -89,6 +91,7 @@ describe("processProgramAccounts", () => {
           await sleep(3000);
         }
         events.push(`write ${pubkey}`);
+        return [];
       },
     );
 
@@ -107,5 +110,77 @@ describe("processProgramAccounts", () => {
     expect(lastOldAttemptEvent, events.join(", ")).to.be.lessThan(
       firstRetryCommit,
     );
+  });
+
+  it("restamps changed rows with a slot read after the batch commits", async () => {
+    handler = (_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        `{"jsonrpc":"2.0","id":1,"result":[${account("a")},${account("b")},${account("c")}]}`,
+      );
+    };
+
+    const events: string[] = [];
+    let slot = 100;
+    const connection: any = {
+      getSlot: async () => {
+        const s = slot++;
+        events.push(`slot ${s}`);
+        return s;
+      },
+    };
+    const updates: { values: any; where: any }[] = [];
+    const model = {
+      update: async (values: any, { where }: any) => {
+        updates.push({ values, where });
+      },
+    };
+    const sequelize: any = {
+      models: { TestAccountV0: model },
+      transaction: async () => {
+        const t: any = {
+          commit: async () => events.push(`commit ${t.pubkeys}`),
+          rollback: async () => events.push(`rollback ${t.pubkeys}`),
+        };
+        return t;
+      },
+    };
+    const stamped: Record<string, number> = {};
+
+    // Batch size 2 covers a full batch (a, b) and the final partial batch (c).
+    await processProgramAccounts(
+      sequelize,
+      connection,
+      PublicKey.default,
+      "TestAccountV0",
+      [],
+      2,
+      async (chunk, t: any, lastBlock) => {
+        t.pubkeys = chunk.map((c: any) => c.pubkey).join(",");
+        chunk.forEach((c: any) => (stamped[c.pubkey] = lastBlock));
+        // "b" is unchanged, so only "a" and "c" were written with lastBlock.
+        return chunk.map((c: any) => c.pubkey).filter((p) => p !== "b");
+      },
+    );
+
+    const byAddress = (address: string) =>
+      updates.find(({ where }) => where.address.includes(address))!;
+    expect(updates.map(({ where }) => where.address)).to.have.deep.members([
+      ["a"],
+      ["c"],
+    ]);
+    for (const [address, batch] of [
+      ["a", "a,b"],
+      ["c", "c"],
+    ]) {
+      const { values, where } = byAddress(address);
+      const restamp = values.lastBlock;
+      expect(restamp).to.be.greaterThan(stamped[address]);
+      expect(where.lastBlock[Op.lt]).to.equal(restamp);
+      expect(
+        events.indexOf(`slot ${restamp}`),
+        events.join(", "),
+      ).to.be.greaterThan(events.indexOf(`commit ${batch}`));
+    }
   });
 });
