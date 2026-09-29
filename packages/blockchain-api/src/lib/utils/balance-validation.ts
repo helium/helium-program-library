@@ -3,6 +3,11 @@ import {
   VersionedTransaction,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
+import {
+  IOT_HOTSPOT_INFO_SPACE,
+  keyToAssetSpace,
+  MOBILE_HOTSPOT_INFO_SPACE,
+} from "@helium/helium-entity-manager-sdk";
 import { recipientSpace } from "@helium/lazy-distributor-sdk";
 import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
@@ -204,6 +209,31 @@ export const getWelcomePackRentParts = async (
     ]);
   return { welcomePackRent, userWelcomePacksRent, fanoutRent, ataRent };
 };
+
+/**
+ * Lamports issue_data_only_entity_v0 takes from the payer: rent for the
+ * KeyToAssetV0 it creates plus the per-leaf tree fee it moves to the
+ * data-only escrow (the stored DataOnlyConfigV0.new_tree_fee_lamports).
+ */
+export const getDataOnlyIssueCostLamports = async (
+  connection: Connection,
+  {
+    entityKeyLen,
+    newTreeFeeLamports,
+  }: { entityKeyLen: number; newTreeFeeLamports: number },
+) =>
+  (await getRentLamports(connection, keyToAssetSpace(entityKeyLen))) +
+  newTreeFeeLamports;
+
+/** Rent for the hotspot info account onboard_data_only_{iot,mobile}_hotspot_v0 creates. */
+export const getDataOnlyOnboardRentLamports = (
+  connection: Connection,
+  network: "iot" | "mobile",
+) =>
+  getRentLamports(
+    connection,
+    network === "iot" ? IOT_HOTSPOT_INFO_SPACE : MOBILE_HOTSPOT_INFO_SPACE,
+  );
 
 /**
  * Lamports the payer spends on the pack account itself. The escrow (gift +
