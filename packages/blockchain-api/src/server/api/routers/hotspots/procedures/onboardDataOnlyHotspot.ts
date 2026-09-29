@@ -156,7 +156,8 @@ export const onboardDataOnlyHotspot =
       );
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
-          message: "Insufficient SOL balance for transaction fees",
+          message:
+            "Insufficient SOL balance for transaction fees and account rent",
           data: { required, available: walletBalance },
         });
       }
