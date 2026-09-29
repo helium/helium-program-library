@@ -1315,7 +1315,7 @@ dependencies = [
 
 [[package]]
 name = "data-credits"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1950,7 +1950,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "helium-entity-manager"
-version = "0.3.11"
+version = "0.3.12"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1973,7 +1973,7 @@ dependencies = [
 
 [[package]]
 name = "helium-sub-daos"
-version = "0.2.50"
+version = "0.2.51"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2512,7 +2512,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-transactions"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -7214,7 +7214,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "voter-stake-registry"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
