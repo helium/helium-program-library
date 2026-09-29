@@ -25,6 +25,7 @@ import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 import {
   COMPUTE_BUDGET_IX_DATA_SIZE,
+  DEFAULT_COMPUTE_SCALE_UP,
   DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
   MAX_PRIO_FEE,
   callerComputeBudgetTypes,
@@ -34,7 +35,18 @@ import {
 } from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
 import { TxVersionOption, resolveTxVersion } from "./txVersion";
-import { compileV1Transaction, getTransactionSizeLimit } from "./v1Transaction";
+import {
+  MAX_COMPUTE_UNITS,
+  tableComputeUnitsForInstructions,
+} from "./computeUnitTable";
+import {
+  V1_MAX_ACCOUNTS,
+  V1_MAX_INSTRUCTIONS,
+  V1_MAX_SIGNERS,
+  compileV1Transaction,
+  exceedsV1Limits,
+  getTransactionSizeLimit,
+} from "./v1Transaction";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -704,6 +716,119 @@ async function getAllTxns(
   ).flat();
 }
 
+const fitsInTx = async (
+  draft: TransactionDraft,
+  version: 0 | 1,
+  sizeLimit: number
+): Promise<boolean> => {
+  if (version === 1 && exceedsV1Limits(draft.feePayer, draft.instructions)) {
+    return false;
+  }
+  try {
+    return (await toVersionedTx(draft)).serialize().length <= sizeLimit;
+  } catch (e: any) {
+    // v0 serialize throws past its buffer instead of returning the size.
+    if (e.toString().includes("encoding overruns Uint8Array")) {
+      return false;
+    }
+    throw e;
+  }
+};
+
+/**
+ * Pack instruction groups into as few txs as possible. From each start, one
+ * greedy cursor per allowed version grows until it stops fitting; the longer
+ * chunk is emitted, and a tie goes to v0.
+ *
+ * `toProbe` builds the draft a chunk is sized by, so it must carry whatever
+ * the sent tx adds (ComputeBudget ixs, signers).
+ */
+export const packInstructionGroups = async ({
+  groups,
+  versions,
+  toProbe,
+  maxTxSize,
+  maxInstructionsPerTx,
+  computeScaleUp = DEFAULT_COMPUTE_SCALE_UP,
+}: {
+  groups: TransactionInstruction[][];
+  versions: (0 | 1)[];
+  toProbe: (
+    instructions: TransactionInstruction[],
+    version: 0 | 1
+  ) => TransactionDraft;
+  maxTxSize?: number;
+  maxInstructionsPerTx?: number;
+  computeScaleUp?: number;
+}): Promise<{ instructions: TransactionInstruction[]; version: 0 | 1 }[]> => {
+  const sizeLimit = (version: 0 | 1) =>
+    Math.min(maxTxSize ?? Infinity, getTransactionSizeLimit(version));
+  const chunks: { instructions: TransactionInstruction[]; version: 0 | 1 }[] =
+    [];
+  let start = 0;
+  while (start < groups.length) {
+    const fitting = { 0: 0, 1: 0 };
+    let live = versions;
+    let cuBounded = true;
+    for (let end = start + 1; end <= groups.length && live.length; end++) {
+      const instructions = groups.slice(start, end).flat();
+      if (maxInstructionsPerTx && instructions.length > maxInstructionsPerTx) {
+        break;
+      }
+      // Bounds growth only: a lone group is never rejected for its CU.
+      if (end > start + 1 && cuBounded) {
+        try {
+          const tableCu = tableComputeUnitsForInstructions(instructions, {
+            throwOnMiss: true,
+          });
+          if (tableCu * computeScaleUp > MAX_COMPUTE_UNITS) {
+            break;
+          }
+        } catch {
+          // Untabled ix: pack by size alone and let the post-pack
+          // simulation in withPriorityFees check CU.
+          cuBounded = false;
+        }
+      }
+      const stillFitting: (0 | 1)[] = [];
+      for (const version of live) {
+        if (
+          await fitsInTx(
+            toProbe(instructions, version),
+            version,
+            sizeLimit(version)
+          )
+        ) {
+          fitting[version] = end - start;
+          stillFitting.push(version);
+        }
+      }
+      live = stillFitting;
+    }
+
+    const version = fitting[1] > fitting[0] ? 1 : 0;
+    const count = fitting[version];
+    if (count === 0) {
+      const limits = versions.map((v) =>
+        v === 1
+          ? `v1 (${sizeLimit(1)} bytes, ${V1_MAX_ACCOUNTS} accounts, ${V1_MAX_INSTRUCTIONS} instructions, ${V1_MAX_SIGNERS} signers)`
+          : `v0 (${sizeLimit(0)} bytes)`
+      );
+      throw new Error(
+        `Instruction group ${start} fits in no transaction under ${limits.join(
+          " or "
+        )}`
+      );
+    }
+    chunks.push({
+      instructions: groups.slice(start, start + count).flat(),
+      version,
+    });
+    start += count;
+  }
+  return chunks;
+};
+
 // Batch instructions parallel into as many txs as it takes
 export async function batchParallelInstructions({
   provider,
@@ -724,9 +849,7 @@ export async function batchParallelInstructions({
   maxSignatureBatch?: number;
   addressLookupTableAddresses?: PublicKey[];
 }): Promise<void> {
-  let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-  const transactions: TransactionDraft[] = [];
   const addressLookupTables = await getAddressLookupTableAccounts(
     provider.connection,
     addressLookupTableAddresses
@@ -734,61 +857,31 @@ export async function batchParallelInstructions({
   const version = await resolveTxVersion(provider.connection, {
     wallet: provider.wallet,
   });
-  maxTxSize ??= getTransactionSizeLimit(version);
+  const toDraft = (
+    chunk: TransactionInstruction[],
+    chunkVersion: 0 | 1
+  ): TransactionDraft => ({
+    feePayer: provider.wallet.publicKey,
+    recentBlockhash: blockhash,
+    instructions: chunk,
+    addressLookupTableAddresses,
+    signers: extraSigners,
+    addressLookupTables,
+    version: chunkVersion,
+  });
 
-  for (const instruction of instructions) {
-    if (Array.isArray(instruction)) {
-      currentTxInstructions.push(...instruction);
-    } else {
-      currentTxInstructions.push(instruction);
-    }
-    const tx = await toVersionedTx({
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash: blockhash,
-      instructions: currentTxInstructions,
-      addressLookupTableAddresses,
-      signers: extraSigners,
-      addressLookupTables,
-      version,
-    });
-    try {
-      if (tx.serialize().length + 64 * tx.signatures.length > maxTxSize) {
-        throw new Error("encoding overruns Uint8Array");
-      }
-    } catch (e: any) {
-      if (e.toString().includes("encoding overruns Uint8Array")) {
-        currentTxInstructions.pop();
-        transactions.push({
-          feePayer: provider.wallet.publicKey,
-          recentBlockhash: blockhash,
-          instructions: currentTxInstructions,
-          addressLookupTableAddresses,
-          signers: extraSigners,
-          addressLookupTables,
-          version,
-        });
-        if (Array.isArray(instruction)) {
-          currentTxInstructions = instruction;
-        } else {
-          currentTxInstructions = [instruction];
-        }
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  if (currentTxInstructions.length > 0) {
-    transactions.push({
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash: blockhash,
-      instructions: currentTxInstructions,
-      addressLookupTableAddresses,
-      signers: extraSigners,
-      addressLookupTables,
-      version,
-    });
-  }
+  const chunks = await packInstructionGroups({
+    // Callers pass arrays at runtime for ixs that must share a tx.
+    groups: instructions.map((instruction) =>
+      Array.isArray(instruction) ? instruction : [instruction]
+    ),
+    versions: version === 1 ? [1, 0] : [0],
+    toProbe: toDraft,
+    maxTxSize,
+  });
+  const transactions = chunks.map((chunk) =>
+    toDraft(chunk.instructions, chunk.version)
+  );
 
   await bulkSendTransactions(
     provider,
@@ -868,7 +961,6 @@ export async function batchInstructionsToTxsWithPriorityFee(
     version?: TxVersionOption;
   } = {}
 ): Promise<TransactionDraft[]> {
-  let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash(commitment))
     .blockhash;
   const transactions: TransactionDraft[] = [];
@@ -880,7 +972,6 @@ export async function batchInstructionsToTxsWithPriorityFee(
     version,
     wallet: provider.wallet,
   });
-  maxTxSize ??= getTransactionSizeLimit(resolvedVersion);
 
   let firstTxComputeBudgetIxs: TransactionInstruction[] | null = null;
   // Price a full chunk and push it as a draft. When the first chunk's
@@ -888,7 +979,10 @@ export async function batchInstructionsToTxsWithPriorityFee(
   // later chunks — skipping any CB type the chunk already carries, since the
   // runtime rejects duplicate ComputeBudget instruction types
   // (DuplicateInstruction) — instead of re-estimating per chunk.
-  const flushChunk = async (chunk: TransactionInstruction[]) => {
+  const flushChunk = async (
+    chunk: TransactionInstruction[],
+    chunkVersion: 0 | 1
+  ) => {
     let ixs: TransactionInstruction[];
     if (firstTxComputeBudgetIxs) {
       const chunkCbTypes = callerComputeBudgetTypes(chunk);
@@ -910,7 +1004,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
         loadedAccountsDataSizeLimit,
         deriveLoadedAccountsDataSizeLimit,
         // Simulate in the version the draft is sent in.
-        version: resolvedVersion,
+        version: chunkVersion,
       });
       if (useFirstEstimateForAll) {
         // A sim-derived data-size limit was measured against THIS tx's
@@ -937,15 +1031,17 @@ export async function batchInstructionsToTxsWithPriorityFee(
           ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
         )
       ),
-      version: resolvedVersion,
+      version: chunkVersion,
     });
   };
-  for (const instruction of instructions) {
-    if (!instruction) continue;
-    const instrArr = Array.isArray(instruction) ? instruction : [instruction];
-    const prevLen = currentTxInstructions.length;
-    currentTxInstructions.push(...instrArr);
-    const tx = await toVersionedTx({
+  const chunks = await packInstructionGroups({
+    groups: instructions
+      .filter((instruction) => instruction)
+      .map((instruction) =>
+        Array.isArray(instruction) ? instruction : [instruction]
+      ),
+    versions: resolvedVersion === 1 ? [1, 0] : [0],
+    toProbe: (chunk, chunkVersion) => ({
       instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({
           units: computeUnitLimit || 100000,
@@ -967,40 +1063,20 @@ export async function batchInstructionsToTxsWithPriorityFee(
               ),
             ]
           : []),
-        ...currentTxInstructions,
+        ...chunk,
       ],
       addressLookupTableAddresses: addressLookupTableAddresses || [],
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
       addressLookupTables,
-      version: resolvedVersion,
-    });
-    try {
-      if (
-        tx.serialize().length + 64 * tx.signatures.length > maxTxSize ||
-        (maxInstructionsPerTx &&
-          currentTxInstructions.length > maxInstructionsPerTx)
-      ) {
-        throw new Error("encoding overruns Uint8Array");
-      }
-    } catch (e: any) {
-      if (e.toString().includes("encoding overruns Uint8Array")) {
-        currentTxInstructions = currentTxInstructions.slice(0, prevLen);
-        if (currentTxInstructions.length > 0) {
-          await flushChunk(currentTxInstructions);
-        }
-
-        // Copy — aliasing instrArr would mutate the caller's group array on
-        // the next push, corrupting inputs across repeated batch calls.
-        currentTxInstructions = [...instrArr];
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  if (currentTxInstructions.length > 0) {
-    await flushChunk(currentTxInstructions);
+      version: chunkVersion,
+    }),
+    maxTxSize,
+    maxInstructionsPerTx,
+    computeScaleUp,
+  });
+  for (const chunk of chunks) {
+    await flushChunk(chunk.instructions, chunk.version);
   }
 
   return transactions;

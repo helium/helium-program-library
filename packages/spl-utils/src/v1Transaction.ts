@@ -34,8 +34,46 @@ const COMPUTE_BUDGET_IX_LIMIT = 2;
 const COMPUTE_BUDGET_IX_PRICE = 3;
 const COMPUTE_BUDGET_IX_DATA_SIZE = 4;
 
+// v1 hard limits. Counted here so an over-limit chunk is a non-fit for the
+// batchers instead of a compile error from kit.
+export const V1_MAX_ACCOUNTS = 64;
+export const V1_MAX_SIGNERS = 12;
+export const V1_MAX_INSTRUCTIONS = 64;
+
 export const getTransactionSizeLimit = (version: 0 | 1): number =>
   version === 1 ? V1_TRANSACTION_SIZE_LIMIT : PACKET_DATA_SIZE;
+
+const isHeaderComputeBudgetIx = (ix: TransactionInstruction): boolean =>
+  ix.programId.equals(ComputeBudgetProgram.programId) &&
+  !(
+    ix.data[0] < COMPUTE_BUDGET_IX_HEAP ||
+    ix.data[0] > COMPUTE_BUDGET_IX_DATA_SIZE
+  );
+
+// Unique accounts include the payer and program ids. Header ComputeBudget ixs
+// move into the message config, so they count toward nothing.
+export const exceedsV1Limits = (
+  feePayer: PublicKey,
+  instructions: TransactionInstruction[]
+): boolean => {
+  const ixs = instructions.filter((ix) => !isHeaderComputeBudgetIx(ix));
+  const accounts = new Set([feePayer.toBase58()]);
+  const signers = new Set([feePayer.toBase58()]);
+  for (const ix of ixs) {
+    accounts.add(ix.programId.toBase58());
+    for (const key of ix.keys) {
+      accounts.add(key.pubkey.toBase58());
+      if (key.isSigner) {
+        signers.add(key.pubkey.toBase58());
+      }
+    }
+  }
+  return (
+    accounts.size > V1_MAX_ACCOUNTS ||
+    signers.size > V1_MAX_SIGNERS ||
+    ixs.length > V1_MAX_INSTRUCTIONS
+  );
+};
 
 // v1 carries the compute budget in the message header, not as instructions.
 export const toV1TransactionConfig = (
@@ -45,11 +83,7 @@ export const toV1TransactionConfig = (
   const rest: TransactionInstruction[] = [];
   for (const ix of instructions) {
     const type = ix.data[0];
-    if (
-      !ix.programId.equals(ComputeBudgetProgram.programId) ||
-      type < COMPUTE_BUDGET_IX_HEAP ||
-      type > COMPUTE_BUDGET_IX_DATA_SIZE
-    ) {
+    if (!isHeaderComputeBudgetIx(ix)) {
       rest.push(ix);
       continue;
     }
