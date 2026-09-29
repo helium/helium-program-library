@@ -295,6 +295,10 @@ The tag format is strict: `docker-<env>-<service>-<version>`. The workflow parse
 
 Once the image is in ECR, update the `image:` field in the matching manifest under [`helium-foundation-k8s`](https://github.com/helium/helium-foundation-k8s) and merge — ArgoCD picks the change up within a few minutes. A full catalogue of where each image is deployed lives in the service's own README.
 
+#### Transaction version kill switch
+
+Crons and services that send through `@helium/spl-utils` pick the transaction version per send: an explicit per-call `version`, then the `HPL_TX_VERSION` env var, then detection (v1 once the cluster runs solana-core 4.2+ with the v1 feature gate active). To force every send back to v0 without a new image, set `HPL_TX_VERSION=v0` on the crons and services and restart them. `HPL_TX_VERSION=v1` forces v1. The env values live in the Helm values in [`helium-foundation-k8s`](https://github.com/helium/helium-foundation-k8s), not in this repo.
+
 ### Releasing a program to mainnet
 
 Mainnet program upgrades go through Squads (multisig) — this repo only builds the verifiable `.so`, stages a buffer, and proposes the upgrade transaction.

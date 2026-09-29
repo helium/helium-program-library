@@ -32,7 +32,10 @@ import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import { confineTaskQueueFreeIds } from "./helpers/tuktuk";
-import { signAndSubmitTransactionData } from "./helpers/tx";
+import {
+  expectLandedTxVersion,
+  signAndSubmitTransactionData,
+} from "./helpers/tx";
 import {
   ensureFunds,
   ensureTokenBalance,
@@ -131,6 +134,8 @@ describe("governance", () => {
         ctx.payer
       );
       expect(sigs).to.have.length(1);
+      // blockchain-api pins version 0 per call, whatever the lane forces
+      await expectLandedTxVersion(ctx.connection, sigs[0], 0);
 
       // Verify position exists on-chain
       const positionMint = data.transactionData.transactions[0].metadata

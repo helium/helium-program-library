@@ -154,8 +154,13 @@ jobs:
             file: delegate-account-resolution.test.ts
           - name: delegate-automation
             file: delegate-automation.test.ts
+          - name: tx-version
+            file: tx-version.test.ts
+        # Every suite runs with the transaction version forced each way. Drop
+        # the v0 lane 7 days after mainnet crons run clean on v1.
+        tx-version: [v1, v0]
 
-    name: ${{ matrix.test.name }}
+    name: ${{ matrix.test.name }} (${{ matrix.tx-version }})
 
     env:
       NODE_ENV: test
@@ -166,6 +171,7 @@ jobs:
       NEXT_PUBLIC_SOLANA_CLUSTER: mainnet
       SURFPOOL_SHOW_LOGS: "0"
       SURFPOOL_HEALTH_TIMEOUT_MS: "180000"
+      HPL_TX_VERSION: ${{ matrix.tx-version }}
 
     defaults:
       run:

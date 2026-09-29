@@ -19,7 +19,10 @@ import {
   ensureTokenBalance,
   loadKeypairFromEnv,
 } from "./helpers/wallet";
-import { signAndSubmitTransactionData } from "./helpers/tx";
+import {
+  expectLandedTxVersion,
+  signAndSubmitTransactionData,
+} from "./helpers/tx";
 import { TOKEN_MINTS } from "../../src/lib/constants/tokens";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -95,11 +98,13 @@ describe("token-transfer", () => {
     expect(actionMeta.tokenName).to.equal("SOL");
     expect(actionMeta.recipient).to.equal(recipient.publicKey.toBase58());
 
-    await signAndSubmitTransactionData(
+    const sigs = await signAndSubmitTransactionData(
       connection,
       result.transactionData,
       payer
     );
+    // blockchain-api pins version 0 per call, whatever the lane forces
+    await expectLandedTxVersion(connection, sigs[0], 0);
 
     const afterBalance = await connection.getBalance(recipient.publicKey);
     expect(afterBalance - beforeBalance).to.equal(lamports);

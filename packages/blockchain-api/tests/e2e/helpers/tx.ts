@@ -4,6 +4,7 @@ import {
   Transaction,
   TransactionInstruction,
   VersionedTransaction,
+  VersionedTransactionResponse,
 } from "@solana/web3.js";
 
 export interface TransactionDataLike {
@@ -82,4 +83,26 @@ export async function sendAndConfirmInstructions(
     "confirmed"
   );
   return sig;
+}
+
+// Reads the landed transaction back, so the check is on what the node
+// executed, not on what the builder returned.
+export async function expectLandedTxVersion(
+  connection: Connection,
+  signature: string,
+  expected: 0 | 1
+): Promise<VersionedTransactionResponse> {
+  const tx = await connection.getTransaction(signature, {
+    commitment: "confirmed",
+    maxSupportedTransactionVersion: 1,
+  });
+  if (!tx) {
+    throw new Error(`expectLandedTxVersion: ${signature} not found`);
+  }
+  if (tx.version !== expected) {
+    throw new Error(
+      `expectLandedTxVersion: ${signature} landed as version ${tx.version}, expected ${expected}`
+    );
+  }
+  return tx;
 }
