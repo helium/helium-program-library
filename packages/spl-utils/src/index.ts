@@ -1,7 +1,6 @@
 export * from "./extendBorsh";
 export * from "./transaction";
 export * from "./anchorError";
-export * from "./executeRemoteTxn";
 export * from "./utils";
 export * from "./token";
 export * from "./constants";

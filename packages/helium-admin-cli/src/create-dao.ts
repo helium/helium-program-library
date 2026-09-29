@@ -47,7 +47,6 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
-  Transaction,
   TransactionInstruction,
 } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
@@ -378,19 +377,13 @@ export async function run(args: any = process.argv) {
       })
       .rpc({ skipPreflight: true });
 
-    let tx = new Transaction();
-    tx.add(
+    await sendInstructions(provider, [
       SystemProgram.transfer({
         fromPubkey: provider.wallet.publicKey,
         toPubkey: accountPayerKey()[0],
         lamports: 5 * LAMPORTS_PER_SOL,
-      })
-    );
-    tx.recentBlockhash = (
-      await provider.connection.getLatestBlockhash()
-    ).blockhash;
-    tx.feePayer = provider.wallet.publicKey;
-    await provider.sendAndConfirm(tx);
+      }),
+    ]);
   }
 
   if (!(await exists(conn, dao))) {
