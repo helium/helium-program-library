@@ -71,6 +71,10 @@ jobs:
       - name: Run unit tests
         run: pnpm test:unit
 
+      - name: Run spl-utils unit tests
+        working-directory: packages/spl-utils
+        run: pnpm test
+
       - name: Typecheck
         run: pnpm typecheck
 

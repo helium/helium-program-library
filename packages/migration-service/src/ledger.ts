@@ -211,16 +211,22 @@ export async function getMigrateTransactions(
 
   const lamports = await provider.connection.getBalance(from);
 
-  const transactions = await batchInstructionsToTxsWithPriorityFee(provider, [
-    ...transferAssetIxns,
-    ...transferPositionIxns,
-    ...transferTokenInstructions,
-    SystemProgram.transfer({
-      fromPubkey: from,
-      toPubkey: to,
-      lamports,
-    }),
-  ]);
+  // A Ledger signs these on an out-of-repo client, and the migration tx
+  // executor (solana-sdk 2.x) cannot decode v1.
+  const transactions = await batchInstructionsToTxsWithPriorityFee(
+    provider,
+    [
+      ...transferAssetIxns,
+      ...transferPositionIxns,
+      ...transferTokenInstructions,
+      SystemProgram.transfer({
+        fromPubkey: from,
+        toPubkey: to,
+        lamports,
+      }),
+    ],
+    { version: 0 }
+  );
 
   return await Promise.all(
     transactions.map(toVersionedTx).map((tx, i) => {

@@ -140,6 +140,11 @@ export async function buildVersionedTransaction({
           addressLookupTables,
           instructions: instructionsWithFees,
           recentBlockhash: (await blockhashPromise).blockhash,
+          // Browser wallets sign these (squads and batched builds included),
+          // and no request says what they support. A future optional
+          // `signerTransactionVersions` input (absent = [legacy, 0]) is the
+          // channel for v1 (4.2 SPEC §2.4).
+          version: 0,
         },
         "finalized",
       ),

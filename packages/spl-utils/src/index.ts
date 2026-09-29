@@ -6,6 +6,7 @@ export * from "./utils";
 export * from "./token";
 export * from "./constants";
 export * from "./draft";
+export * from "./txVersion";
 export {
   fetchBackwardsCompatibleIdl,
   useBackwardsCompatibleIdl,

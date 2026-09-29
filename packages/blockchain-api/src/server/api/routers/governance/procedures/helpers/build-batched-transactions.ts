@@ -69,6 +69,7 @@ function measureSize(
     recentBlockhash: DUMMY_BLOCKHASH,
     instructions: [...COMPUTE_BUDGET_PLACEHOLDERS, ...instructions],
     addressLookupTables,
+    version: 0,
   });
   return tx.serialize().length;
 }

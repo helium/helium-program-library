@@ -555,6 +555,9 @@ export async function formBulkTransactions({
       ],
       // Wallet-signed: guard ixs may be appended (see withPriorityFees).
       deriveLoadedAccountsDataSizeLimit: false,
+      // The oracle's /bulk-sign co-signs with web3.js 1.x, which cannot
+      // sign v1.
+      version: 0,
     }
   );
   const initialTxs = initialTxDrafts.map(toVersionedTx);
@@ -778,6 +781,8 @@ export async function formTransaction({
   const tx = toVersionedTx({
     ...fullDraft,
     instructions,
+    // The oracle co-signs with web3.js 1.x, which cannot sign v1.
+    version: 0,
   });
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);

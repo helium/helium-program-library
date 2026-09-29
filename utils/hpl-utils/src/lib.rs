@@ -37,6 +37,24 @@ pub struct SendResult {
   pub confirmed_signatures: Vec<Option<Signature>>,
 }
 
+// solana-sdk 2.x decodes legacy and v0 only. A newer transaction (v1 leads
+// with its message, prefix byte 0x80 | version) fails here with an error that
+// names it instead of a panic.
+fn deserialize_versioned_transaction(
+  idx: usize,
+  tx: &[u8],
+) -> Result<VersionedTransaction, TpuSenderError> {
+  bincode::deserialize(tx).map_err(|err| {
+    let version = match tx.first() {
+      Some(prefix) if prefix & 0x80 != 0 => format!("version {}", prefix & 0x7f),
+      _ => "an unknown version".to_string(),
+    };
+    TpuSenderError::Custom(format!(
+      "transaction {idx} is {version}, which solana-sdk 2.x cannot decode: {err}"
+    ))
+  })
+}
+
 // This is based on tpu_client but rewritten to work with raw versioned txs
 pub fn send_and_confirm_messages_with_spinner<
   P: ConnectionPool<NewConnectionConfig = C>,
@@ -67,11 +85,8 @@ pub fn send_and_confirm_messages_with_spinner<
   let transactions_with_sigs: Vec<(usize, Vec<u8>, VersionedTransaction)> = messages
     .into_iter()
     .enumerate()
-    .map(|(idx, tx)| {
-      let vt: VersionedTransaction = bincode::deserialize(&tx).unwrap();
-      (idx, tx.clone(), vt)
-    })
-    .collect();
+    .map(|(idx, tx)| Ok((idx, tx.clone(), deserialize_versioned_transaction(idx, tx)?)))
+    .collect::<Result<_, TpuSenderError>>()?;
   let total_transactions = transactions_with_sigs.len();
   let mut transaction_errors = vec![None; transactions_with_sigs.len()];
   let mut confirmed_signatures = vec![None; transactions_with_sigs.len()];
@@ -338,4 +353,32 @@ pub fn construct_and_send_txs<
   }
 
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use solana_sdk::{hash::Hash, message::Message};
+
+  #[test]
+  fn decodes_a_legacy_transaction() {
+    let payer = Keypair::new();
+    let tx = Transaction::new(
+      &[&payer],
+      Message::new(&[], Some(&payer.pubkey())),
+      Hash::default(),
+    );
+    let bytes = bincode::serialize(&VersionedTransaction::from(tx)).unwrap();
+    assert!(deserialize_versioned_transaction(0, &bytes).is_ok());
+  }
+
+  #[test]
+  fn names_the_unsupported_version() {
+    // v1 wire bytes lead with the message, whose first byte is 0x81.
+    let bytes = [0x81, 1, 0, 0];
+    let err = deserialize_versioned_transaction(3, &bytes).unwrap_err();
+    let message = err.to_string();
+    assert!(message.contains("transaction 3"), "{message}");
+    assert!(message.contains("version 1"), "{message}");
+  }
 }

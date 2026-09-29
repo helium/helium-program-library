@@ -826,6 +826,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       commitment: "finalized" as const,
       // Wallet-signed: guard ixs may be appended (see withPriorityFees).
       deriveLoadedAccountsDataSizeLimit: false,
+      version: 0 as const,
     };
 
     const addDrafts = (drafts: TransactionDraft[], description: string) => {
@@ -993,6 +994,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
             ],
             feePayer,
             addressLookupTableAddresses: [lut],
+            version: 0,
           } as TransactionDraft);
           txMetadata.push({
             type: TRANSACTION_TYPES.MIGRATION,

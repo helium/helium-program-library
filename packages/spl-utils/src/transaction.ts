@@ -33,6 +33,7 @@ import {
   withPriorityFees,
 } from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
+import { TxVersionOption } from "./txVersion";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -824,6 +825,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     loadedAccountsDataSizeLimit,
     // See withPriorityFees; set false for wallet-signed txs.
     deriveLoadedAccountsDataSizeLimit,
+    version,
   }: {
     commitment?: Commitment;
     // Manually specify limit instead of simulating
@@ -842,6 +844,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
     maxInstructionsPerTx?: number;
     loadedAccountsDataSizeLimit?: number;
     deriveLoadedAccountsDataSizeLimit?: boolean;
+    // Carried onto every draft; see TransactionDraft.version.
+    version?: TxVersionOption;
   } = {}
 ): Promise<TransactionDraft[]> {
   let currentTxInstructions: TransactionInstruction[] = [];
@@ -906,6 +910,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
           ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
         )
       ),
+      version,
     });
   };
   for (const instruction of instructions) {
