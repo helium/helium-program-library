@@ -18,6 +18,7 @@ import {
   toVersionedTx,
 } from "../src/transaction";
 import { TransactionDraft } from "../src/draft";
+import { setLoadedAccountsDataSizeLimit } from "../src/priorityFees";
 import { resetTxVersionCache } from "../src/txVersion";
 
 const FEE_PAYER = Keypair.generate().publicKey;
@@ -85,12 +86,17 @@ const serializedSize = async (draft: TransactionDraft) =>
 
 // The batcher prices each chunk with a limit + price pair, so a fixture is
 // measured the same way the emitted tx will be.
-const measure = async (ixs: TransactionInstruction[], version: 0 | 1) =>
+const measure = async (
+  ixs: TransactionInstruction[],
+  version: 0 | 1,
+  budgetIxs: TransactionInstruction[] = []
+) =>
   (
     await toVersionedTx({
       instructions: [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 200000 }),
         ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
+        ...budgetIxs,
         ...ixs,
       ],
       feePayer: FEE_PAYER,
@@ -101,9 +107,18 @@ const measure = async (ixs: TransactionInstruction[], version: 0 | 1) =>
   ).serialize().length;
 
 // Two ixs whose tx serializes to exactly `target` bytes.
-const pairAt = async (target: number, first: number, version: 0 | 1) => {
+const pairAt = async (
+  target: number,
+  first: number,
+  version: 0 | 1,
+  budgetIxs: TransactionInstruction[] = []
+) => {
   const base = 200;
-  const size = await measure([dataIx(first), dataIx(base)], version);
+  const size = await measure(
+    [dataIx(first), dataIx(base)],
+    version,
+    budgetIxs
+  );
   return [dataIx(first), dataIx(base + target - size)];
 };
 
@@ -123,6 +138,17 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
       makeProvider(),
       await pairAt(1233, 500, 0),
       { ...OPTIONS, version: 0 }
+    );
+    expect(drafts).to.have.length(2);
+  });
+
+  it("counts the loaded-accounts-data-size ix when sizing a v0 pair", async () => {
+    // Explicit computeUnitLimit and loadedAccountsDataSizeLimit emit the
+    // data-size ix without simulating.
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      makeProvider(),
+      await pairAt(1233, 500, 0, [setLoadedAccountsDataSizeLimit(100000)]),
+      { ...OPTIONS, loadedAccountsDataSizeLimit: 100000, version: 0 }
     );
     expect(drafts).to.have.length(2);
   });

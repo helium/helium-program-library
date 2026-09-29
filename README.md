@@ -297,7 +297,7 @@ Once the image is in ECR, update the `image:` field in the matching manifest und
 
 #### Transaction version kill switch
 
-Crons and services that send through `@helium/spl-utils` pick the transaction version per send: an explicit per-call `version`, then the `HPL_TX_VERSION` env var, then detection (v1 once the cluster runs solana-core 4.2+ with the v1 feature gate active). To force every send back to v0 without a new image, set `HPL_TX_VERSION=v0` on the crons and services and restart them. `HPL_TX_VERSION=v1` forces v1. Any other value throws, so a typo such as `V0` or `0` fails the send instead of being ignored. The env values live in the Helm values in [`helium-foundation-k8s`](https://github.com/helium/helium-foundation-k8s), not in this repo.
+Crons and services that send through `@helium/spl-utils` pick the transaction version per send: an explicit per-call `version`, then the `HPL_TX_VERSION` env var, then detection (v1 once the cluster runs solana-core 4.2+ with the v1 feature gate active). To force every send back to v0 without a new image, set `HPL_TX_VERSION=v0` on the crons and services and restart them. `HPL_TX_VERSION=v1` forces v1. Any other value throws, so a typo such as `V0` or `0` fails every send that does not pin a per-call `version`, instead of being ignored. The env values live in the Helm values in [`helium-foundation-k8s`](https://github.com/helium/helium-foundation-k8s), not in this repo.
 
 ### Releasing a program to mainnet
 
