@@ -198,7 +198,7 @@ jobs:
             ~/.cargo/bin/surfpool
             ~/.cargo/.crates2.json
             ~/.cargo/.crates.toml
-          key: ${{ runner.os }}-surfpool-bin-v0.11.2
+          key: ${{ runner.os }}-surfpool-bin-v1.6.0
 
       - name: Install Surfpool CLI
         if: steps.cache-surfpool.outputs.cache-hit != 'true'
@@ -208,7 +208,7 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
           CARGO_HTTP_MULTIPLEXING: "false"
         run: |
-          cargo install --git https://github.com/txtx/surfpool --tag v0.11.2 --locked --force
+          cargo install --git https://github.com/txtx/surfpool --tag v1.6.0 --locked --force
 
       - name: Download anchor types and IDLs
         uses: actions/download-artifact@v4
