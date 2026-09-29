@@ -23,6 +23,7 @@ import {
 } from "@/lib/utils/build-transaction";
 import {
   calculateRequiredBalance,
+  getDataOnlyOnboardRentLamports,
   getTransactionFee,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -143,11 +144,16 @@ export const onboardDataOnlyHotspot =
         },
       });
 
-      const [totalFee, walletBalance] = await Promise.all([
+      const [totalFee, walletBalance, infoRent] = await Promise.all([
         getTransactionFee(connection, tx),
         connection.getBalance(owner),
+        getDataOnlyOnboardRentLamports(connection, network),
       ]);
-      const required = await calculateRequiredBalance(connection, totalFee, 0);
+      const required = await calculateRequiredBalance(
+        connection,
+        totalFee,
+        infoRent
+      );
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance for transaction fees",

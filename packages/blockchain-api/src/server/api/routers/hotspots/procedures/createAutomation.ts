@@ -149,7 +149,7 @@ export const createAutomation =
         recipientRentLamports,
         pdaWalletRentLamports,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
         pdaWallet,
       } = await fetchAutomationData(walletAddress, provider);
 
@@ -163,7 +163,7 @@ export const createAutomation =
             cronSchedule.length,
           );
 
-      // ATA rent and task return account rent are included from automationData
+      // ATA rent and task return account funding are included from automationData
       const { cronJobFundingLamports, pdaWalletFundingLamports } =
         calculateFundingForAdditionalDuration({
           cronJobBalanceLamports,
@@ -175,7 +175,7 @@ export const createAutomation =
           pdaWalletRentLamports,
           additionalDuration: duration,
           ataRentLamports,
-          taskReturnAccountRentLamports,
+          taskReturnAccountFundingLamports,
         });
 
       // Always add at least minimal funding to ensure transaction is created

@@ -191,7 +191,7 @@ export interface CalculatePeriodsRemainingParams {
   cronJobRentLamports: number; // Minimum rent for cron job account (calculated from account data length)
   pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet, priced from the cluster
   ataRentLamports?: number; // ATA rent if ATA doesn't exist (will be locked up)
-  taskReturnAccountRentLamports?: number; // Task return account rent if it doesn't exist (will be locked up)
+  taskReturnAccountFundingLamports?: number; // Fixed 0.01 SOL the cron job is topped up with for its task return accounts on first funding; not rent
 }
 
 /**
@@ -221,16 +221,16 @@ export function calculatePeriodsRemaining(
     cronJobRentLamports,
     pdaWalletRentLamports,
     ataRentLamports = 0,
-    taskReturnAccountRentLamports = 0,
+    taskReturnAccountFundingLamports = 0,
   } = params;
 
-  // Subtract minimum rent, task return account rent, and recipient rent from balances since they're already committed
+  // Subtract minimum rent, task return account funding, and recipient rent from balances since they're already committed
   // Cron job must maintain rent for the account and task return account
   const availableCronJobBalance = Math.max(
     0,
     cronJobBalanceLamports -
       cronJobRentLamports -
-      taskReturnAccountRentLamports,
+      taskReturnAccountFundingLamports,
   );
 
   // PDA wallet must maintain minimum rent, plus any recipient rent and ATA rent
@@ -328,7 +328,7 @@ export interface CalculateFundingForAdditionalDurationParams {
   pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet, priced from the cluster
   additionalDuration: number;
   ataRentLamports?: number; // ATA rent if ATA doesn't exist (will be locked up)
-  taskReturnAccountRentLamports?: number; // Task return account rent if it doesn't exist (will be locked up)
+  taskReturnAccountFundingLamports?: number; // Fixed 0.01 SOL the cron job is topped up with for its task return accounts on first funding; not rent
 }
 
 /**
@@ -354,16 +354,16 @@ export function calculateFundingForAdditionalDuration(
     pdaWalletRentLamports,
     additionalDuration,
     ataRentLamports = 0,
-    taskReturnAccountRentLamports = 0,
+    taskReturnAccountFundingLamports = 0,
   } = params;
 
   // Calculate available balances (subtract rent that's already committed)
-  // Task return account rent is part of cron job funding, so subtract it from cron job balance
+  // Task return account funding is part of cron job funding, so subtract it from cron job balance
   // If balance goes negative, that's a shortfall that needs to be funded
   const cronJobBalanceAfterRent =
     cronJobBalanceLamports -
     cronJobRentLamports -
-    taskReturnAccountRentLamports;
+    taskReturnAccountFundingLamports;
   const cronJobRentShortfall = Math.max(0, -cronJobBalanceAfterRent);
   const availableCronJobBalanceLamports = Math.max(0, cronJobBalanceAfterRent);
 
@@ -427,7 +427,7 @@ export function calculateFundingForAdditionalDuration(
 
   // Add rent shortfalls (when balance doesn't cover required rent)
   // The shortfall already includes all rent (PDA wallet rent, recipient rent, ATA rent for PDA wallet;
-  // cron job rent, task return account rent for cron job)
+  // cron job rent, task return account funding for cron job)
   // So we just add the shortfall - no need to add rent separately
   const cronJobFundingWithShortfall =
     fundingNeeded.cronJobFundingLamports + cronJobRentShortfall;
@@ -435,15 +435,15 @@ export function calculateFundingForAdditionalDuration(
     fundingNeeded.pdaWalletFundingLamports + pdaWalletRentShortfall;
 
   // However, if there's no shortfall (balance already covers rent), we still need to add
-  // ATA rent and task return account rent if they don't exist yet (one-time creation costs)
+  // ATA rent and task return account funding if they don't exist yet (one-time creation costs)
   const pdaWalletFundingWithAta =
     pdaWalletFundingWithShortfall +
     (pdaWalletRentShortfall === 0 && ataRentLamports > 0 ? ataRentLamports : 0);
 
   const cronJobFundingWithTaskReturn =
     cronJobFundingWithShortfall +
-    (cronJobRentShortfall === 0 && taskReturnAccountRentLamports > 0
-      ? taskReturnAccountRentLamports
+    (cronJobRentShortfall === 0 && taskReturnAccountFundingLamports > 0
+      ? taskReturnAccountFundingLamports
       : 0);
 
   // Recipient fee: return only the ADDITIONAL recipient rent that still needs to be paid.

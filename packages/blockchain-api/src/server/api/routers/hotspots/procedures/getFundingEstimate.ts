@@ -33,7 +33,7 @@ export const getFundingEstimate =
         recipientRentLamports,
         pdaWalletRentLamports,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
       } = automationData;
 
       // Calculate initial setup rent if automation doesn't exist
@@ -58,7 +58,7 @@ export const getFundingEstimate =
         pdaWalletRentLamports,
         additionalDuration: duration,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
       });
 
       const cronJobFunding = cronJobFundingLamports / LAMPORTS_PER_SOL;

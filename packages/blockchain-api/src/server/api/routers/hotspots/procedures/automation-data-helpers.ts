@@ -148,7 +148,7 @@ export interface AutomationData {
   recipientRentLamports: number;
   pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet
   ataRentLamports: number; // ATA rent if ATA doesn't exist (will be locked up)
-  taskReturnAccountRentLamports: number; // Task return account rent if it doesn't exist (will be locked up)
+  taskReturnAccountFundingLamports: number; // Fixed 0.01 SOL the cron job is topped up with for its task return accounts on first funding; not rent
   cronJob: PublicKey;
   pdaWallet: PublicKey;
 }
@@ -249,7 +249,7 @@ export async function fetchAutomationData(
   // If the ATA doesn't exist, rent will be needed and locked up
   const ataRentLamports = ataAccount ? 0 : ataRent;
 
-  const taskReturnAccountRentLamports = taskReturnAccountInfo
+  const taskReturnAccountFundingLamports = taskReturnAccountInfo
     ? 0
     : Math.ceil(TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL);
 
@@ -265,7 +265,7 @@ export async function fetchAutomationData(
     recipientRentLamports,
     pdaWalletRentLamports,
     ataRentLamports,
-    taskReturnAccountRentLamports,
+    taskReturnAccountFundingLamports,
     cronJob,
     pdaWallet,
   };

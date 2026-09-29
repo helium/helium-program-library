@@ -32,7 +32,7 @@ export const getAutomationStatus =
         recipientRentLamports,
         pdaWalletRentLamports,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
       } = await fetchAutomationData(walletAddress, provider);
 
       // Calculate funding needed using the same helper as getFundingEstimate
@@ -48,7 +48,7 @@ export const getAutomationStatus =
           pdaWalletRentLamports,
           additionalDuration: 0,
           ataRentLamports,
-          taskReturnAccountRentLamports,
+          taskReturnAccountFundingLamports,
         });
 
       const rentFee = cronJobAccount
@@ -89,7 +89,7 @@ export const getAutomationStatus =
         };
 
         // Calculate periods remaining for each pool separately
-        // Accounts for minimum rent requirements, recipient rent, ATA rent, and task return account rent
+        // Accounts for minimum rent requirements, recipient rent, ATA rent, and task return account funding
         const {
           periodsRemaining,
           periodLength,
@@ -105,7 +105,7 @@ export const getAutomationStatus =
           cronJobRentLamports,
           pdaWalletRentLamports,
           ataRentLamports,
-          taskReturnAccountRentLamports,
+          taskReturnAccountFundingLamports,
         });
 
         remainingClaims = periodsRemaining;
