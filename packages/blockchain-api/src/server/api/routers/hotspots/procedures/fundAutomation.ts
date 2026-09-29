@@ -1,6 +1,6 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { calculateFundingForAdditionalDuration } from "@/lib/utils/automation-helpers";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   HELIUM_COMMON_LUT,
   HELIUM_COMMON_LUT_DEVNET,

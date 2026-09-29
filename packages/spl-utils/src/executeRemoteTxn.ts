@@ -1,4 +1,4 @@
-import { Provider, AnchorProvider } from "@coral-xyz/anchor";
+import { Provider, AnchorProvider } from "@anchor-lang/core";
 import { Transaction } from "@solana/web3.js";
 import { ProgramError } from "./anchorError";
 import axios from "axios";

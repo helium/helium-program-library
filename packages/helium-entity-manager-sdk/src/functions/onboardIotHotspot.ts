@@ -1,4 +1,4 @@
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 import {
   ProofArgsAndAccountsArgs,

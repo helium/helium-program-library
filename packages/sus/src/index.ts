@@ -3,12 +3,12 @@ import {
   BorshAccountsCoder,
   BorshInstructionCoder,
   Idl,
-} from "@coral-xyz/anchor";
+} from "@anchor-lang/core";
 import {
   convertIdlToCamelCase,
   decodeIdlAccount,
-} from "@coral-xyz/anchor/dist/cjs/idl";
-import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+} from "@anchor-lang/core/dist/cjs/idl";
+import { utf8 } from "@anchor-lang/core/dist/cjs/utils/bytes";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import {
   PROGRAM_ID as MPL_PID,

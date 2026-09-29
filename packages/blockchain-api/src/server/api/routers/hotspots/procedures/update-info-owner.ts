@@ -1,4 +1,4 @@
-import { BN } from "@coral-xyz/anchor";
+import { BN } from "@anchor-lang/core";
 import { dataCreditsKey } from "@helium/data-credits-sdk";
 import {
   iotInfoKey,

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { PublicKey, TransactionSignature } from "@solana/web3.js";
 
 interface GetTransactionSignaturesUptoBlockTimeArgs {

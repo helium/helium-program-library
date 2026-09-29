@@ -4,7 +4,7 @@ import {
   createVerifyCollectionInstruction,
   PROGRAM_ID as METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   createAssociatedTokenAccountInstruction,
   createInitializeMintInstruction,

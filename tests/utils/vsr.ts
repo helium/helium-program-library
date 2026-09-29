@@ -6,7 +6,7 @@ import {
   toBN,
   truthy,
 } from "@helium/spl-utils";
-import { AnchorProvider, BN, Program, web3 } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program, web3 } from "@anchor-lang/core";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
   Keypair,

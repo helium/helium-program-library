@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init } from "@helium/voter-stake-registry-sdk";
 import { PublicKey } from "@solana/web3.js";
 import os from "os";

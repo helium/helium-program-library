@@ -1,4 +1,4 @@
-import { Program, Provider, web3 } from "@coral-xyz/anchor";
+import { Program, Provider, web3 } from "@anchor-lang/core";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { PROGRAM_ID, init } from "@helium/voter-stake-registry-sdk";
 

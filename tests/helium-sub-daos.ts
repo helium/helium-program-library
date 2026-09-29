@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import { PythSolanaReceiver } from "@pythnetwork/pyth-solana-receiver";
 import { init as cbInit } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";

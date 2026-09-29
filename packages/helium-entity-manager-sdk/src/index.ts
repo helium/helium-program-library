@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Asset, HNT_MINT } from "@helium/spl-utils";
 import { keyToAssetKey } from "./pdas";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
-import { IdlTypes } from "@coral-xyz/anchor";
+import { IdlTypes } from "@anchor-lang/core";
 import { HeliumEntityManager } from "@helium/idls/lib/types/helium_entity_manager";
 
 export * from "./constants";

@@ -1,4 +1,4 @@
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@anchor-lang/core";
 import {
   PROGRAM_ID as HSD_PROGRAM_ID,
   init as initHsd,

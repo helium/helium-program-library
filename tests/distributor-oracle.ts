@@ -1,6 +1,6 @@
-import * as anchor from "@coral-xyz/anchor";
-import { BN, Program } from "@coral-xyz/anchor";
-import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+import * as anchor from "@anchor-lang/core";
+import { BN, Program } from "@anchor-lang/core";
+import { bs58 } from "@anchor-lang/core/dist/cjs/utils/bytes";
 import Address from "@helium/address";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import { Keypair as HeliumKeypair } from "@helium/crypto";

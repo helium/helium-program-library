@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
 import { init as initMfan } from "@helium/mini-fanout-sdk";
 import { HNT_MINT, sendInstructionsWithPriorityFee } from "@helium/spl-utils";

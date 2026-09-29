@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
 import retry from "async-retry";
 import { Op, Sequelize, Transaction } from "sequelize";

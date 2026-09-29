@@ -1,7 +1,7 @@
 import { publicProcedure } from "../../../procedures";
 import { createSolanaConnection } from "@/lib/solana";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   getBaseAutomationRentLamports,
   TASK_RETURN_ACCOUNT_SIZE,
