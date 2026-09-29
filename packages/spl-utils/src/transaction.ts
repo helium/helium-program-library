@@ -2,7 +2,6 @@ import { AnchorProvider, Program, Provider } from "@anchor-lang/core";
 import {
   AddressLookupTableAccount,
   Commitment,
-  ComputeBudgetProgram,
   Connection,
   Keypair,
   Message,
@@ -28,8 +27,8 @@ import {
   DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
   MAX_PRIO_FEE,
   callerComputeBudgetTypes,
+  prependComputeBudgetIxs,
   prependedComputeBudgetIxs,
-  setLoadedAccountsDataSizeLimit,
   withPriorityFees,
 } from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
@@ -948,34 +947,20 @@ export async function batchInstructionsToTxsWithPriorityFee(
       ),
     versions: resolvedVersion === 1 ? [1, 0] : [0],
     toProbe: (chunk, chunkVersion) => {
-      // Same skip as flushChunk: v1 rejects duplicate ComputeBudget types.
-      const chunkCbTypes = callerComputeBudgetTypes(chunk);
+      // Probe must match the real tx's ix count or the size check
+      // mis-measures: under-counting overflows maxTxSize, over-counting
+      // splits early. The placeholder values don't affect sizing.
       return {
-        instructions: [
-          ...[
-            ComputeBudgetProgram.setComputeUnitLimit({
-              units: computeUnitLimit || 100000,
-            }),
-            ComputeBudgetProgram.setComputeUnitPrice({
-              // Placeholder, will be replaced with actual value
-              microLamports: 1,
-            }),
-            // Probe must match the real tx's ix count or the size check
-            // mis-measures: under-counting overflows maxTxSize, over-counting
-            // splits early. The ix is a fixed 5 bytes, so the placeholder value
-            // doesn't affect sizing. Omit it when the real tx won't carry one.
-            ...(loadedAccountsDataSizeLimit != null ||
+        instructions: prependComputeBudgetIxs(chunk, {
+          computeUnits: computeUnitLimit || 100000,
+          microLamports: 1,
+          loadedAccountsDataSizeLimit:
+            loadedAccountsDataSizeLimit != null ||
             deriveLoadedAccountsDataSizeLimit !== false
-              ? [
-                  setLoadedAccountsDataSizeLimit(
-                    loadedAccountsDataSizeLimit ??
-                      DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
-                  ),
-                ]
-              : []),
-          ].filter((ix) => !chunkCbTypes.has(ix.data[0])),
-          ...chunk,
-        ],
+              ? (loadedAccountsDataSizeLimit ??
+                DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT)
+              : undefined,
+        }),
         addressLookupTableAddresses: addressLookupTableAddresses || [],
         feePayer: provider.wallet.publicKey,
         recentBlockhash: blockhash,

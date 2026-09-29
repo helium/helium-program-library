@@ -80,7 +80,7 @@ describe("resolveSignerVersions", () => {
     expect([...resolveSignerVersions(wallet)]).to.have.members(["legacy", 0]);
   });
 
-  it("logs a signer's capability once per signer", () => {
+  it("logs a signer's capability once per capability set", () => {
     const lines: string[] = [];
     const info = console.info;
     console.info = (...args: any[]) => lines.push(args.join(" "));
@@ -94,6 +94,21 @@ describe("resolveSignerVersions", () => {
       console.info = info;
     }
     expect(lines).to.have.length(2);
+  });
+
+  it("logs two signers with the same capability set once between them", () => {
+    const lines: string[] = [];
+    const info = console.info;
+    console.info = (...args: any[]) => lines.push(args.join(" "));
+    try {
+      const a = Keypair.generate();
+      const b = Keypair.generate();
+      resolveSignerVersions({ payer: a, publicKey: a.publicKey });
+      resolveSignerVersions({ payer: b, publicKey: b.publicKey });
+    } finally {
+      console.info = info;
+    }
+    expect(lines).to.have.length(1);
   });
 });
 
