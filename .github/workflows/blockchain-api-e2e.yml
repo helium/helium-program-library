@@ -75,6 +75,10 @@ jobs:
         working-directory: packages/spl-utils
         run: pnpm test
 
+      - name: Run sus unit tests
+        working-directory: packages/sus
+        run: pnpm test
+
       - name: Typecheck
         run: pnpm typecheck
 

@@ -135,7 +135,9 @@ export const sampleComputeUnits = async (
         const ixs = tx.transaction.message.instructions;
         (txStats[label] ??= []).push([
           sig,
-          requestedCu(ixs),
+          // v1 carries the limit in the message header, not as an ix.
+          tx.transaction.message.transactionConfig?.computeUnitLimit ??
+            requestedCu(ixs),
           tx.meta.computeUnitsConsumed ?? null,
         ]);
 
