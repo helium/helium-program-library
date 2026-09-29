@@ -270,7 +270,7 @@ export async function getTransactionFee(
 
 /**
  * Local fallback: (base_signature_fee * num_signatures) + priority fee parsed
- * from the transaction's compute-budget instructions.
+ * from the transaction's compute-budget instructions, or from the v1 header.
  *
  * Models only today's fee components — it does NOT model the SIMD-0553
  * resource fee (burned, priced on requested CU + loaded-data size), whose
@@ -281,6 +281,11 @@ export async function getTransactionFee(
 function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
   const numSignatures = tx.message.header.numRequiredSignatures;
   const baseFee = BASE_SIGNATURE_FEE_LAMPORTS * numSignatures;
+
+  // v1 carries the total priority fee, in lamports, in the message header.
+  if (tx.message.version === 1) {
+    return baseFee + (tx.message.transactionConfig.priorityFee ?? 0);
+  }
 
   let computeUnitLimit: number | undefined;
   let computeUnitPrice = 0; // Default no priority fee
