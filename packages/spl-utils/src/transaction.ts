@@ -191,6 +191,16 @@ export async function sendInstructions(
   ) {
     tx = await provider.wallet.signTransaction(tx);
   }
+  // VersionedTransaction.serialize does not verify signatures, so an
+  // unsigned required signer would otherwise be resent until it expires.
+  const unsigned = tx.signatures.findIndex((sig) => sig.every((b) => b === 0));
+  if (unsigned >= 0) {
+    throw new Error(
+      `Missing signature for public key ${tx.message.staticAccountKeys[
+        unsigned
+      ].toBase58()}`
+    );
+  }
 
   try {
     const { txid } = await sendAndConfirmWithRetry(
@@ -937,36 +947,42 @@ export async function batchInstructionsToTxsWithPriorityFee(
         Array.isArray(instruction) ? instruction : [instruction]
       ),
     versions: resolvedVersion === 1 ? [1, 0] : [0],
-    toProbe: (chunk, chunkVersion) => ({
-      instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units: computeUnitLimit || 100000,
-        }),
-        ComputeBudgetProgram.setComputeUnitPrice({
-          // Placeholder, will be replaced with actual value
-          microLamports: 1,
-        }),
-        // Probe must match the real tx's ix count or the size check
-        // mis-measures: under-counting overflows maxTxSize, over-counting
-        // splits early. The ix is a fixed 5 bytes, so the placeholder value
-        // doesn't affect sizing. Omit it when the real tx won't carry one.
-        ...(loadedAccountsDataSizeLimit != null ||
-        deriveLoadedAccountsDataSizeLimit !== false
-          ? [
-              setLoadedAccountsDataSizeLimit(
-                loadedAccountsDataSizeLimit ??
-                  DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
-              ),
-            ]
-          : []),
-        ...chunk,
-      ],
-      addressLookupTableAddresses: addressLookupTableAddresses || [],
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash: blockhash,
-      addressLookupTables,
-      version: chunkVersion,
-    }),
+    toProbe: (chunk, chunkVersion) => {
+      // Same skip as flushChunk: v1 rejects duplicate ComputeBudget types.
+      const chunkCbTypes = callerComputeBudgetTypes(chunk);
+      return {
+        instructions: [
+          ...[
+            ComputeBudgetProgram.setComputeUnitLimit({
+              units: computeUnitLimit || 100000,
+            }),
+            ComputeBudgetProgram.setComputeUnitPrice({
+              // Placeholder, will be replaced with actual value
+              microLamports: 1,
+            }),
+            // Probe must match the real tx's ix count or the size check
+            // mis-measures: under-counting overflows maxTxSize, over-counting
+            // splits early. The ix is a fixed 5 bytes, so the placeholder value
+            // doesn't affect sizing. Omit it when the real tx won't carry one.
+            ...(loadedAccountsDataSizeLimit != null ||
+            deriveLoadedAccountsDataSizeLimit !== false
+              ? [
+                  setLoadedAccountsDataSizeLimit(
+                    loadedAccountsDataSizeLimit ??
+                      DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
+                  ),
+                ]
+              : []),
+          ].filter((ix) => !chunkCbTypes.has(ix.data[0])),
+          ...chunk,
+        ],
+        addressLookupTableAddresses: addressLookupTableAddresses || [],
+        feePayer: provider.wallet.publicKey,
+        recentBlockhash: blockhash,
+        addressLookupTables,
+        version: chunkVersion,
+      };
+    },
     maxTxSize,
     maxInstructionsPerTx,
     computeScaleUp,

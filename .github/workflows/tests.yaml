@@ -387,6 +387,11 @@ jobs:
       - run: cd $RUST_PATH && cargo build
         env:
           RUST_PATH: ${{ matrix.test }}
+      # hpl-utils carries unit tests that no other job runs.
+      - if: matrix.test == 'utils/hpl-utils'
+        run: cd $RUST_PATH && cargo test
+        env:
+          RUST_PATH: ${{ matrix.test }}
 
   test-contracts:
     needs: build

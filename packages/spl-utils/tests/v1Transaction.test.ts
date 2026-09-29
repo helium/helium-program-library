@@ -60,9 +60,8 @@ describe("toV1TransactionConfig", () => {
       price(Number.MAX_SAFE_INTEGER),
       transfer,
     ]);
-    expect(config.priorityFeeLamports).to.equal(
-      (BigInt(Number.MAX_SAFE_INTEGER) * 1_400_000n + 999_999n) / 1_000_000n
-    );
+    // ceil(9007199254740991 * 1400000 / 1000000), computed by hand.
+    expect(config.priorityFeeLamports).to.equal(12_610_078_956_637_388n);
   });
 
   it("defaults a missing CU limit to the table and data size to 64 MiB", () => {

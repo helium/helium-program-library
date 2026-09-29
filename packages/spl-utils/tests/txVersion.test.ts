@@ -213,6 +213,23 @@ describe("transaction version precedence", () => {
     expect(await resolveTxVersion(connection)).to.equal(0);
   });
 
+  it("rejects an HPL_TX_VERSION other than v0, v1 or auto", async () => {
+    const { connection } = fakeConnection();
+    for (const value of ["V0", "0", "v2"]) {
+      resetTxVersionCache();
+      process.env.HPL_TX_VERSION = value;
+      let error: Error | undefined;
+      try {
+        await resolveTxVersion(connection);
+      } catch (e: any) {
+        error = e;
+      }
+      expect(error?.message).to.equal(
+        `HPL_TX_VERSION must be v0, v1 or auto; got ${value}`
+      );
+    }
+  });
+
   it("HPL_TX_VERSION=auto defers to detection", async () => {
     process.env.HPL_TX_VERSION = "auto";
     const { connection } = fakeConnection();

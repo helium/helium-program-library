@@ -11,7 +11,7 @@ const TX_V1_FEATURE_GATE = new PublicKey(
 // Per RPC endpoint, for the process lifetime (no TTL).
 const detectedVersions = new Map<string, Promise<0 | 1>>();
 const warnedEndpoints = new Set<string>();
-const loggedSigners = new Set<string>();
+const loggedCapabilitySets = new Set<string>();
 let envTxVersion: TxVersionOption | undefined;
 let walletSignedTxVersionCeiling: 0 | 1 = 0;
 
@@ -20,13 +20,21 @@ function envTxVersionOption(): TxVersionOption {
   if (envTxVersion === undefined) {
     const env =
       typeof process !== "undefined" ? process.env?.HPL_TX_VERSION : undefined;
-    envTxVersion = env === "v0" ? 0 : env === "v1" ? 1 : "auto";
+    if (!env || env === "auto") envTxVersion = "auto";
+    else if (env === "v0") envTxVersion = 0;
+    else if (env === "v1") envTxVersion = 1;
+    // A typo in the kill switch must not quietly leave v1 on.
+    else throw new Error(`HPL_TX_VERSION must be v0, v1 or auto; got ${env}`);
   }
   return envTxVersion;
 }
 
 // Called once by the host app. Caps wallet-shaped signers only; a
-// keypair-backed wallet is never capped.
+// keypair-backed wallet is never capped. Raising it to 1 does not work yet
+// under web3.js 1.x: a wallet-standard adapter returns a plain
+// VersionedTransaction whose v1 message web3.js cannot serialize, so
+// sendInstructions throws after signing. The caller must re-wrap the signed
+// transaction into a V1Transaction first.
 export function setWalletSignedTxVersionCeiling(ceiling: 0 | 1): void {
   walletSignedTxVersionCeiling = ceiling;
 }
@@ -48,10 +56,13 @@ export function resolveSignerVersions(
   }
 
   // Logged so the team learns when a wallet vendor adds v1 and a ceiling-raise
-  // smoke is due; the ceiling never moves on its own.
+  // smoke is due; the ceiling never moves on its own. Keyed on the capability
+  // set, not the signer: signers come from request input, so a per-signer key
+  // grows without bound.
   const signer = wallet?.publicKey?.toBase58?.() ?? "unknown";
-  if (!loggedSigners.has(signer)) {
-    loggedSigners.add(signer);
+  const capabilitySet = [...versions].map(String).sort().join(",");
+  if (!loggedCapabilitySets.has(capabilitySet)) {
+    loggedCapabilitySets.add(capabilitySet);
     console.info(
       `spl-utils: signer ${signer} supports transaction versions [${[
         ...versions,
@@ -122,6 +133,6 @@ export async function resolveTxVersion(
 export function resetTxVersionCache(): void {
   detectedVersions.clear();
   warnedEndpoints.clear();
-  loggedSigners.clear();
+  loggedCapabilitySets.clear();
   envTxVersion = undefined;
 }

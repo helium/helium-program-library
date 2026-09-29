@@ -98,6 +98,7 @@ export const buildAutomationTransactionResponse = async ({
       await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
         addressLookupTableAddresses: [getHeliumLookupTable()],
         commitment: "finalized",
+        version: 0,
         // Wallet-signed: guard ixs may be appended (see withPriorityFees).
         deriveLoadedAccountsDataSizeLimit: false,
       })

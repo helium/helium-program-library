@@ -263,7 +263,9 @@ export async function getTransactionFee(
     const { value } = await connection.getFeeForMessage(tx.message);
     if (value != null) return value;
   } catch {
-    // RPC unavailable — use the local estimate below.
+    // RPC unavailable, or a V1Transaction (web3.js cannot serialize a
+    // MessageV1, so getFeeForMessage always throws) — both use the local
+    // estimate below.
   }
   return estimateTransactionFeeLocally(tx);
 }

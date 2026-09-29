@@ -43,8 +43,9 @@ const fakeConnection = () => {
       ),
     _rpcRequest: async (method: string, args: any[]) => {
       requests.push({ method, args });
+      // What the node returns once the blockhash has expired.
       if (method === "getFeeForMessage") {
-        return { result: { context: { slot: 1 }, value: 7000 } };
+        return { result: { context: { slot: 1 }, value: null } };
       }
       return {
         result: {
@@ -108,12 +109,10 @@ describe("sus", () => {
       recipient.toBase58(),
     ]);
 
-    const fee = requests.find((r) => r.method === "getFeeForMessage")!;
-    expect(fee.args[0]).to.equal(messageBytes.toString("base64"));
-
     expect(result.error).to.equal(undefined);
     expect(result.logs).to.have.length(1);
     expect(result.solFee).to.equal(5000);
+    // Header fee: 1000 CU at 2,000,000 micro-lamports per CU.
     expect(result.priorityFee).to.equal(2000);
     expect(result.explorerLink).to.equal(
       `https://explorer.solana.com/tx/inspector?cluster=mainnet-beta&message=${encodeURIComponent(

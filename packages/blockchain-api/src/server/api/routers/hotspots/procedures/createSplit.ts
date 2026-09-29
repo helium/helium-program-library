@@ -235,6 +235,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
               : HELIUM_COMMON_LUT,
           ],
           commitment: "finalized",
+          version: 0,
           // Wallet-signed: guard ixs may be appended (see withPriorityFees).
           deriveLoadedAccountsDataSizeLimit: false,
         })

@@ -112,4 +112,32 @@ describe("sendInstructions", () => {
       ),
     ).to.equal(true);
   });
+  it("rejects without sending when a required signer has not signed", async () => {
+    const { connection, sent } = fakeV1Node();
+    const wallet = Keypair.generate();
+    const payer = Keypair.generate();
+    const provider: any = { connection, wallet: keypairWallet(wallet) };
+
+    let error: Error | undefined;
+    try {
+      await sendInstructions(
+        provider,
+        [
+          SystemProgram.transfer({
+            fromPubkey: payer.publicKey,
+            toPubkey: Keypair.generate().publicKey,
+            lamports: 1,
+          }),
+        ],
+        [],
+        payer.publicKey,
+      );
+    } catch (e: any) {
+      error = e;
+    }
+    expect(error?.message).to.equal(
+      `Missing signature for public key ${payer.publicKey.toBase58()}`,
+    );
+    expect(sent).to.have.length(0);
+  });
 });

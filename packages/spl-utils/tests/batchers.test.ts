@@ -206,6 +206,20 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
     expect(drafts[0].version).to.equal(0);
   });
 
+  it("batches a v1 group that carries its own setComputeUnitLimit", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      makeProvider(),
+      [
+        [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 300000 }),
+          dataIx(10),
+        ],
+      ],
+      { ...OPTIONS, version: 1 }
+    );
+    expect(drafts).to.have.length(1);
+  });
+
   it("stops growth once table CU × computeScaleUp passes 1.4M", async () => {
     const tableCu = (count: number) =>
       tableComputeUnitsForInstructions(

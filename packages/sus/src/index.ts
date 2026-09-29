@@ -30,6 +30,7 @@ import {
   AddressLookupTableAccount,
   Connection,
   MessageAccountKeys,
+  MessageV1,
   PublicKey,
   RpcResponseAndContext,
   SimulatedTransactionResponse,
@@ -571,15 +572,18 @@ export async function sus({
       let solFee = (transaction?.signatures.length || 1) * 5000;
       let priorityFee = 0;
 
-      const fee =
-        (transaction.version === 1
-          ? await rpcRequest(connection, "getFeeForMessage", [
-              message,
-              { commitment: "confirmed" },
-            ])
-          : await connection?.getFeeForMessage(transaction.message, "confirmed")
-        ).value || solFee;
-      priorityFee = fee - solFee;
+      if (transaction.version === 1) {
+        // Read the header, not getFeeForMessage: that returns null once the
+        // blockhash expires, which would price the fee at 0.
+        priorityFee = Number(
+          (transaction.message as MessageV1).transactionConfig.priorityFee ?? 0
+        );
+      } else {
+        const fee =
+          (await connection?.getFeeForMessage(transaction.message, "confirmed"))
+            .value || solFee;
+        priorityFee = fee - solFee;
+      }
       const balanceChanges = writableAccounts
         .map((acc) => {
           const type =

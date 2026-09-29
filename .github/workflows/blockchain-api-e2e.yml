@@ -2,19 +2,23 @@ name: Blockchain API E2E Tests
 
 on:
   # These path filters gate every job below, the 19-job e2e matrix included.
-  # The typecheck step resolves the workspace SDKs (spl-utils, the *-sdk
-  # packages, idls) too, so a change confined to those does not run it.
+  # The typecheck step resolves the workspace SDKs (the *-sdk packages,
+  # idls) too, so a change confined to those does not run it.
   push:
     branches: [master]
     paths:
       - "packages/blockchain-api/**"
       - "packages/blockchain-api-client/**"
+      - "packages/spl-utils/**"
+      - "packages/sus/**"
       # The matrix check below reads this file, so an edit here runs it.
       - ".github/workflows/blockchain-api-e2e.yml"
   pull_request:
     paths:
       - "packages/blockchain-api/**"
       - "packages/blockchain-api-client/**"
+      - "packages/spl-utils/**"
+      - "packages/sus/**"
       # The matrix check below reads this file, so an edit here runs it.
       - ".github/workflows/blockchain-api-e2e.yml"
 
