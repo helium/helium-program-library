@@ -213,11 +213,11 @@ export const getWelcomePackRentParts = async (
 /**
  * Lamports issue_data_only_entity_v0 takes from the payer: rent for the
  * KeyToAssetV0 it creates plus the per-leaf tree fee it moves to the
- * data-only escrow. The gate quotes the stored
- * DataOnlyConfigV0.new_tree_fee_lamports. The upgraded program ignores that
- * field and transfers `ceil(rent(new_tree_space) / 2^new_tree_depth)`, which
- * is below the stored value on mainnet. The gate switches to the derived fee
- * in the blockchain-api release after the program upgrade (ADR 0004).
+ * data-only escrow. The fee quoted is the stored
+ * DataOnlyConfigV0.new_tree_fee_lamports. Programs that derive the fee from
+ * rent transfer `ceil(rent(new_tree_space) / 2^new_tree_depth)` instead, which
+ * is below the stored value on mainnet, so the stored value never under-quotes
+ * there.
  */
 export const getDataOnlyIssueCostLamports = async (
   connection: Connection,
