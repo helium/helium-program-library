@@ -48,5 +48,7 @@ export {
   tableComputeUnitsForInstructions,
 } from "./computeUnitTable";
 
+export { getTransactionSizeLimit } from "./v1Transaction";
+
 export { proofArgsAndAccounts } from "./proofArgsAndAccounts";
 export type { ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";

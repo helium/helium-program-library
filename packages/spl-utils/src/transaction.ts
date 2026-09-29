@@ -33,7 +33,8 @@ import {
   withPriorityFees,
 } from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
-import { TxVersionOption } from "./txVersion";
+import { TxVersionOption, resolveTxVersion } from "./txVersion";
+import { compileV1Transaction, getTransactionSizeLimit } from "./v1Transaction";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -82,7 +83,18 @@ export const getAddressLookupTableAccounts = async (
   }, new Array<AddressLookupTableAccount>());
 };
 
-export function toVersionedTx(tx: TransactionDraft): VersionedTransaction {
+// Only a resolved 1 builds v1; resolveTxVersion holds the node and signer
+// checks, so an unresolved "auto" stays v0 here.
+export async function toVersionedTx(
+  tx: TransactionDraft
+): Promise<VersionedTransaction> {
+  if (tx.version === 1) {
+    return compileV1Transaction({
+      feePayer: tx.feePayer,
+      recentBlockhash: tx.recentBlockhash!,
+      instructions: tx.instructions,
+    });
+  }
   const messageV0 = new TransactionMessage({
     payerKey: tx.feePayer,
     recentBlockhash: tx.recentBlockhash!,
@@ -510,6 +522,7 @@ export async function bulkSendTransactions(
             addressLookupTableAddresses: tx.addressLookupTableAddresses,
             addressLookupTables: tx.addressLookupTables!,
             feePayer: tx.feePayer,
+            version: tx.version,
           });
         })
       );
@@ -699,7 +712,7 @@ export async function batchParallelInstructions({
   triesRemaining = 10,
   extraSigners = [],
   maxSignatureBatch = TX_BATCH_SIZE,
-  maxTxSize = 1232,
+  maxTxSize,
   addressLookupTableAddresses = [],
 }: {
   provider: AnchorProvider;
@@ -718,6 +731,10 @@ export async function batchParallelInstructions({
     provider.connection,
     addressLookupTableAddresses
   );
+  const version = await resolveTxVersion(provider.connection, {
+    wallet: provider.wallet,
+  });
+  maxTxSize ??= getTransactionSizeLimit(version);
 
   for (const instruction of instructions) {
     if (Array.isArray(instruction)) {
@@ -732,6 +749,7 @@ export async function batchParallelInstructions({
       addressLookupTableAddresses,
       signers: extraSigners,
       addressLookupTables,
+      version,
     });
     try {
       if (tx.serialize().length + 64 * tx.signatures.length > maxTxSize) {
@@ -747,6 +765,7 @@ export async function batchParallelInstructions({
           addressLookupTableAddresses,
           signers: extraSigners,
           addressLookupTables,
+          version,
         });
         if (Array.isArray(instruction)) {
           currentTxInstructions = instruction;
@@ -767,6 +786,7 @@ export async function batchParallelInstructions({
       addressLookupTableAddresses,
       signers: extraSigners,
       addressLookupTables,
+      version,
     });
   }
 
@@ -816,7 +836,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     basePriorityFee,
     addressLookupTableAddresses,
     computeScaleUp,
-    maxTxSize = 1232,
+    maxTxSize,
     extraSigners = [],
     useFirstEstimateForAll = false,
     maxInstructionsPerTx,
@@ -844,7 +864,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     maxInstructionsPerTx?: number;
     loadedAccountsDataSizeLimit?: number;
     deriveLoadedAccountsDataSizeLimit?: boolean;
-    // Carried onto every draft; see TransactionDraft.version.
+    // Resolved once, then carried onto every draft; see TransactionDraft.version.
     version?: TxVersionOption;
   } = {}
 ): Promise<TransactionDraft[]> {
@@ -856,6 +876,11 @@ export async function batchInstructionsToTxsWithPriorityFee(
     provider.connection,
     addressLookupTableAddresses || []
   );
+  const resolvedVersion = await resolveTxVersion(provider.connection, {
+    version,
+    wallet: provider.wallet,
+  });
+  maxTxSize ??= getTransactionSizeLimit(resolvedVersion);
 
   let firstTxComputeBudgetIxs: TransactionInstruction[] | null = null;
   // Price a full chunk and push it as a draft. When the first chunk's
@@ -884,6 +909,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
         feePayer: provider.wallet.publicKey,
         loadedAccountsDataSizeLimit,
         deriveLoadedAccountsDataSizeLimit,
+        // Simulate in the version the draft is sent in.
+        version: resolvedVersion,
       });
       if (useFirstEstimateForAll) {
         // A sim-derived data-size limit was measured against THIS tx's
@@ -910,7 +937,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
           ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
         )
       ),
-      version,
+      version: resolvedVersion,
     });
   };
   for (const instruction of instructions) {
@@ -946,6 +973,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
       feePayer: provider.wallet.publicKey,
       recentBlockhash: blockhash,
       addressLookupTables,
+      version: resolvedVersion,
     });
     try {
       if (

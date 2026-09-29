@@ -93,14 +93,16 @@ export const buildAutomationTransactionResponse = async ({
   actionMetadata: Record<string, unknown>;
   extraFeeLamports?: number;
 }) => {
-  const vtxs = (
-    await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-      addressLookupTableAddresses: [getHeliumLookupTable()],
-      commitment: "finalized",
-      // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-      deriveLoadedAccountsDataSizeLimit: false,
-    })
-  ).map((tx) => toVersionedTx(tx));
+  const vtxs = await Promise.all(
+    (
+      await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+        addressLookupTableAddresses: [getHeliumLookupTable()],
+        commitment: "finalized",
+        // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+        deriveLoadedAccountsDataSizeLimit: false,
+      })
+    ).map((tx) => toVersionedTx(tx)),
+  );
 
   const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
   if (useJito) {

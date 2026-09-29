@@ -560,7 +560,7 @@ export async function formBulkTransactions({
       version: 0,
     }
   );
-  const initialTxs = initialTxDrafts.map(toVersionedTx);
+  const initialTxs = await Promise.all(initialTxDrafts.map(toVersionedTx));
 
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
@@ -778,7 +778,7 @@ export async function formTransaction({
     // Wallet-signed: guard ixs may be appended (see withPriorityFees).
     deriveLoadedAccountsDataSizeLimit: false,
   });
-  const tx = toVersionedTx({
+  const tx = await toVersionedTx({
     ...fullDraft,
     instructions,
     // The oracle co-signs with web3.js 1.x, which cannot sign v1.

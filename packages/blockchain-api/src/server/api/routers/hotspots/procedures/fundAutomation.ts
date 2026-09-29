@@ -140,18 +140,20 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
     }
 
     // Build and serialize transactions
-    const vtxs = (
-      await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-        addressLookupTableAddresses: [
-          process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
-            ? HELIUM_COMMON_LUT_DEVNET
-            : HELIUM_COMMON_LUT,
-        ],
-        commitment: "finalized",
-        // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-        deriveLoadedAccountsDataSizeLimit: false,
-      })
-    ).map((tx) => toVersionedTx(tx));
+    const vtxs = await Promise.all(
+      (
+        await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+          addressLookupTableAddresses: [
+            process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
+              ? HELIUM_COMMON_LUT_DEVNET
+              : HELIUM_COMMON_LUT,
+          ],
+          commitment: "finalized",
+          // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+          deriveLoadedAccountsDataSizeLimit: false,
+        })
+      ).map((tx) => toVersionedTx(tx)),
+    );
 
     // Add Jito tip if needed for mainnet bundles
     const useJito = shouldUseJitoBundle(vtxs.length, getCluster());

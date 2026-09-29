@@ -7,6 +7,7 @@ import { getCluster } from "@/lib/solana";
 import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
 import {
   getAddressLookupTableAccounts,
+  getTransactionSizeLimit,
   toVersionedTx,
 } from "@helium/spl-utils";
 import {
@@ -49,7 +50,8 @@ export interface BuildBatchedTransactionsResult {
   hasMore: boolean;
 }
 
-const MAX_TX_SIZE = 1232;
+// measureSize builds v0.
+const MAX_TX_SIZE = getTransactionSizeLimit(0);
 const SIZE_MARGIN = 100;
 
 const COMPUTE_BUDGET_PLACEHOLDERS = [
@@ -59,12 +61,12 @@ const COMPUTE_BUDGET_PLACEHOLDERS = [
 
 const DUMMY_BLOCKHASH = "1".repeat(32);
 
-function measureSize(
+async function measureSize(
   instructions: TransactionInstruction[],
   feePayer: PublicKey,
   addressLookupTables: AddressLookupTableAccount[],
-): number {
-  const tx = toVersionedTx({
+): Promise<number> {
+  const tx = await toVersionedTx({
     feePayer,
     recentBlockhash: DUMMY_BLOCKHASH,
     instructions: [...COMPUTE_BUDGET_PLACEHOLDERS, ...instructions],
@@ -202,7 +204,7 @@ export async function buildBatchedTransactions({
   for (const group of groups) {
     let isOversized = false;
     try {
-      const size = measureSize(
+      const size = await measureSize(
         group.instructions,
         feePayer,
         addressLookupTables,
@@ -233,7 +235,11 @@ export async function buildBatchedTransactions({
 
     let size: number;
     try {
-      size = measureSize(candidateInstructions, feePayer, addressLookupTables);
+      size = await measureSize(
+        candidateInstructions,
+        feePayer,
+        addressLookupTables,
+      );
     } catch {
       size = MAX_TX_SIZE;
     }

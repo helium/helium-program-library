@@ -229,7 +229,7 @@ export async function getMigrateTransactions(
   );
 
   return await Promise.all(
-    transactions.map(toVersionedTx).map((tx, i) => {
+    (await Promise.all(transactions.map(toVersionedTx))).map((tx, i) => {
       const draft = transactions[i];
       tx.serialize();
       if (

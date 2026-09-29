@@ -197,7 +197,7 @@ async function getSolanaUnixTimestamp(
 
     for (const tx of txs) {
       const fullDraft = await populateMissingDraftInfo(conn, tx);
-      const versionedTx = toVersionedTx(fullDraft);
+      const versionedTx = await toVersionedTx(fullDraft);
       const signed = await provider.wallet.signTransaction(versionedTx);
       await sendAndConfirmWithRetry(
         conn,

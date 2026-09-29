@@ -143,7 +143,7 @@ export async function runAllTasks(
       addressLookupTableAddresses: taskQueueAcc.lookupTables,
       feePayer: crankTurner.publicKey,
     });
-    const tx = toVersionedTx(
+    const tx = await toVersionedTx(
       await populateMissingDraftInfo(
         provider.connection,
         {

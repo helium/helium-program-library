@@ -132,7 +132,7 @@ export async function buildVersionedTransaction({
 
   let tx: VersionedTransaction;
   try {
-    tx = toVersionedTx(
+    tx = await toVersionedTx(
       await populateMissingDraftInfo(
         connection,
         {

@@ -352,7 +352,7 @@ export async function withPriorityFees({
     });
     let budget = await estimateComputeBudget(
       connection,
-      toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),
+      await toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),
       { computeScaleUp }
     );
     // Whether the sim that produced `budget` ran under our injected ceiling —
@@ -371,7 +371,7 @@ export async function withPriorityFees({
         // runtime 64 MiB default.
         budget = await estimateComputeBudget(
           connection,
-          toVersionedTx({
+          await toVersionedTx({
             ...tx,
             instructions: prependComputeBudgetIxs(tx.instructions, {
               computeUnits: MAX_COMPUTE_UNITS,
