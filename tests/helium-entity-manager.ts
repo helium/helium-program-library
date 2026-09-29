@@ -29,6 +29,7 @@ import {
 import chai from "chai";
 import {
   dataOnlyConfigKey,
+  dataOnlyEscrowKey,
   init as initHeliumEntityManager,
   iotInfoKey,
   onboardIotHotspot,
@@ -306,7 +307,8 @@ describe("helium-entity-manager", () => {
           newTreeSpace: new BN(
             getConcurrentMerkleTreeAccountSize(height, buffer, canopy)
           ),
-          newTreeFeeLamports: new BN((LAMPORTS_PER_SOL * 30) / 2 ** height),
+          // Dead field: the fee comes from rent, so reading this fails the fee test
+          newTreeFeeLamports: new BN(123456789),
           name: "DATAONLY",
           metadataUrl: "test",
         })
@@ -341,6 +343,38 @@ describe("helium-entity-manager", () => {
         ).txs
       );
     });
+    it("charges the tree fee derived from rent, not the stored fee", async () => {
+      const dataOnlyConfig = dataOnlyConfigKey(dao)[0];
+      const escrow = dataOnlyEscrowKey(dataOnlyConfig)[0];
+      const doAcc = await hemProgram.account.dataOnlyConfigV0.fetch(
+        dataOnlyConfig
+      );
+      const treeRent =
+        await provider.connection.getMinimumBalanceForRentExemption(
+          doAcc.newTreeSpace.toNumber()
+        );
+      const expectedFee = Math.ceil(treeRent / 2 ** doAcc.newTreeDepth);
+      const escrowBefore = await provider.connection.getBalance(escrow);
+
+      await hemProgram.methods
+        .issueDataOnlyEntityV0({
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
+        .accountsPartial({
+          recipient: hotspotOwner.publicKey,
+          dao,
+          eccVerifier: eccVerifier.publicKey,
+        })
+        .signers([eccVerifier])
+        .rpc({ skipPreflight: true });
+
+      const escrowAfter = await provider.connection.getBalance(escrow);
+      expect(escrowAfter - escrowBefore).to.eq(expectedFee);
+    });
+
     it("issues and onboards an iot data only hotspot", async () => {
       let hotspotOwner = Keypair.generate();
       const issueMethod = hemProgram.methods
