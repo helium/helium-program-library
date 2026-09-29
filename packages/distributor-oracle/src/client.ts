@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, IdlAccounts, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, IdlAccounts, Program } from "@anchor-lang/core";
 import { getSingleton } from "@helium/account-fetch-cache";
 import {
   decodeEntityKey,

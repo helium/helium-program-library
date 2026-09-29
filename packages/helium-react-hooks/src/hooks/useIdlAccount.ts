@@ -1,11 +1,11 @@
-import { BorshAccountsCoder, Idl, IdlAccounts } from "@coral-xyz/anchor";
-import { AllAccountsMap } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
+import { BorshAccountsCoder, Idl, IdlAccounts } from "@anchor-lang/core";
+import { AllAccountsMap } from "@anchor-lang/core/dist/cjs/program/namespace/types";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
 import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
 import { PublicKey } from "@solana/web3.js";
 import { useMemo } from "react";
 import { lowerFirstChar } from "@helium/spl-utils";
-import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
+import { convertIdlToCamelCase } from "@anchor-lang/core/dist/cjs/idl";
 
 // Cache parsers per key/type combination to avoid re-creating them on re-render.
 // This makes it so we get fewer rerenders using effectively the same parser

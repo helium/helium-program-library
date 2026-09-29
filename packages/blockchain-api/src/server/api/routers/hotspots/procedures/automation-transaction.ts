@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { cronJobKey, init as initCron } from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,

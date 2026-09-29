@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { dataCreditsKey, init as initDc } from "@helium/data-credits-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import fs from "fs";

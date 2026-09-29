@@ -1,4 +1,4 @@
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import { MiniFanout } from "@helium/idls/lib/types/mini_fanout";
 import { taskKey, nextAvailableTaskIds } from "@helium/tuktuk-sdk";
 import { PublicKey } from "@solana/web3.js";

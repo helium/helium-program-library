@@ -1,5 +1,5 @@
 import { MobileEntityManager } from "@helium/idls/lib/types/mobile_entity_manager";
-import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Idl, Program } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { mobileEntityManagerResolvers } from "./resolvers";

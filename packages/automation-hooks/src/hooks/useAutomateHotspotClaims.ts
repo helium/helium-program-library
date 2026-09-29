@@ -31,7 +31,7 @@ import { useMemo } from "react";
 import { useAsync, useAsyncCallback } from "react-async-hook";
 import { useCronJob } from "./useCronJob";
 import { useTaskQueue } from "./useTaskQueue";
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@anchor-lang/core";
 import { TASK_QUEUE } from "../constants";
 import { useAccount } from "@helium/account-fetch-cache-hooks";
 

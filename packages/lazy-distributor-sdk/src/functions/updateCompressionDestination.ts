@@ -1,4 +1,4 @@
-import { Idl, Program } from "@coral-xyz/anchor";
+import { Idl, Program } from "@anchor-lang/core";
 import { LazyDistributor } from "@helium/idls/lib/types/lazy_distributor";
 import { Asset, AssetProof, proofArgsAndAccounts } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";

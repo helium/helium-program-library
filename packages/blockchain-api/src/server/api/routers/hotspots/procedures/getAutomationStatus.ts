@@ -6,7 +6,7 @@ import {
   calculatePeriodsRemaining,
   interpretCronString,
 } from "@/lib/utils/automation-helpers";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { publicProcedure } from "../../../procedures";
 import { fetchAutomationData } from "./automation-data-helpers";

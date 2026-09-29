@@ -1,5 +1,5 @@
 import { createSolanaConnection } from "@/lib/solana";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { cronJobKey } from "@helium/cron-sdk";
 import { entityCronAuthorityKey } from "@helium/hpl-crons-sdk";
 import { customSignerKey } from "@helium/tuktuk-sdk";

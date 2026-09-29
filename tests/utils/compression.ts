@@ -13,8 +13,8 @@ import {
   Metadata,
   PROGRAM_ID as TOKEN_METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import {
   ConcurrentMerkleTreeAccount,
   getConcurrentMerkleTreeAccountSize,

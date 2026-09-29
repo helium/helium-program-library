@@ -32,7 +32,7 @@
     "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@helium/address": "^4.12.0",
     "@helium/anchor-resolvers": "workspace:^",
     "@helium/helium-sub-daos-sdk": "workspace:^",

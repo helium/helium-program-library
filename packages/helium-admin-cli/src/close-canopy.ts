@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { daoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import os from "os";

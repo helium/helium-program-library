@@ -4,7 +4,7 @@ import {
 } from "@helium/circuit-breaker-sdk";
 import { CircuitBreaker } from "@helium/idls/lib/types/circuit_breaker";
 import { toNumber } from "@helium/spl-utils";
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import { getAccount, getMint, Mint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";

@@ -1,6 +1,6 @@
-import * as anchor from "@coral-xyz/anchor";
-import { AnchorProvider } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import * as anchor from "@anchor-lang/core";
+import { AnchorProvider } from "@anchor-lang/core";
+import NodeWallet from "@anchor-lang/core/dist/cjs/nodewallet";
 import { init as initHem } from "@helium/helium-entity-manager-sdk";
 import { init as initMem } from "@helium/mobile-entity-manager-sdk";
 import {
