@@ -542,9 +542,10 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
     });
     return { connection, wallet: { publicKey: feePayer } } as any;
   };
-  // Enough unique transfers to overflow one tx and force reuse on later txs.
+  // Enough unique transfers to overflow one tx under both v0 (1232 bytes) and
+  // v1 (64 accounts) and force reuse on later txs.
   const manyTransfers = () =>
-    Array.from({ length: 60 }, () =>
+    Array.from({ length: 200 }, () =>
       SystemProgram.transfer({
         fromPubkey: feePayer,
         toPubkey: Keypair.generate().publicKey,
