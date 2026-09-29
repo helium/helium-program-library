@@ -279,6 +279,29 @@ export async function sus({
     [];
   // Linearly simulate txs so as not to hit rate limits
   for (const [index, transaction] of transactions.entries()) {
+    const accounts = {
+      encoding: "base64" as const,
+      addresses:
+        simulationAccountsByTx[index]?.map((account) => account.toBase58()) ||
+        [],
+    };
+    // web3.js 1.x reads v1 but cannot serialize it, so simulate the bytes as
+    // given and let the node swap in a fresh blockhash.
+    if (transaction.version === 1) {
+      simulatedTxs.push(
+        await rpcRequest(connection, "simulateTransaction", [
+          serializedTransactions[index].toString("base64"),
+          {
+            encoding: "base64",
+            commitment: connection.commitment,
+            sigVerify: false,
+            replaceRecentBlockhash: true,
+            accounts,
+          },
+        ])
+      );
+      continue;
+    }
     let simulatedTxn: RpcResponseAndContext<SimulatedTransactionResponse> | null =
       null;
     let tries = 0;
@@ -286,13 +309,7 @@ export async function sus({
     blockhashLoop: while (true) {
       transaction.message.recentBlockhash = blockhash;
       simulatedTxn = await connection.simulateTransaction(transaction, {
-        accounts: {
-          encoding: "base64",
-          addresses:
-            simulationAccountsByTx[index]?.map((account) =>
-              account.toBase58()
-            ) || [],
-        },
+        accounts,
       });
       if (isBlockhashNotFound(simulatedTxn)) {
         ({ blockhash } = await connection?.getLatestBlockhash("finalized"));
@@ -519,9 +536,11 @@ export async function sus({
     const writableAccounts = writableAccountsByTx[index];
     const transaction = transactions[index];
 
-    const message = Buffer.from(transaction.message.serialize()).toString(
-      "base64"
-    );
+    const message = Buffer.from(
+      transaction.version === 1
+        ? v1MessageBytes(serializedTransactions[index], transaction)
+        : transaction.message.serialize()
+    ).toString("base64");
     const explorerLink = `https://explorer.solana.com/tx/inspector?cluster=${cluster}&message=${encodeURIComponent(
       message
     )}`;
@@ -553,8 +572,13 @@ export async function sus({
       let priorityFee = 0;
 
       const fee =
-        (await connection?.getFeeForMessage(transaction.message, "confirmed"))
-          .value || solFee;
+        (transaction.version === 1
+          ? await rpcRequest(connection, "getFeeForMessage", [
+              message,
+              { commitment: "confirmed" },
+            ])
+          : await connection?.getFeeForMessage(transaction.message, "confirmed")
+        ).value || solFee;
       priorityFee = fee - solFee;
       const balanceChanges = writableAccounts
         .map((acc) => {
@@ -663,6 +687,30 @@ export async function sus({
   }
 
   return results;
+}
+
+// v1 wire layout: the message, then the signatures with no length prefix.
+function v1MessageBytes(
+  serialized: Buffer,
+  transaction: VersionedTransaction
+): Buffer {
+  return serialized.subarray(
+    0,
+    serialized.length - 64 * transaction.signatures.length
+  );
+}
+
+async function rpcRequest(
+  connection: Connection,
+  method: string,
+  args: unknown[]
+) {
+  // @ts-ignore
+  const res = await connection._rpcRequest(method, args);
+  if (res.error) {
+    throw new Error(`failed to ${method}: ${res.error.message}`);
+  }
+  return res.result;
 }
 
 function isBlockhashNotFound(

@@ -5,7 +5,6 @@ import {
   Asset,
   createAtaAndMint,
   createMint,
-  createNft,
   sendInstructions,
 } from "@helium/spl-utils";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
@@ -41,6 +40,7 @@ import { PROGRAM_ID } from "../packages/lazy-distributor-sdk/src/constants";
 import { LazyDistributor } from "../target/types/lazy_distributor";
 import { createCompressionNft } from "./utils/compression";
 import { ensureLDIdl } from "./utils/fixtures";
+import { createNft } from "./utils/nft";
 import { MerkleTree, MerkleTreeProof } from "@solana/spl-account-compression";
 import { loadKeypair } from "./utils/solana";
 

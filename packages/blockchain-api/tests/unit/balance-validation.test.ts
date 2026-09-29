@@ -10,6 +10,7 @@ import {
 } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
+import { toVersionedTx } from "../../../spl-utils/src/transaction";
 import {
   getTotalTransactionFees,
   getTransactionFee,
@@ -76,6 +77,24 @@ describe("getTransactionFee", () => {
       SystemProgram.transfer({ fromPubkey: from, toPubkey: to, lamports: 2 }),
     ]);
     expect(await getTransactionFee(rpcFee(null), tx)).to.eq(9_000);
+  });
+
+  it("falls back to base + the v1 header priority fee when no ComputeBudget ixs are present", async () => {
+    // The v1 build moves both ixs into the header: priority = ceil(50k * 100k / 1e6) = 5000
+    const tx = await toVersionedTx({
+      feePayer: from,
+      recentBlockhash: PublicKey.default.toBase58(),
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 50_000 }),
+        transfer,
+      ],
+      addressLookupTables: [],
+      version: 1,
+    });
+    expect(tx.version).to.eq(1);
+    expect(tx.message.compiledInstructions).to.have.length(1);
+    expect(await getTransactionFee(rpcError(), tx)).to.eq(10_000);
   });
 
   it("parses a compute-unit price above the 2^31 signed-int boundary", async () => {

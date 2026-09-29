@@ -4,7 +4,6 @@ import {
   Commitment,
   ComputeBudgetProgram,
   Connection,
-  Finality,
   Keypair,
   Message,
   PublicKey,
@@ -57,17 +56,6 @@ async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function promiseAllInOrder<T>(
-  it: (() => Promise<T>)[]
-): Promise<Iterable<T>> {
-  let ret: T[] = [];
-  for (const i of it) {
-    ret.push(await i());
-  }
-
-  return ret;
-}
-
 export const getAddressLookupTableAccounts = async (
   connection: Connection,
   keys: PublicKey[]
@@ -118,12 +106,6 @@ export async function toVersionedTx(
 export interface InstructionResult<A> {
   instructions: TransactionInstruction[];
   signers: Signer[];
-  output: A;
-}
-
-export interface BigInstructionResult<A> {
-  instructions: TransactionInstruction[][];
-  signers: Signer[][];
   output: A;
 }
 
@@ -185,18 +167,23 @@ export async function sendInstructions(
     return "";
   }
 
-  let tx = new Transaction();
-  tx.recentBlockhash = (
-    await provider.connection.getLatestBlockhash(commitment)
-  ).blockhash;
-  tx.feePayer = payer || provider.wallet.publicKey;
-  tx.add(...instructions);
+  const feePayer = payer || provider.wallet.publicKey;
+  let tx = await toVersionedTx({
+    feePayer,
+    recentBlockhash: (
+      await provider.connection.getLatestBlockhash(commitment)
+    ).blockhash,
+    instructions,
+    version: await resolveTxVersion(provider.connection, {
+      wallet: provider.wallet,
+    }),
+  });
   if (signers.length > 0) {
-    tx.partialSign(...signers);
+    tx.sign(signers);
   }
   if (
-    tx.feePayer.equals(provider.wallet.publicKey) ||
-    tx.instructions.some((ix) =>
+    feePayer.equals(provider.wallet.publicKey) ||
+    instructions.some((ix) =>
       ix.keys.some(
         (key) => key.isSigner && key.pubkey.equals(provider.wallet.publicKey)
       )
@@ -208,7 +195,7 @@ export async function sendInstructions(
   try {
     const { txid } = await sendAndConfirmWithRetry(
       provider.connection,
-      tx.serialize(),
+      Buffer.from(tx.serialize()),
       {
         skipPreflight: true,
         maxRetries: 0,
@@ -227,74 +214,6 @@ type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // fro
 
 function truthy<T>(value: T): value is Truthy<T> {
   return !!value;
-}
-
-export async function sendMultipleInstructions(
-  provider: AnchorProvider,
-  instructionGroups: TransactionInstruction[][],
-  signerGroups: Signer[][],
-  payer?: PublicKey,
-  finality: Finality = "confirmed",
-  idlErrors: Map<number, string> = new Map()
-): Promise<Iterable<string>> {
-  const recentBlockhash = (
-    await provider.connection.getLatestBlockhash(finality)
-  ).blockhash;
-
-  const ixAndSigners = instructionGroups
-    .map((instructions, i) => {
-      const signers = signerGroups[i];
-
-      return {
-        instructions,
-        signers,
-      };
-    })
-    .filter(({ instructions }) => instructions.length > 0);
-  const txns = ixAndSigners.map(({ instructions }) => {
-    const tx = new Transaction({
-      feePayer: payer || provider.wallet.publicKey,
-      recentBlockhash,
-    });
-
-    tx.add(...instructions);
-
-    return tx;
-  });
-
-  const txnsSignedByWallet = await provider.wallet.signAllTransactions(txns);
-  const txnsSigned = txnsSignedByWallet
-    .map((tx, index) => {
-      const signers = ixAndSigners[index].signers;
-
-      if (signers.length > 0) {
-        tx.partialSign(...signers);
-      }
-
-      return tx;
-    })
-    .map((tx) => tx.serialize());
-
-  console.log("Sending multiple transactions...");
-  try {
-    return await promiseAllInOrder(
-      txnsSigned.map((txn) => async () => {
-        const { txid } = await sendAndConfirmWithRetry(
-          provider.connection,
-          txn,
-          {
-            skipPreflight: true,
-          },
-          finality
-        );
-        return txid;
-      })
-    );
-  } catch (e) {
-    console.error(e);
-    const wrappedE = ProgramError.parse(e, idlErrors);
-    throw wrappedE == null ? e : wrappedE;
-  }
 }
 
 export async function execute<Output>(
@@ -319,37 +238,6 @@ export async function execute<Output>(
       errors
     );
     return { txid, ...output };
-  }
-
-  // @ts-ignore
-  return output;
-}
-
-export async function executeBig<Output>(
-  program: Program,
-  provider: AnchorProvider,
-  command: BigInstructionResult<Output>,
-  payer: PublicKey = provider.wallet.publicKey,
-  finality?: Finality
-): Promise<Output & { txids?: string[] }> {
-  const { instructions, signers, output } = command;
-  const errors = program.idl.errors?.reduce((acc, err) => {
-    acc.set(err.code, `${err.name}: ${err.msg}`);
-    return acc;
-  }, new Map<number, string>());
-  if (instructions.length > 0) {
-    const txids = await sendMultipleInstructions(
-      provider,
-      instructions,
-      signers,
-      payer || provider.wallet.publicKey,
-      finality,
-      errors
-    );
-    return {
-      ...output,
-      txids: Array.from(txids),
-    };
   }
 
   // @ts-ignore
@@ -478,10 +366,18 @@ export async function sendAndConfirmWithRetry(
   return { txid };
 }
 
+/**
+ * @deprecated Legacy only: throws on v0 and v1 bytes. Use
+ * `VersionedTransaction.deserialize`. Removed in the next release.
+ */
 export function stringToTransaction(solanaTransaction: string) {
   return Transaction.from(Buffer.from(solanaTransaction));
 }
 
+/**
+ * @deprecated Legacy only: throws on v0 and v1 bytes. Use
+ * `VersionedTransaction.deserialize`. Removed in the next release.
+ */
 export function bufferToTransaction(solanaTransaction: Buffer) {
   return Transaction.from(solanaTransaction);
 }

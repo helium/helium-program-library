@@ -402,7 +402,7 @@ describe("tuktuk-dca", () => {
     /** The deepest `Program … invoke [n]` any program reached in this transaction. */
     async function maxCpiDepth(signature: string): Promise<number> {
       const tx = await provider.connection.getTransaction(signature, {
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
         commitment: "confirmed",
       });
       const logs = tx?.meta?.logMessages ?? [];
