@@ -126,6 +126,9 @@ export const FundAutomationInputSchema = z.object({
 export const GetFundingEstimateInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   duration: z.coerce.number().int().min(1), // Number of claims to estimate funding for
+  // The schedule createAutomation will be given. Prices the cron job at its
+  // crontab length; without it the estimate assumes the longest preset.
+  schedule: SetupAutomationInputSchema.shape.schedule.optional(),
 });
 
 export const CloseAutomationInputSchema = z.object({

@@ -37,7 +37,10 @@ import type { appRouter } from "@/server/api";
 import type { RouterClient } from "@orpc/server";
 import { ORPCError } from "@orpc/server";
 
-import { getBaseAutomationRentLamports } from "../../src/lib/utils/automation-helpers";
+import {
+  getBaseAutomationRentLamports,
+  resolveScheduleToCron,
+} from "../../src/lib/utils/automation-helpers";
 
 // Raw crontab string (6-field clockwork format: sec min hour dom month dow).
 const DAILY_CRON = "0 0 0 * * *";
@@ -152,6 +155,43 @@ describe("automation endpoints", () => {
           (toLamports(estimate.operationalSol) -
             toLamports(status.operationalSol)),
       );
+    });
+
+    it("prices the setup rent at the schedule createAutomation would use", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      const baseRentSol = async (scheduleLen: number) =>
+        (await getBaseAutomationRentLamports(connection, scheduleLen)) /
+        LAMPORTS_PER_SOL;
+      const unscheduled = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration: 1,
+      });
+
+      // A preset resolves from the clock, so its length can change between
+      // this resolve and the server's; either side of the call is accepted.
+      const dailyLenBefore = resolveScheduleToCron("daily").length;
+      const daily = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration: 1,
+        schedule: "daily",
+      });
+      const dailyLenAfter = resolveScheduleToCron("daily").length;
+      expect([
+        await baseRentSol(dailyLenBefore),
+        await baseRentSol(dailyLenAfter),
+      ]).to.include(daily.rentFee);
+      // Every daily crontab is shorter than the unscheduled 15-char bound.
+      expect(daily.rentFee).to.be.lessThan(unscheduled.rentFee);
+
+      // A raw crontab over 15 chars is priced at its own length, not the bound.
+      const longCron = "0 0 0 1,15 * 1-5";
+      const long = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration: 1,
+        schedule: longCron,
+      });
+      expect(long.rentFee).to.equal(await baseRentSol(longCron.length));
+      expect(long.rentFee).to.be.greaterThan(unscheduled.rentFee);
     });
 
     it("returns NOT_FOUND when funding a non-existent automation", async () => {

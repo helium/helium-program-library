@@ -4,6 +4,7 @@ import * as anchor from "@coral-xyz/anchor";
 import {
   getBaseAutomationRentLamports,
   estimateAutomationFunding,
+  resolveScheduleToCron,
 } from "@/lib/utils/automation-helpers";
 import { fetchAutomationData } from "./automation-data-helpers";
 
@@ -14,7 +15,7 @@ import { fetchAutomationData } from "./automation-data-helpers";
 export const getFundingEstimate =
   publicProcedure.hotspots.getFundingEstimate.handler(
     async ({ input, errors }) => {
-      const { walletAddress, duration } = input;
+      const { walletAddress, duration, schedule } = input;
 
       const { provider } = createSolanaConnection(walletAddress);
       anchor.setProvider(provider);
@@ -38,7 +39,12 @@ export const getFundingEstimate =
         cronJobExists: !!cronJobAccount,
         baseAutomationRentLamports: cronJobAccount
           ? 0
-          : await getBaseAutomationRentLamports(provider.connection),
+          : await getBaseAutomationRentLamports(
+              provider.connection,
+              schedule === undefined
+                ? undefined
+                : resolveScheduleToCron(schedule).length,
+            ),
         cronJobBalanceLamports,
         cronJobCostPerClaimLamports,
         pdaWalletBalanceLamports,
