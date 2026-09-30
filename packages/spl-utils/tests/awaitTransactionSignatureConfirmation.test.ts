@@ -57,4 +57,30 @@ describe("awaitTransactionSignatureConfirmation", () => {
     });
     expect(removed).to.deep.equal([7]);
   });
+
+  it("removes no other subscription when subscribing failed", async () => {
+    const { connection, removed } = fakeWsNode();
+    connection.onSignature = () => {
+      throw new Error("ws down");
+    };
+    connection.getSignatureStatuses = async () => ({
+      value: [
+        {
+          slot: 1,
+          confirmations: 1,
+          err: null,
+          confirmationStatus: "confirmed",
+        },
+      ],
+    });
+
+    await awaitTransactionSignatureConfirmation(
+      "sig",
+      60 * 1000,
+      connection,
+      "confirmed",
+    );
+
+    expect(removed).to.deep.equal([]);
+  });
 });
