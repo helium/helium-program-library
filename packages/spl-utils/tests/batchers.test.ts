@@ -287,7 +287,8 @@ describe("batchParallelInstructions", () => {
   // Captures the txs handed to the wallet, then stops before any send.
   const packed = async (
     instructions: TransactionInstruction[],
-    envVersion: "v0" | "v1"
+    envVersion: "v0" | "v1",
+    version?: 0 | 1
   ): Promise<VersionedTransaction[]> => {
     process.env.HPL_TX_VERSION = envVersion;
     resetTxVersionCache();
@@ -303,7 +304,7 @@ describe("batchParallelInstructions", () => {
       },
     } as unknown as AnchorProvider;
     try {
-      await batchParallelInstructions({ provider, instructions });
+      await batchParallelInstructions({ provider, instructions, version });
     } catch (e) {
       if (e !== SIGNED) throw e;
     }
@@ -323,6 +324,13 @@ describe("batchParallelInstructions", () => {
     expect((await packed(ixs, "v0")).map((tx) => tx.version)).to.deep.equal([
       0, 0, 0,
     ]);
+  });
+
+  it("keeps a pinned version 0 when HPL_TX_VERSION is v1", async () => {
+    const ixs = [dataIx(1000), dataIx(1000), dataIx(1000)];
+    expect((await packed(ixs, "v1", 0)).map((tx) => tx.version)).to.deep.equal(
+      [0, 0, 0]
+    );
   });
 
   it("sends a chunk that fits either version as v0", async () => {
