@@ -53,6 +53,11 @@ const ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey(
   "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
 );
 
+// web3.js ships no class for this precompile.
+const SECP256R1_PROGRAM_ID = new PublicKey(
+  "Secp256r1SigVerify1111111111111111111111111"
+);
+
 export type BalanceChange = {
   owner: PublicKey;
   address: PublicKey;
@@ -714,7 +719,8 @@ function precompileSignatureCount(message: MessageV1): number {
       const programId = message.staticAccountKeys[ix.programIdIndex];
       return (
         programId.equals(Ed25519Program.programId) ||
-        programId.equals(Secp256k1Program.programId)
+        programId.equals(Secp256k1Program.programId) ||
+        programId.equals(SECP256R1_PROGRAM_ID)
       );
     })
     .reduce((count, ix) => count + (ix.data[0] ?? 0), 0);

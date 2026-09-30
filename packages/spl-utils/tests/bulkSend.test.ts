@@ -128,6 +128,7 @@ describe("bulkSendTransactions", () => {
     expect(error?.message).to.equal(
       `Missing signature for public key ${stranger.publicKey.toBase58()}`,
     );
+    expect((error as any)?.landedSignatures).to.deep.equal([sigOf(sent[0])]);
     expect(sent.map(payerOf).map((key) => key.toBase58())).to.deep.equal([
       wallet.publicKey.toBase58(),
     ]);
@@ -241,9 +242,144 @@ describe("bulkSendTransactions", () => {
     expect(error?.message).to.equal("Failed to run txs");
     expect(error?.landedSignatures).to.deep.equal([sigOf(sent[0])]);
   });
+
+  it("rethrows the original error when nothing landed and every tx was signed", async () => {
+    const wallet = Keypair.generate();
+    const rejection = new Error("User rejected the request");
+    const provider: any = {
+      connection: fakeNode().connection,
+      wallet: {
+        publicKey: wallet.publicKey,
+        signAllTransactions: async () => {
+          throw rejection;
+        },
+      },
+    };
+
+    let error: any;
+    try {
+      await bulkSendTransactions(provider, [transferFrom(wallet)]);
+    } catch (e: any) {
+      error = e;
+    }
+
+    expect(error).to.equal(rejection);
+    expect(error.landedSignatures).to.equal(undefined);
+  });
+
+  it("keeps the landed signatures and the cause when a later chunk's signing throws", async () => {
+    const wallet = Keypair.generate();
+    const rejection = new Error("User rejected the request");
+    const { connection, sent } = fakeNode();
+    let signings = 0;
+    const provider: any = {
+      connection,
+      wallet: {
+        publicKey: wallet.publicKey,
+        signAllTransactions: async (txs: VersionedTransaction[]) => {
+          if (++signings > 1) throw rejection;
+          txs.forEach((tx) => tx.sign([wallet]));
+          return txs;
+        },
+      },
+    };
+
+    let error: any;
+    try {
+      await bulkSendTransactions(
+        provider,
+        [transferFrom(wallet), transferFrom(wallet)],
+        undefined,
+        2,
+        [],
+        1,
+      );
+    } catch (e: any) {
+      error = e;
+    }
+
+    expect(error?.message).to.equal("User rejected the request");
+    expect(error?.landedSignatures).to.deep.equal([sigOf(sent[0])]);
+    expect(error?.cause).to.equal(rejection);
+  });
 });
 
 describe("bulkSendRawTransactions", () => {
+  it("keeps the signatures of a landed chunk when a later send throws", async () => {
+    const { connection } = fakeNode();
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash();
+    // One more than a send batch, so the last tx goes in a second chunk.
+    const txs = Array.from({ length: 101 }, () =>
+      signedTransferFrom(Keypair.generate(), blockhash),
+    );
+    const rpcError = new Error("fetch failed");
+    const send = connection.sendRawTransaction;
+    let sends = 0;
+    connection.sendRawTransaction = async (raw: Buffer) => {
+      if (++sends > 100) throw rpcError;
+      return send(raw);
+    };
+
+    let error: any;
+    try {
+      await bulkSendRawTransactions(
+        connection,
+        txs.map((tx) => Buffer.from(tx.serialize())),
+        undefined,
+        lastValidBlockHeight,
+      );
+    } catch (e: any) {
+      error = e;
+    }
+
+    expect(error?.landedSignatures).to.deep.equal(
+      txs.slice(0, 100).map((tx) => bs58.encode(tx.signatures[0])),
+    );
+    expect(error?.cause).to.equal(rpcError);
+  });
+
+  it("returns a tx that lands in the poll that sees its blockhash expire, without resending it", async () => {
+    const { connection, sent } = fakeNode();
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash();
+    const tx = signedTransferFrom(Keypair.generate(), blockhash);
+    // The node reports the tx only once the chain passes its last valid
+    // height. The clock jumps past the 4s resend interval at that point, so
+    // a resend after expiry would show in `sent`.
+    const realValueOf = Date.prototype.valueOf;
+    let clockOffset = 0;
+    let expired = false;
+    connection.getBlockHeight = async () => {
+      if (expired) return lastValidBlockHeight + 1;
+      if (sent.length === 0) return 0;
+      expired = true;
+      clockOffset += 5_000;
+      return lastValidBlockHeight + 1;
+    };
+    const getTransactions = connection.getTransactions;
+    connection.getTransactions = async (txids: string[]) =>
+      expired ? getTransactions(txids) : txids.map(() => null);
+
+    let landed: string[];
+    Date.prototype.valueOf = function () {
+      return realValueOf.call(this) + clockOffset;
+    };
+    try {
+      landed = await bulkSendRawTransactions(
+        connection,
+        [Buffer.from(tx.serialize())],
+        undefined,
+        lastValidBlockHeight,
+      );
+    } finally {
+      Date.prototype.valueOf = realValueOf;
+    }
+
+    expect(landed).to.deep.equal([bs58.encode(tx.signatures[0])]);
+    expect(sent).to.have.length(1);
+  });
+
   it("keeps the signatures that landed in the same batch as an on-chain failure", async () => {
     const wallet = Keypair.generate();
     const failer = Keypair.generate();
@@ -345,6 +481,7 @@ describe("bulkSendRawTransactions", () => {
   it("reports the unsigned tx when the signed tx's blockhash expires", async () => {
     const wallet = Keypair.generate();
     const stranger = Keypair.generate();
+    const lander = Keypair.generate();
     const { connection } = fakeNode(wallet.publicKey);
     const { blockhash, lastValidBlockHeight } =
       await connection.getLatestBlockhash();
@@ -362,11 +499,13 @@ describe("bulkSendRawTransactions", () => {
       instructions: transferFrom(stranger).instructions,
     });
 
-    let error: Error | undefined;
+    const landed = signedTransferFrom(lander, blockhash);
+
+    let error: any;
     try {
       await bulkSendRawTransactions(
         connection,
-        [signed, unsigned].map((tx) => Buffer.from(tx.serialize())),
+        [signed, unsigned, landed].map((tx) => Buffer.from(tx.serialize())),
         undefined,
         lastValidBlockHeight,
       );
@@ -377,6 +516,9 @@ describe("bulkSendRawTransactions", () => {
     expect(error?.message).to.equal(
       `Missing signature for public key ${stranger.publicKey.toBase58()}`,
     );
+    expect(error?.landedSignatures).to.deep.equal([
+      bs58.encode(landed.signatures[0]),
+    ]);
   });
 });
 

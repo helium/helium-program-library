@@ -93,7 +93,8 @@ describe("transaction version on the fork", () => {
       expect(solanaCore).to.equal(FORK_SOLANA_CORE);
       expect(await resolveTxVersion(connection)).to.equal(1);
     } finally {
-      process.env.HPL_TX_VERSION = lane;
+      if (lane === undefined) delete process.env.HPL_TX_VERSION;
+      else process.env.HPL_TX_VERSION = lane;
       resetTxVersionCache();
     }
   });

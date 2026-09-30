@@ -165,6 +165,44 @@ describe("sus", () => {
     expect(result.priorityFee).to.equal(2000);
   });
 
+  it("charges the base fee for each secp256r1 precompile signature in a v1 transaction", async () => {
+    const tx = await toVersionedTx({
+      feePayer: payer.publicKey,
+      recentBlockhash: Keypair.generate().publicKey.toBase58(),
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 }),
+        new TransactionInstruction({
+          programId: new PublicKey(
+            "Secp256r1SigVerify1111111111111111111111111"
+          ),
+          keys: [],
+          data: Buffer.from([2, 0]),
+        }),
+        SystemProgram.transfer({
+          fromPubkey: payer.publicKey,
+          toPubkey: recipient,
+          lamports: 1,
+        }),
+      ],
+      addressLookupTables: [],
+      version: 1,
+    });
+    tx.sign([payer]);
+
+    const { connection } = fakeConnection();
+    const [result] = await sus({
+      connection,
+      wallet: payer.publicKey,
+      serializedTransactions: [Buffer.from(tx.serialize())],
+    });
+
+    expect(result.error).to.equal(undefined);
+    // One message signature plus two precompile signatures.
+    expect(result.solFee).to.equal(15000);
+    expect(result.priorityFee).to.equal(2000);
+  });
+
   it("prices a v1 transaction from the node when the node can price it", async () => {
     const wire = await v1TxWithEd25519(2);
     const messageBytes = wire.subarray(0, wire.length - 64);

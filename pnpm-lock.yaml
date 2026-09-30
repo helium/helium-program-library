@@ -32,10 +32,10 @@ importers:
         version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/nft-proxy-sdk':
         specifier: ^0.1.5-alpha.0
-        version: 0.1.5-alpha.0(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5-alpha.0(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/proposal-sdk':
         specifier: ^0.1.5-alpha.0
-        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/transactions':
         specifier: ^3.38.0
         version: 3.62.0
@@ -44,7 +44,7 @@ importers:
         version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@metaplex-foundation/mpl-bubblegum':
         specifier: ^0.7.0
-        version: 0.7.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.7.0(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@pythnetwork/client':
         specifier: ^2.8.0
         version: 2.22.1(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -183,7 +183,7 @@ importers:
     dependencies:
       '@solana/web3.js':
         specifier: 1.99.0
-        version: 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
     devDependencies:
       '@swc-node/register':
         specifier: ^1.11.1
@@ -245,7 +245,7 @@ importers:
     dependencies:
       '@anchor-lang/core':
         specifier: ^0.31.2
-        version: 0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
+        version: 0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@bufbuild/protobuf':
         specifier: ^1.10.0
         version: 1.10.0
@@ -263,10 +263,10 @@ importers:
         version: link:../spl-utils
       '@metaplex-foundation/mpl-token-metadata':
         specifier: ^2.10.0
-        version: 2.13.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
+        version: 2.13.0(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/web3.js':
         specifier: 1.99.0
-        version: 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
+        version: 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@substreams/core':
         specifier: ^0.16.0
         version: 0.16.0(@bufbuild/protobuf@1.10.0)(@connectrpc/connect@1.6.1(@bufbuild/protobuf@1.10.0))
@@ -448,7 +448,7 @@ importers:
         version: link:../spl-utils
       '@metaplex-foundation/mpl-bubblegum':
         specifier: ^0.7.0
-        version: 0.7.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.7.0(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/web3.js':
         specifier: 1.99.0
         version: 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -575,7 +575,7 @@ importers:
         version: link:../spl-utils
       '@helium/tuktuk-sdk':
         specifier: ^0.1.1
-        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/wallet-adapter-base':
         specifier: ^0.9.22
         version: 0.9.23(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))
@@ -1858,7 +1858,7 @@ importers:
         version: link:../idls
       '@helium/nft-proxy-sdk':
         specifier: ^0.1.5-alpha.0
-        version: 0.1.5-alpha.0(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5-alpha.0(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/no-emit-sdk':
         specifier: workspace:^
         version: link:../no-emit-sdk
@@ -1922,22 +1922,22 @@ importers:
         version: link:../no-emit-sdk
       '@helium/organization-sdk':
         specifier: ^0.1.5
-        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/proposal-sdk':
         specifier: ^0.1.5
-        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/spl-utils':
         specifier: workspace:^
         version: link:../spl-utils
       '@helium/state-controller-sdk':
         specifier: ^0.1.5
-        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/tuktuk-idls':
         specifier: ^0.1.1
         version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/tuktuk-sdk':
         specifier: ^0.1.1
-        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/voter-stake-registry-sdk':
         specifier: workspace:^
         version: link:../voter-stake-registry-sdk
@@ -2089,7 +2089,7 @@ importers:
         version: link:../anchor-resolvers
       '@helium/cron-sdk':
         specifier: ^0.1.1
-        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/helium-sub-daos-sdk':
         specifier: workspace:^
         version: link:../helium-sub-daos-sdk
@@ -2098,19 +2098,19 @@ importers:
         version: link:../idls
       '@helium/organization-sdk':
         specifier: ^0.1.5-alpha.0
-        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/proposal-sdk':
         specifier: ^0.1.5-alpha.0
-        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/spl-utils':
         specifier: workspace:^
         version: link:../spl-utils
       '@helium/state-controller-sdk':
         specifier: ^0.1.5-alpha.0
-        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/tuktuk-sdk':
         specifier: ^0.1.1
-        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/voter-stake-registry-sdk':
         specifier: workspace:^
         version: link:../voter-stake-registry-sdk
@@ -3243,7 +3243,7 @@ importers:
         version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/tuktuk-sdk':
         specifier: ^0.1.1
-        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@pythnetwork/hermes-client':
         specifier: ^3.1.0
         version: 3.1.0(axios@1.13.6)
@@ -3337,13 +3337,13 @@ importers:
         version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/organization-sdk':
         specifier: ^0.1.5-alpha.0
-        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/spl-utils':
         specifier: workspace:^
         version: link:../spl-utils
       '@helium/tuktuk-sdk':
         specifier: ^0.1.1
-        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+        version: 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/voter-stake-registry-sdk':
         specifier: workspace:^
         version: link:../voter-stake-registry-sdk
@@ -15523,39 +15523,12 @@ snapshots:
       bn.js: 5.2.5
       buffer-layout: 1.2.2
 
-  '@anchor-lang/borsh@0.31.2(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6))':
-    dependencies:
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      bn.js: 5.2.5
-      buffer-layout: 1.2.2
-
   '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@anchor-lang/borsh': 0.31.2(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))
       '@anchor-lang/errors': 0.31.2
       '@noble/hashes': 1.8.0
       '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      bn.js: 5.2.5
-      bs58: 4.0.1
-      buffer-layout: 1.2.2
-      camelcase: 6.3.0
-      cross-fetch: 3.2.0(encoding@0.1.13)
-      eventemitter3: 4.0.7
-      pako: 2.1.0
-      superstruct: 0.15.5
-      toml: 3.0.0
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - typescript
-      - utf-8-validate
-
-  '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@anchor-lang/borsh': 0.31.2(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6))
-      '@anchor-lang/errors': 0.31.2
-      '@noble/hashes': 1.8.0
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
       bn.js: 5.2.5
       bs58: 4.0.1
       buffer-layout: 1.2.2
@@ -17479,18 +17452,6 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@helium/anchor-resolvers@0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
-      '@solana/spl-token': 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
   '@helium/anchor-resolvers@0.11.16(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
@@ -17526,20 +17487,6 @@ snapshots:
       '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/tuktuk-idls': 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/tuktuk-sdk': 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      js-sha256: 0.11.1
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
-  '@helium/cron-sdk@0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
-      '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/tuktuk-idls': 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/tuktuk-sdk': 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       js-sha256: 0.11.1
     transitivePeerDependencies:
       - bufferutil
@@ -17620,7 +17567,7 @@ snapshots:
       '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
       '@helium/account-fetch-cache': 0.10.35(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/account-fetch-cache-hooks': 0.10.35(bufferutil@4.0.7)(encoding@0.1.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/spl-token': 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      '@solana/spl-token': 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/wallet-adapter-react': 0.15.34(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bs58@4.0.1)(react-native@0.72.17(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(bufferutil@4.0.7)(encoding@0.1.13)(react@18.2.0)(utf-8-validate@5.0.10))(react@18.2.0)
       '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       bs58: 4.0.1
@@ -17694,7 +17641,7 @@ snapshots:
       '@helium/account-fetch-cache-hooks': 0.10.35(bufferutil@4.0.7)(encoding@0.1.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/helium-react-hooks': 0.10.35(@solana/wallet-adapter-react@0.15.34(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bs58@4.0.1)(react-native@0.72.17(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(bufferutil@4.0.7)(encoding@0.1.13)(react@18.2.0)(utf-8-validate@5.0.10))(react@18.2.0))(bufferutil@4.0.7)(encoding@0.1.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/modular-governance-idls': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/organization-sdk': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
+      '@helium/organization-sdk': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -17732,20 +17679,6 @@ snapshots:
       '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/modular-governance-idls': 0.0.10(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/spl-token': 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - '@solana/web3.js'
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
-  '@helium/nft-proxy-sdk@0.1.5-alpha.0(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
-      '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/modular-governance-idls': 0.0.10(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/spl-token': 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - '@solana/web3.js'
       - bufferutil
@@ -17819,35 +17752,10 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@helium/organization-sdk@0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
-      '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/modular-governance-idls': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/proposal-sdk': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
   '@helium/proposal-sdk@0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
       '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
       '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/modular-governance-idls': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
-  '@helium/proposal-sdk@0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
-      '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/modular-governance-idls': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
@@ -17891,18 +17799,6 @@ snapshots:
     dependencies:
       '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
       '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/modular-governance-idls': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
-  '@helium/state-controller-sdk@0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
-      '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/modular-governance-idls': 0.1.5(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
     transitivePeerDependencies:
       - bufferutil
@@ -17958,19 +17854,6 @@ snapshots:
     dependencies:
       '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
       '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@helium/tuktuk-idls': 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      js-sha256: 0.11.1
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
-  '@helium/tuktuk-sdk@0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@coral-xyz/anchor': '@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)'
-      '@helium/anchor-resolvers': 0.10.35(@anchor-lang/core@0.31.2(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@helium/tuktuk-idls': 0.1.1(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       js-sha256: 0.11.1
     transitivePeerDependencies:
@@ -18716,19 +18599,6 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@metaplex-foundation/beet-solana@0.4.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@metaplex-foundation/beet': 0.7.1
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      bs58: 5.0.0
-      debug: 4.4.3(supports-color@8.1.1)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - supports-color
-      - typescript
-      - utf-8-validate
-
   '@metaplex-foundation/beet@0.7.1':
     dependencies:
       ansicolors: 0.3.2
@@ -18745,24 +18615,6 @@ snapshots:
       '@metaplex-foundation/beet-solana': 0.4.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@metaplex-foundation/cusper': 0.0.2
       '@metaplex-foundation/mpl-token-metadata': 2.13.0(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/spl-account-compression': 0.1.10(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/spl-token': 0.1.8(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      js-sha3: 0.8.0
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - supports-color
-      - typescript
-      - utf-8-validate
-
-  '@metaplex-foundation/mpl-bubblegum@0.7.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@metaplex-foundation/beet': 0.7.1
-      '@metaplex-foundation/beet-solana': 0.4.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@metaplex-foundation/cusper': 0.0.2
-      '@metaplex-foundation/mpl-token-metadata': 2.13.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/spl-account-compression': 0.1.10(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/spl-token': 0.1.8(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -18800,40 +18652,6 @@ snapshots:
       '@solana/spl-token': 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       bn.js: 5.2.5
-      debug: 4.4.3(supports-color@8.1.1)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - supports-color
-      - typescript
-      - utf-8-validate
-
-  '@metaplex-foundation/mpl-token-metadata@2.13.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@metaplex-foundation/beet': 0.7.1
-      '@metaplex-foundation/beet-solana': 0.4.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@metaplex-foundation/cusper': 0.0.2
-      '@solana/spl-token': 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      bn.js: 5.2.3
-      debug: 4.4.3(supports-color@8.1.1)
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - supports-color
-      - typescript
-      - utf-8-validate
-
-  '@metaplex-foundation/mpl-token-metadata@2.13.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@metaplex-foundation/beet': 0.7.1
-      '@metaplex-foundation/beet-solana': 0.4.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@metaplex-foundation/cusper': 0.0.2
-      '@solana/spl-token': 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      bn.js: 5.2.3
       debug: 4.4.3(supports-color@8.1.1)
     transitivePeerDependencies:
       - bufferutil
@@ -21841,18 +21659,6 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@solana/buffer-layout-utils@0.2.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@solana/buffer-layout': 4.0.1
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      bigint-buffer: 1.1.5
-      bignumber.js: 9.3.1
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - typescript
-      - utf-8-validate
-
   '@solana/buffer-layout@3.0.0':
     dependencies:
       buffer: 6.0.3
@@ -22696,22 +22502,6 @@ snapshots:
       - fastestsmallesttextencoderdecoder
       - typescript
 
-  '@solana/spl-token-metadata@0.1.6(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(typescript@5.9.3)':
-    dependencies:
-      '@solana/codecs': 2.0.0-rc.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-    transitivePeerDependencies:
-      - fastestsmallesttextencoderdecoder
-      - typescript
-
-  '@solana/spl-token-metadata@0.1.6(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6))(typescript@5.9.3)':
-    dependencies:
-      '@solana/codecs': 2.0.0-rc.1(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
-    transitivePeerDependencies:
-      - fastestsmallesttextencoderdecoder
-      - typescript
-
   '@solana/spl-token-registry@0.2.1105':
     dependencies:
       cross-fetch: 3.0.6
@@ -22753,34 +22543,6 @@ snapshots:
       '@solana/buffer-layout-utils': 0.2.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
       '@solana/spl-token-metadata': 0.1.6(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)
       '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      buffer: 6.0.3
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
-  '@solana/spl-token@0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)':
-    dependencies:
-      '@solana/buffer-layout': 4.0.1
-      '@solana/buffer-layout-utils': 0.2.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@solana/spl-token-metadata': 0.1.6(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(typescript@5.9.3)
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      buffer: 6.0.3
-    transitivePeerDependencies:
-      - bufferutil
-      - encoding
-      - fastestsmallesttextencoderdecoder
-      - typescript
-      - utf-8-validate
-
-  '@solana/spl-token@0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6))(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)':
-    dependencies:
-      '@solana/buffer-layout': 4.0.1
-      '@solana/buffer-layout-utils': 0.2.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
-      '@solana/spl-token-metadata': 0.1.6(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6))(typescript@5.9.3)
-      '@solana/web3.js': 1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@6.0.6)
       buffer: 6.0.3
     transitivePeerDependencies:
       - bufferutil

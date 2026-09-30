@@ -33,7 +33,7 @@
     "test": "mocha -r @swc-node/register \"tests/**/*.test.ts\" --timeout 10000"
   },
   "dependencies": {
-    "@solana/web3.js": "^1.91.1"
+    "@solana/web3.js": "^1.99.0"
   },
   "devDependencies": {
     "@swc-node/register": "^1.11.1",

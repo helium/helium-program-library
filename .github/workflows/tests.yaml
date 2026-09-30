@@ -159,9 +159,11 @@ jobs:
   # setup-ts would build @helium/idls, which needs target/types; the filtered
   # turbo run builds only the four packages the suites import.
   test-ts-unit:
-    name: spl-utils and sus Unit Tests
+    name: spl-utils, sus and account-fetch-cache Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -170,7 +172,7 @@ jobs:
           node-version-file: .node-version
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm turbo run test --filter=@helium/spl-utils --filter=@helium/sus
+      - run: pnpm turbo run test --filter=@helium/spl-utils --filter=@helium/sus --filter=@helium/account-fetch-cache
 
   test-testing-guard:
     name: TESTING Build Guard

@@ -200,8 +200,7 @@ jobs:
             file: delegate-automation.test.ts
           - name: tx-version
             file: tx-version.test.ts
-        # Every suite runs with the transaction version forced each way. Drop
-        # the v0 lane 7 days after mainnet crons run clean on v1.
+        # Every suite runs with the transaction version forced each way.
         tx-version: [v1, v0]
 
     name: ${{ matrix.test.name }} (${{ matrix.tx-version }})

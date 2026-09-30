@@ -368,7 +368,7 @@ export async function sendAndConfirmWithRetry(
 
 /**
  * @deprecated Legacy only: throws on v0 and v1 bytes. Use
- * `VersionedTransaction.deserialize`. Removed in the next release.
+ * `VersionedTransaction.deserialize`.
  */
 export function stringToTransaction(solanaTransaction: string) {
   return Transaction.from(Buffer.from(solanaTransaction));
@@ -376,7 +376,7 @@ export function stringToTransaction(solanaTransaction: string) {
 
 /**
  * @deprecated Legacy only: throws on v0 and v1 bytes. Use
- * `VersionedTransaction.deserialize`. Removed in the next release.
+ * `VersionedTransaction.deserialize`.
  */
 export function bufferToTransaction(solanaTransaction: Buffer) {
   return Transaction.from(solanaTransaction);
@@ -413,9 +413,12 @@ const missingSigner = (tx: VersionedTransaction): PublicKey | undefined => {
 };
 
 /**
- * Thrown for an on-chain failure, a missing signer, or any error after a tx
- * landed. Read `landedSignatures` rather than using `instanceof`: the CJS and
- * ESM builds each define this class.
+ * Thrown by the bulk senders for an on-chain failure, a missing signer, or any
+ * error after a tx landed, and by `sendInstructions` for a missing signer.
+ * `landedSignatures` lists only txs seen landed. A tx not listed may still land
+ * until its blockhash expires, so wait for expiry before resending it. Read
+ * `landedSignatures` rather than using `instanceof`: the CJS and ESM builds
+ * each define this class.
  */
 export class BulkSendError extends Error {
   /** Txs that landed before the throw, ordered by confirmation. */
@@ -560,7 +563,7 @@ export async function bulkSendTransactions(
       const landedSignatures = [
         ...ret,
         ...thisRet,
-        ...(e.landedSignatures ?? []),
+        ...(e?.landedSignatures ?? []),
       ];
       // Nothing to add: keep the original error, e.g. a wallet rejection.
       if (landedSignatures.length === 0 && missingSigners.length === 0) {
@@ -607,86 +610,103 @@ export async function bulkSendRawTransactions(
     lastValidBlockHeight = blockhash.lastValidBlockHeight;
   }
 
-  for (let chunk of chunks(txs, txBatchSize)) {
-    let currentBatchProgress = 0;
+  try {
+    for (let chunk of chunks(txs, txBatchSize)) {
+      let currentBatchProgress = 0;
 
-    let pendingCount = chunk.length;
-    let txids: string[] = [];
-    let lastRetry = 0;
+      let pendingCount = chunk.length;
+      let txids: string[] = [];
+      let lastRetry = 0;
 
-    while (pendingCount > 0) {
-      if (
-        (await withRetries(5, () => connection.getBlockHeight())) >
-        lastValidBlockHeight
-      ) {
-        assertNoMissingSigners(missingSigners, ret);
-        return ret;
-      }
+      while (pendingCount > 0) {
+        let expired = false;
+        if (
+          (await withRetries(5, () => connection.getBlockHeight("confirmed"))) >
+          lastValidBlockHeight
+        ) {
+          expired = true;
+        }
 
-      // only resend txs every 4s
-      if (lastRetry < new Date().valueOf() - 4 * 1000) {
-        lastRetry = new Date().valueOf();
-        txids = [];
-        for (const tx of chunk) {
-          const txid = await connection.sendRawTransaction(tx, {
-            skipPreflight,
-            maxRetries,
+        // only resend txs every 4s
+        if (!expired && lastRetry < new Date().valueOf() - 4 * 1000) {
+          lastRetry = new Date().valueOf();
+          txids = [];
+          for (const tx of chunk) {
+            const txid = await connection.sendRawTransaction(tx, {
+              skipPreflight,
+              maxRetries,
+            });
+            txids.push(txid);
+          }
+        }
+
+        const statuses = await getAllTxns(connection, txids);
+        const completed = statuses.filter((status) => status !== null);
+        totalProgress += completed.length;
+        currentBatchProgress += completed.length;
+        onProgress &&
+          onProgress({
+            totalTxs: txs.length,
+            totalProgress: totalProgress,
+            currentBatchProgress: currentBatchProgress,
+            currentBatchSize: txBatchSize,
           });
-          txids.push(txid);
+        const failures = completed
+          .map((status) => status !== null && status.meta?.err)
+          .filter(truthy);
+
+        if (failures.length > 0) {
+          const failureIndexes = statuses
+            .map((status, index) => (status?.meta?.err ? index : null))
+            .filter((i) => typeof i !== "undefined" && i !== null);
+          const failedTxs = await Promise.all(
+            failureIndexes.map((index) =>
+              connection.getTransaction(txids[index!], {
+                commitment: "confirmed",
+                maxSupportedTransactionVersion: 1,
+              })
+            )
+          );
+          for (const tx of failedTxs) {
+            console.error(tx?.meta?.logMessages?.join("\n"));
+          }
+          throw new BulkSendError({
+            message: "Failed to run txs",
+            missingSigners,
+            landedSignatures: [
+              ...ret,
+              ...txids.filter(
+                (_, index) => statuses[index] && !statuses[index]!.meta?.err
+              ),
+            ],
+          });
         }
-      }
-
-      const statuses = await getAllTxns(connection, txids);
-      const completed = statuses.filter((status) => status !== null);
-      totalProgress += completed.length;
-      currentBatchProgress += completed.length;
-      onProgress &&
-        onProgress({
-          totalTxs: txs.length,
-          totalProgress: totalProgress,
-          currentBatchProgress: currentBatchProgress,
-          currentBatchSize: txBatchSize,
-        });
-      const failures = completed
-        .map((status) => status !== null && status.meta?.err)
-        .filter(truthy);
-
-      if (failures.length > 0) {
-        const failureIndexes = statuses
-          .map((status, index) => (status?.meta?.err ? index : null))
-          .filter((i) => typeof i !== "undefined" && i !== null);
-        const failedTxs = await Promise.all(
-          failureIndexes.map((index) =>
-            connection.getTransaction(txids[index!], {
-              commitment: "confirmed",
-              maxSupportedTransactionVersion: 1,
-            })
-          )
+        ret.push(
+          ...txids
+            .map((txid, idx) => (statuses[idx] == null ? null : txid))
+            .filter(truthy)
         );
-        for (const tx of failedTxs) {
-          console.error(tx?.meta?.logMessages?.join("\n"));
+        chunk = chunk.filter((_, index) => statuses[index] === null);
+        txids = txids.filter((_, index) => statuses[index] === null);
+        pendingCount -= completed.length;
+        // A tx sent before expiry can still land; the caller resends the rest.
+        if (expired) {
+          assertNoMissingSigners(missingSigners, ret);
+          return ret;
         }
-        throw new BulkSendError({
-          message: "Failed to run txs",
-          missingSigners,
-          landedSignatures: [
-            ...ret,
-            ...txids.filter(
-              (_, index) => statuses[index] && !statuses[index]!.meta?.err
-            ),
-          ],
-        });
+        await sleep(1000); // Wait one seconds before querying again
       }
-      ret.push(
-        ...txids
-          .map((txid, idx) => (statuses[idx] == null ? null : txid))
-          .filter(truthy)
-      );
-      chunk = chunk.filter((_, index) => statuses[index] === null);
-      txids = txids.filter((_, index) => statuses[index] === null);
-      pendingCount -= completed.length;
-      await sleep(1000); // Wait one seconds before querying again
     }
+  } catch (e: any) {
+    // Already carries the landed list (the failure throw, missing signers).
+    if (e?.landedSignatures) throw e;
+    if (ret.length === 0 && missingSigners.length === 0) throw e;
+    throw new BulkSendError({
+      message: e?.message,
+      missingSigners,
+      landedSignatures: ret,
+      cause: e,
+    });
   }
 
   assertNoMissingSigners(missingSigners, ret);
