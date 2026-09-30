@@ -1,5 +1,10 @@
 import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  ACCOUNT_SIZE,
+  AccountLayout,
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
@@ -20,6 +25,8 @@ import {
   assertDcCovered,
   assertNotDelegated,
   buildOwnerPaidUpdateInstruction,
+  dataOnlyIotOnboardDcFee,
+  dcBalance,
   dcBurnerFor,
   hotspotInfoKey,
   locationAssertDcFee,
@@ -563,5 +570,104 @@ describe("on-chain unit conversion", () => {
 
   it("leaves an unset elevation unset", () => {
     expect(toOnChainElevation(undefined)).to.eq(null);
+  });
+});
+
+describe("dcBalance", () => {
+  const connectionWith = (
+    accountAt: (address: PublicKey) => Buffer | null
+  ): Connection =>
+    ({
+      getAccountInfo: async (address: PublicKey) => {
+        const data = accountAt(address);
+        return data
+          ? {
+              data,
+              owner: TOKEN_PROGRAM_ID,
+              lamports: 2_039_280,
+              executable: false,
+            }
+          : null;
+      },
+    }) as unknown as Connection;
+
+  const dcTokenAccount = (amount: bigint): Buffer => {
+    const data = Buffer.alloc(ACCOUNT_SIZE);
+    AccountLayout.encode(
+      {
+        mint: DC_MINT,
+        owner: OWNER,
+        amount,
+        delegateOption: 0,
+        delegate: PublicKey.default,
+        state: 1,
+        isNativeOption: 0,
+        isNative: BigInt(0),
+        delegatedAmount: BigInt(0),
+        closeAuthorityOption: 0,
+        closeAuthority: PublicKey.default,
+      },
+      data
+    );
+    return data;
+  };
+
+  it("reads a missing DC token account as zero, so the DC gate refuses it", async () => {
+    const available = await dcBalance(
+      connectionWith(() => null),
+      OWNER
+    );
+
+    expect(available).to.eq(BigInt(0));
+    expect(() =>
+      assertDcCovered({
+        required: new BN(4_000_000),
+        available,
+        errors: {
+          INSUFFICIENT_FUNDS: (opts) => new Error(opts.message),
+        },
+      })
+    ).to.throw(/Insufficient DC balance/);
+  });
+
+  it("reads the owner's DC ATA balance", async () => {
+    const ata = getAssociatedTokenAddressSync(DC_MINT, OWNER, true);
+    const available = await dcBalance(
+      connectionWith((address) =>
+        address.equals(ata) ? dcTokenAccount(BigInt(4_000_000)) : null
+      ),
+      OWNER
+    );
+
+    expect(available).to.eq(BigInt(4_000_000));
+  });
+});
+
+describe("dataOnlyIotOnboardDcFee", () => {
+  const settings = {
+    iotConfig: {
+      fullLocationStakingFee: new BN(4_000_000),
+      dataonlyLocationStakingFee: new BN(500_000),
+    },
+  };
+
+  it("charges only the onboarding fee when no location is asserted", () => {
+    expect(
+      dataOnlyIotOnboardDcFee({
+        onboardingFee: new BN(1_000_000),
+        settings,
+        assertsLocation: false,
+      }).toString()
+    ).to.eq("1000000");
+  });
+
+  it("adds the data-only location staking fee when a location is asserted", () => {
+    expect(
+      dataOnlyIotOnboardDcFee({
+        onboardingFee: new BN(1_000_000),
+        settings,
+        assertsLocation: true,
+      }).toString()
+    ).to.eq("1500000");
   });
 });

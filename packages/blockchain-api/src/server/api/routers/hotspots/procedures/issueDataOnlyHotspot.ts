@@ -13,8 +13,7 @@ import { HNT_MINT } from "@helium/spl-utils";
 import { helium } from "@helium/proto";
 import Address from "@helium/address";
 import {
-  calculateRequiredBalance,
-  getDataOnlyIssueCostLamports,
+  getDataOnlyIssueFunding,
   getTransactionFee,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -168,15 +167,12 @@ export const issueDataOnlyHotspot =
         connection.getBalance(owner),
         program.account.dataOnlyConfigV0.fetch(dataOnlyConfigKey(dao)[0]),
       ]);
-      const issueCost = await getDataOnlyIssueCostLamports(connection, {
-        entityKeyLen: entityKeyBytes.length,
-        newTreeFeeLamports: dataOnlyConfig.newTreeFeeLamports.toNumber(),
-      });
-      const required = await calculateRequiredBalance(
-        connection,
-        totalFee,
-        issueCost
-      );
+      const { estimatedLamports, requiredLamports: required } =
+        await getDataOnlyIssueFunding(connection, {
+          txFeeLamports: totalFee,
+          entityKeyLen: entityKeyBytes.length,
+          newTreeFeeLamports: dataOnlyConfig.newTreeFeeLamports.toNumber(),
+        });
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
           message:
@@ -201,7 +197,7 @@ export const issueDataOnlyHotspot =
           actionMetadata: { type: "issue_data_only_hotspot" },
         },
         estimatedSolFee: await toTokenAmountOutput(
-          new BN(totalFee),
+          new BN(estimatedLamports),
           NATIVE_MINT.toBase58()
         ),
       };

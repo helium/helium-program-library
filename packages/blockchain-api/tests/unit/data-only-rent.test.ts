@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
   getDataOnlyIssueCostLamports,
+  getDataOnlyIssueFunding,
   getDataOnlyOnboardRentLamports,
 } from "../../src/lib/utils/balance-validation";
 
@@ -47,6 +48,25 @@ describe("getDataOnlyIssueCostLamports", () => {
 
     expect(low).to.equal(143 * 1000);
     expect(high).to.equal(143 * 6960);
+  });
+});
+
+describe("getDataOnlyIssueFunding", () => {
+  it("estimates the tx fee plus issue cost, and gates on that plus the wallet-rent floor", async () => {
+    // 890_880 is the 0-byte rent floor; the KeyToAssetV0 (143 bytes) prices at 1_234_567.
+    const connection = stubConnection((space) =>
+      space === 0 ? 890_880 : 1_234_567,
+    );
+
+    const { estimatedLamports, requiredLamports } =
+      await getDataOnlyIssueFunding(connection, {
+        txFeeLamports: 10_000,
+        entityKeyLen: 38,
+        newTreeFeeLamports: 69_215,
+      });
+
+    expect(estimatedLamports).to.equal(10_000 + 1_234_567 + 69_215);
+    expect(requiredLamports - estimatedLamports).to.equal(890_880);
   });
 });
 
