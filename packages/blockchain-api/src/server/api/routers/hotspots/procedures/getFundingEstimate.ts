@@ -1,11 +1,9 @@
 import { publicProcedure } from "../../../procedures";
 import { createSolanaConnection } from "@/lib/solana";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 import {
   getBaseAutomationRentLamports,
-  TASK_RETURN_ACCOUNT_FUNDING_SOL,
-  calculateFundingForAdditionalDuration,
+  estimateAutomationFunding,
 } from "@/lib/utils/automation-helpers";
 import { fetchAutomationData } from "./automation-data-helpers";
 
@@ -36,19 +34,11 @@ export const getFundingEstimate =
         taskReturnAccountFundingLamports,
       } = automationData;
 
-      // Calculate initial setup rent if automation doesn't exist
-      // This matches the logic in getAutomationStatus
-      const rentFee = cronJobAccount
-        ? 0
-        : (await getBaseAutomationRentLamports(provider.connection)) /
-            LAMPORTS_PER_SOL +
-          TASK_RETURN_ACCOUNT_FUNDING_SOL;
-
-      const {
-        cronJobFundingLamports,
-        pdaWalletFundingLamports,
-        recipientFeeLamports,
-      } = calculateFundingForAdditionalDuration({
+      const funding = estimateAutomationFunding({
+        cronJobExists: !!cronJobAccount,
+        baseAutomationRentLamports: cronJobAccount
+          ? 0
+          : await getBaseAutomationRentLamports(provider.connection),
         cronJobBalanceLamports,
         cronJobCostPerClaimLamports,
         pdaWalletBalanceLamports,
@@ -61,21 +51,8 @@ export const getFundingEstimate =
         taskReturnAccountFundingLamports,
       });
 
-      const cronJobFunding = cronJobFundingLamports / LAMPORTS_PER_SOL;
-      const pdaWalletFunding = pdaWalletFundingLamports / LAMPORTS_PER_SOL;
-      const recipientFee = recipientFeeLamports / LAMPORTS_PER_SOL;
-      const operationalSol = cronJobFunding + pdaWalletFunding;
-      // recipientFeeLamports already represents only the ADDITIONAL recipient rent needed
-      // (0 if already included in shortfall, full amount if not)
-      const totalSolNeeded = rentFee + operationalSol + recipientFee;
-
       return {
-        rentFee,
-        cronJobFunding,
-        pdaWalletFunding,
-        recipientFee,
-        operationalSol,
-        totalSolNeeded,
+        ...funding,
         currentCronJobBalance: cronJobBalanceLamports.toString(),
         currentPdaWalletBalance: pdaWalletBalanceLamports.toString(),
       };

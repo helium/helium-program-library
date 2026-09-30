@@ -3,7 +3,7 @@ import {
   ENTITY_CLAIM_CRON_NAME,
   MAX_PRESET_SCHEDULE_LEN,
 } from "@helium/hpl-crons-sdk";
-import { Connection } from "@solana/web3.js";
+import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getRentLamports } from "./balance-validation";
 
 export type Schedule = "daily" | "weekly" | "monthly";
@@ -462,3 +462,53 @@ export function calculateFundingForAdditionalDuration(
     targetPeriods,
   };
 }
+
+export interface EstimateAutomationFundingParams extends CalculateFundingForAdditionalDurationParams {
+  cronJobExists: boolean;
+  baseAutomationRentLamports: number; // Rent init_entity_claim_cron_v0 locks up; only charged when the cron job does not exist yet
+}
+
+/**
+ * Price the SOL a wallet needs to add `additionalDuration` to its automation,
+ * including the initial setup rent when the cron job does not exist yet.
+ */
+export const estimateAutomationFunding = (
+  params: EstimateAutomationFundingParams,
+): {
+  rentFee: number;
+  cronJobFunding: number;
+  pdaWalletFunding: number;
+  recipientFee: number;
+  operationalSol: number;
+  totalSolNeeded: number;
+} => {
+  const { cronJobExists, baseAutomationRentLamports } = params;
+
+  const rentFee = cronJobExists
+    ? 0
+    : baseAutomationRentLamports / LAMPORTS_PER_SOL +
+      TASK_RETURN_ACCOUNT_FUNDING_SOL;
+
+  const {
+    cronJobFundingLamports,
+    pdaWalletFundingLamports,
+    recipientFeeLamports,
+  } = calculateFundingForAdditionalDuration(params);
+
+  const cronJobFunding = cronJobFundingLamports / LAMPORTS_PER_SOL;
+  const pdaWalletFunding = pdaWalletFundingLamports / LAMPORTS_PER_SOL;
+  const recipientFee = recipientFeeLamports / LAMPORTS_PER_SOL;
+  const operationalSol = cronJobFunding + pdaWalletFunding;
+  // recipientFeeLamports already represents only the ADDITIONAL recipient rent needed
+  // (0 if already included in shortfall, full amount if not)
+  const totalSolNeeded = rentFee + operationalSol + recipientFee;
+
+  return {
+    rentFee,
+    cronJobFunding,
+    pdaWalletFunding,
+    recipientFee,
+    operationalSol,
+    totalSolNeeded,
+  };
+};
