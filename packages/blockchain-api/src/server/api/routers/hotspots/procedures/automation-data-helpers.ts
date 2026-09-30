@@ -29,7 +29,7 @@ import {
   calculateCronJobCostPerClaim,
   calculatePdaWalletCostPerClaim,
   ENTITY_CLAIM_CRON_NAME,
-  TASK_RETURN_ACCOUNT_SIZE,
+  TASK_RETURN_ACCOUNT_FUNDING_SOL,
 } from "@/lib/utils/automation-helpers";
 import {
   ATA_SPACE,
@@ -251,7 +251,7 @@ export async function fetchAutomationData(
 
   const taskReturnAccountFundingLamports = taskReturnAccountInfo
     ? 0
-    : Math.ceil(TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL);
+    : Math.ceil(TASK_RETURN_ACCOUNT_FUNDING_SOL * LAMPORTS_PER_SOL);
 
   return {
     cronJobAccount,
