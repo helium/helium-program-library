@@ -184,6 +184,7 @@ export const useDelegatePositions = ({
                   triesRemaining: 10,
                   extraSigners: [],
                   maxSignatureBatch: 10,
+                  version: 0,
                 });
               }
             }
@@ -204,7 +205,8 @@ export const useDelegatePositions = ({
             } else {
               await batchParallelInstructionsWithPriorityFee(
                 provider,
-                closeInstructions
+                closeInstructions,
+                { version: 0 }
               );
             }
 
@@ -457,6 +459,7 @@ export const useDelegatePositions = ({
               triesRemaining: 10,
               extraSigners: [],
               maxSignatureBatch: 10,
+              version: 0,
             }
           );
         }

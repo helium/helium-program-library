@@ -151,7 +151,7 @@ export const useSplitPosition = () => {
             provider,
             instructions,
             // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-            { deriveLoadedAccountsDataSizeLimit: false }
+            { deriveLoadedAccountsDataSizeLimit: false, version: 0 }
           );
           const transactions = await Promise.all(drafts.map(toVersionedTx));
 
