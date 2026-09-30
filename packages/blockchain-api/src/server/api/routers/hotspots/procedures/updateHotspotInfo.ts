@@ -42,7 +42,7 @@ import {
   assertDcCovered,
   assertNotDelegated,
   buildOwnerPaidUpdateInstruction,
-  dcBurnerFor,
+  dcBalance,
   hotspotInfoKey,
   locationAssertDcFee,
   locationStakingFee,
@@ -55,12 +55,7 @@ import {
   withPreservedWifiSerial,
 } from "./update-info-owner";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
-import {
-  getAccount,
-  NATIVE_MINT,
-  TokenAccountNotFoundError,
-  TokenInvalidAccountOwnerError,
-} from "@solana/spl-token";
+import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 
 type HemProgram = Awaited<ReturnType<typeof initHemLocal>>;
@@ -201,24 +196,6 @@ async function estimateMobileResizeRent({
     encoded.length + RESIZE_PADDING_BYTES,
   );
   return resizeTopUpLamports(rentExempt, account.lamports);
-}
-
-/** DC the owner holds, treating a missing token account as a zero balance. */
-async function dcBalance(
-  connection: Connection,
-  owner: PublicKey,
-): Promise<bigint> {
-  try {
-    return (await getAccount(connection, dcBurnerFor(owner))).amount;
-  } catch (e) {
-    if (
-      e instanceof TokenAccountNotFoundError ||
-      e instanceof TokenInvalidAccountOwnerError
-    ) {
-      return BigInt(0);
-    }
-    throw e;
-  }
 }
 
 /**
