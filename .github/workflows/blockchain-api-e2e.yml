@@ -18,6 +18,10 @@ on:
       # The matrix check below reads this file, so an edit here runs it.
       - ".github/workflows/blockchain-api-e2e.yml"
 
+env:
+  # The commit of the `v1.6.0` tag. A tag can move; a commit cannot.
+  SURFPOOL_REV: 050a81b9f366a813d2f3da810bf6fbc52f1047ac
+
 jobs:
   # Build anchor once and share the generated types/IDLs as an artifact. The
   # matrix jobs only need target/types (to build @helium/idls); having each of
@@ -42,6 +46,46 @@ jobs:
           path: |
             target/types
             target/idl
+          retention-days: 1
+          if-no-files-found: error
+
+  # Build surfpool once and share the binary as an artifact. When every matrix
+  # job built it on a cache miss, a cold build took about half of each job's
+  # 20-minute timeout.
+  build-surfpool:
+    runs-on: ubuntu-latest
+    # The cold build of 1.6.0 has not been timed; 0.11.2 took about 10 minutes.
+    timeout-minutes: 60
+    steps:
+      - name: Setup Rust toolchain
+        id: toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache surfpool binary
+        id: cache-surfpool
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/surfpool
+            ~/.cargo/.crates2.json
+            ~/.cargo/.crates.toml
+          key: ${{ runner.os }}-surfpool-bin-${{ env.SURFPOOL_REV }}-${{ steps.toolchain.outputs.cachekey }}
+
+      - name: Install Surfpool CLI
+        if: steps.cache-surfpool.outputs.cache-hit != 'true'
+        env:
+          # crates.io downloads intermittently fail with "HTTP2 framing layer";
+          # fetch via git CLI and disable HTTP/2 multiplexing to avoid it.
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_HTTP_MULTIPLEXING: "false"
+        run: |
+          cargo install --git https://github.com/txtx/surfpool --rev "$SURFPOOL_REV" --locked --force
+
+      - name: Upload surfpool binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: surfpool
+          path: ~/.cargo/bin/surfpool
           retention-days: 1
           if-no-files-found: error
 
@@ -99,7 +143,7 @@ jobs:
           exit $missing
 
   e2e-tests:
-    needs: build-idls
+    needs: [build-idls, build-surfpool]
     runs-on: ubuntu-latest
     # Backstop so a hung test (e.g. a stalled RPC) fails fast instead of running
     # until GitHub's default 6h job timeout and holding a runner.
@@ -174,41 +218,13 @@ jobs:
           node-version-file: .node-version
           cache: "pnpm"
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+      # download-artifact drops the executable bit.
+      - name: Download surfpool binary
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Cache surfpool binary
-        id: cache-surfpool
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/surfpool
-            ~/.cargo/.crates2.json
-            ~/.cargo/.crates.toml
-          key: ${{ runner.os }}-surfpool-bin-v1.6.0-050a81b9f366a813d2f3da810bf6fbc52f1047ac
-
-      - name: Install Surfpool CLI
-        if: steps.cache-surfpool.outputs.cache-hit != 'true'
-        env:
-          # crates.io downloads intermittently fail with "HTTP2 framing layer";
-          # fetch via git CLI and disable HTTP/2 multiplexing to avoid it.
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          CARGO_HTTP_MULTIPLEXING: "false"
-        run: |
-          # The commit of the `v1.6.0` tag. A tag can move; a commit cannot.
-          cargo install --git https://github.com/txtx/surfpool --rev 050a81b9f366a813d2f3da810bf6fbc52f1047ac --locked --force
+          name: surfpool
+          path: ${{ runner.temp }}/surfpool
+      - run: chmod +x "$RUNNER_TEMP/surfpool/surfpool"
 
       - name: Download anchor types and IDLs
         uses: actions/download-artifact@v4
@@ -243,11 +259,7 @@ jobs:
           TEST_WALLET_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
           TEST_WALLET_2_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key_2.json
           FEE_PAYER_WALLET_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
-          SURFPOOL_CMD: ${{ runner.tool_cache }}/cargo/bin/surfpool
+          SURFPOOL_CMD: ${{ runner.temp }}/surfpool/surfpool
         run: |
-          # Fallback if cached path not present
-          if [ ! -x "$SURFPOOL_CMD" ]; then
-            export SURFPOOL_CMD="$HOME/.cargo/bin/surfpool"
-          fi
           echo "Using SURFPOOL_CMD=$SURFPOOL_CMD"
           pnpm test:e2e:file tests/e2e/${{ matrix.test.file }}
