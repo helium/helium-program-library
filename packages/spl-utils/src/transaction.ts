@@ -412,6 +412,25 @@ export type Status = {
   currentBatchSize: number;
 };
 const TX_BATCH_SIZE = 100;
+
+// VersionedTransaction.serialize does not verify signatures, so a tx with an
+// unsigned required signer would otherwise be resent until its blockhash
+// expires.
+const missingSigner = (tx: VersionedTransaction): PublicKey | undefined => {
+  const unsigned = tx.signatures.findIndex((sig) => sig.every((b) => b === 0));
+  return unsigned >= 0 ? tx.message.staticAccountKeys[unsigned] : undefined;
+};
+
+const assertNoMissingSigners = (missingSigners: PublicKey[]) => {
+  if (missingSigners.length > 0) {
+    throw new Error(
+      `Missing signature for public key ${missingSigners
+        .map((key) => key.toBase58())
+        .join(", ")}`
+    );
+  }
+};
+
 export async function bulkSendTransactions(
   provider: Provider,
   txs: TransactionDraft[],
@@ -421,6 +440,7 @@ export async function bulkSendTransactions(
   maxSignatureBatch: number = TX_BATCH_SIZE
 ): Promise<string[]> {
   let ret: string[] = [];
+  const missingSigners: PublicKey[] = [];
 
   // attempt to chunk by blockhash bounds (so signing doesn't take too long)
   for (let chunk of chunks(txs, maxSignatureBatch)) {
@@ -443,7 +463,7 @@ export async function bulkSendTransactions(
           });
         })
       );
-      const signedTxs = (
+      let signedTxs = (
         await (provider as AnchorProvider).wallet.signAllTransactions(
           blockhashedTxs
         )
@@ -459,6 +479,10 @@ export async function bulkSendTransactions(
         }, tx);
         return tx;
       });
+      const missing = signedTxs.map(missingSigner);
+      missingSigners.push(...missing.filter(truthy));
+      signedTxs = signedTxs.filter((_, i) => !missing[i]);
+      chunk = chunk.filter((_, i) => !missing[i]);
 
       const txsWithSigs = signedTxs.map((tx, index) => {
         return {
@@ -504,6 +528,7 @@ export async function bulkSendTransactions(
     ret.push(...thisRet);
   }
 
+  assertNoMissingSigners(missingSigners);
   return ret;
 }
 
@@ -522,6 +547,11 @@ export async function bulkSendRawTransactions(
   const txBatchSize = TX_BATCH_SIZE;
   let totalProgress = 0;
   const ret: string[] = [];
+  const missing = txs.map((tx) =>
+    missingSigner(VersionedTransaction.deserialize(tx))
+  );
+  const missingSigners = missing.filter(truthy);
+  txs = txs.filter((_, i) => !missing[i]);
   if (!lastValidBlockHeight) {
     const blockhash = await withRetries(5, () =>
       connection.getLatestBlockhash("confirmed")
@@ -541,6 +571,7 @@ export async function bulkSendRawTransactions(
         (await withRetries(5, () => connection.getBlockHeight())) >
         lastValidBlockHeight
       ) {
+        assertNoMissingSigners(missingSigners);
         return ret;
       }
 
@@ -601,6 +632,7 @@ export async function bulkSendRawTransactions(
     }
   }
 
+  assertNoMissingSigners(missingSigners);
   return ret;
 }
 
