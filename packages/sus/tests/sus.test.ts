@@ -1,10 +1,12 @@
 import { toVersionedTx } from "@helium/spl-utils";
 import {
   ComputeBudgetProgram,
+  Ed25519Program,
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import { expect } from "chai";
 import { sus } from "../src";
@@ -22,7 +24,7 @@ const systemAccount = (lamports: number) => ({
 
 // Stands in for the RPC node. Records every raw JSON-RPC call; only the
 // payer and recipient exist on chain.
-const fakeConnection = () => {
+const fakeConnection = (feeForMessage: number | null = null) => {
   const requests: { method: string; args: any[] }[] = [];
   const onChain: Record<string, number> = {
     [payer.publicKey.toBase58()]: LAMPORTS_PER_SOL,
@@ -43,9 +45,9 @@ const fakeConnection = () => {
       ),
     _rpcRequest: async (method: string, args: any[]) => {
       requests.push({ method, args });
-      // What the node returns once the blockhash has expired.
+      // null is what the node returns once the blockhash has expired.
       if (method === "getFeeForMessage") {
-        return { result: { context: { slot: 1 }, value: null } };
+        return { result: { context: { slot: 1 }, value: feeForMessage } };
       }
       return {
         result: {
@@ -119,5 +121,64 @@ describe("sus", () => {
         messageBytes.toString("base64")
       )}`
     );
+  });
+
+  const v1TxWithEd25519 = async (signatures: number) => {
+    const tx = await toVersionedTx({
+      feePayer: payer.publicKey,
+      recentBlockhash: Keypair.generate().publicKey.toBase58(),
+      instructions: [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1000 }),
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 }),
+        // The precompile header's first byte is its signature count.
+        new TransactionInstruction({
+          programId: Ed25519Program.programId,
+          keys: [],
+          data: Buffer.from([signatures, 0]),
+        }),
+        SystemProgram.transfer({
+          fromPubkey: payer.publicKey,
+          toPubkey: recipient,
+          lamports: 1,
+        }),
+      ],
+      addressLookupTables: [],
+      version: 1,
+    });
+    tx.sign([payer]);
+    return Buffer.from(tx.serialize());
+  };
+
+  it("charges the base fee for each ed25519 precompile signature in a v1 transaction", async () => {
+    const wire = await v1TxWithEd25519(2);
+
+    const { connection } = fakeConnection();
+    const [result] = await sus({
+      connection,
+      wallet: payer.publicKey,
+      serializedTransactions: [wire],
+    });
+
+    expect(result.error).to.equal(undefined);
+    // One message signature plus two precompile signatures.
+    expect(result.solFee).to.equal(15000);
+    expect(result.priorityFee).to.equal(2000);
+  });
+
+  it("prices a v1 transaction from the node when the node can price it", async () => {
+    const wire = await v1TxWithEd25519(2);
+    const messageBytes = wire.subarray(0, wire.length - 64);
+
+    const { connection, requests } = fakeConnection(30000);
+    const [result] = await sus({
+      connection,
+      wallet: payer.publicKey,
+      serializedTransactions: [wire],
+    });
+
+    const feeRequest = requests.find((r) => r.method === "getFeeForMessage")!;
+    expect(feeRequest.args[0]).to.equal(messageBytes.toString("base64"));
+    expect(result.solFee).to.equal(28000);
+    expect(result.priorityFee).to.equal(2000);
   });
 });
