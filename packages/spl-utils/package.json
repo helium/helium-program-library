@@ -31,7 +31,8 @@
     "prebuild": "npm run clean && npm run package",
     "build": "tsc -b tsconfig.json",
     "sample-cu": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/sample-cu.ts",
-    "check-cu-table": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/check-cu-table.ts"
+    "check-cu-table": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/check-cu-table.ts",
+    "update-hem-idl": "cd ../.. && anchor idl build -p helium_entity_manager -o packages/spl-utils/src/idl/helium_entity_manager.json"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.0",
