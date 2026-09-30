@@ -85,19 +85,20 @@ export class TransactionCompletionQueue {
       confirmations: 0,
       err: null,
     };
-    let subId = 0;
+    // Subscription ids start at 0, so no default: a failed subscribe must not
+    // remove another caller's subscription on the shared connection.
+    let subId: number | undefined;
     const cleanup = async () => {
-      if (
-        //@ts-ignore
-        connection._signatureSubscriptions &&
-        //@ts-ignore
-        connection._signatureSubscriptions[subId]
-      ) {
-        connection.removeSignatureListener(subId);
-      }
       done = true;
       // @ts-ignore
       this.txPromises[commitment][txid] = undefined;
+      if (subId !== undefined) {
+        try {
+          await connection.removeSignatureListener(subId);
+        } catch (e) {
+          // Already removed.
+        }
+      }
     };
     this.txPromises[commitment][txid] = new Promise(async (resolve, reject) => {
       let t: NodeJS.Timeout;
@@ -122,6 +123,8 @@ export class TransactionCompletionQueue {
               slot: context.slot,
               confirmations: 0,
             };
+            // web3.js removes a signature listener itself once it fires.
+            subId = undefined;
             setDone();
             if (result.err) {
               this.log && console.log("Rejected via websocket", result.err);
