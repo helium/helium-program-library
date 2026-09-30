@@ -41,7 +41,7 @@
     "@helium/anchor-resolvers": "workspace:^",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@noble/curves": "^1.9.7",
-    "@solana/kit": "^8.3.0",
+    "@solana/kit": "8.3.0",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.99.0",
