@@ -1,12 +1,11 @@
 import { createSolanaConnection } from "@/lib/solana";
 import {
   getBaseAutomationRentLamports,
-  calculateFundingForAdditionalDuration,
+  estimateAutomationFunding,
   calculatePeriodsRemaining,
   interpretCronString,
 } from "@/lib/utils/automation-helpers";
 import * as anchor from "@coral-xyz/anchor";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { publicProcedure } from "../../../procedures";
 import { fetchAutomationData } from "./automation-data-helpers";
 
@@ -34,10 +33,14 @@ export const getAutomationStatus =
         taskReturnAccountFundingLamports,
       } = await fetchAutomationData(walletAddress, provider);
 
-      // Calculate funding needed using the same helper as getFundingEstimate
-      // Using additionalDuration: 0 to get baseline funding needed (for current state)
-      const { cronJobFundingLamports, pdaWalletFundingLamports } =
-        calculateFundingForAdditionalDuration({
+      // Price the status with the same helper as getFundingEstimate, at
+      // additionalDuration: 0 (current state), so its fields sum to that estimate.
+      const { rentFee, recipientFee, operationalSol } =
+        estimateAutomationFunding({
+          cronJobExists: !!cronJobAccount,
+          baseAutomationRentLamports: cronJobAccount
+            ? 0
+            : await getBaseAutomationRentLamports(provider.connection),
           cronJobBalanceLamports,
           cronJobCostPerClaimLamports,
           pdaWalletBalanceLamports,
@@ -49,15 +52,6 @@ export const getAutomationStatus =
           ataRentLamports,
           taskReturnAccountFundingLamports,
         });
-
-      // The task-return funding is left out: operationalSol already carries it.
-      const rentFee = cronJobAccount
-        ? 0
-        : (await getBaseAutomationRentLamports(provider.connection)) /
-          LAMPORTS_PER_SOL;
-      const recipientFee = recipientRentLamports / LAMPORTS_PER_SOL;
-      const operationalSol =
-        (cronJobFundingLamports + pdaWalletFundingLamports) / LAMPORTS_PER_SOL;
 
       // Calculate remaining claims and time
       let remainingClaims: number | undefined;

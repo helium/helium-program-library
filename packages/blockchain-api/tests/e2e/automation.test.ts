@@ -137,6 +137,20 @@ describe("automation endpoints", () => {
       expect(estimate.rentFee).to.equal(status.rentFee);
       // One claim costs at least the zero-claim setup transfers the status reports.
       expect(estimate.operationalSol).to.be.at.least(status.operationalSol);
+      // rentFee and recipientFee do not depend on the duration, so the status
+      // fields sum to the duration-0 estimate: the duration-1 estimate less its
+      // one-claim operational delta. The input schema rejects duration 0.
+      expect(status.recipientFee).to.equal(estimate.recipientFee);
+      const toLamports = (sol: number) => Math.round(sol * LAMPORTS_PER_SOL);
+      expect(
+        toLamports(status.rentFee) +
+          toLamports(status.recipientFee) +
+          toLamports(status.operationalSol)
+      ).to.equal(
+        toLamports(estimate.totalSolNeeded) -
+          (toLamports(estimate.operationalSol) -
+            toLamports(status.operationalSol))
+      );
     });
 
     it("returns NOT_FOUND when funding a non-existent automation", async () => {
