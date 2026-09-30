@@ -621,6 +621,96 @@ describe("helium-entity-manager", () => {
     });
   });
 
+  describe("with a data only tree whose rent does not split evenly", () => {
+    let ecc: string;
+
+    beforeEach(async () => {
+      ecc = (await HeliumKeypair.makeRandom()).address.b58;
+      const [height, buffer, canopy] = [10, 32, 0];
+      const merkle = Keypair.generate();
+      const space = getConcurrentMerkleTreeAccountSize(height, buffer, canopy);
+      const cost = await provider.connection.getMinimumBalanceForRentExemption(
+        space
+      );
+      await sendInstructions(
+        provider,
+        [
+          SystemProgram.createAccount({
+            fromPubkey: provider.wallet.publicKey,
+            newAccountPubkey: merkle.publicKey,
+            lamports: cost,
+            space: space,
+            programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          }),
+        ],
+        [merkle]
+      );
+      await hemProgram.methods
+        .initializeDataOnlyV0({
+          authority: me,
+          newTreeDepth: height,
+          newTreeBufferSize: buffer,
+          newTreeSpace: new BN(space),
+          newTreeFeeLamports: new BN(0),
+          name: "DATAONLY",
+          metadataUrl: "test",
+        })
+        .accountsPartial({
+          dao,
+          merkleTree: merkle.publicKey,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 350000 }),
+        ])
+        .rpc({ skipPreflight: true });
+
+      // A fee below the system account rent minimum cannot open the empty escrow
+      const escrow = dataOnlyEscrowKey(dataOnlyConfigKey(dao)[0])[0];
+      await sendInstructions(provider, [
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: escrow,
+          lamports:
+            await provider.connection.getMinimumBalanceForRentExemption(0),
+        }),
+      ]);
+    });
+
+    it("rounds the tree fee up", async () => {
+      const dataOnlyConfig = dataOnlyConfigKey(dao)[0];
+      const escrow = dataOnlyEscrowKey(dataOnlyConfig)[0];
+      const doAcc = await hemProgram.account.dataOnlyConfigV0.fetch(
+        dataOnlyConfig
+      );
+      const treeRent =
+        await provider.connection.getMinimumBalanceForRentExemption(
+          doAcc.newTreeSpace.toNumber()
+        );
+      const leaves = 2 ** doAcc.newTreeDepth;
+      // An even split cannot tell ceil from floor
+      expect(treeRent % leaves).to.not.eq(0);
+      const escrowBefore = await provider.connection.getBalance(escrow);
+
+      await hemProgram.methods
+        .issueDataOnlyEntityV0({
+          entityKey: Buffer.from(bs58.decode(ecc)),
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 500000 }),
+        ])
+        .accountsPartial({
+          recipient: Keypair.generate().publicKey,
+          dao,
+          eccVerifier: eccVerifier.publicKey,
+        })
+        .signers([eccVerifier])
+        .rpc({ skipPreflight: true });
+
+      const escrowAfter = await provider.connection.getBalance(escrow);
+      expect(escrowAfter - escrowBefore).to.eq(Math.ceil(treeRent / leaves));
+    });
+  });
+
   it("initializes a maker", async () => {
     const { rewardableEntityConfig } = await initTestRewardableEntityConfig(
       hemProgram,
