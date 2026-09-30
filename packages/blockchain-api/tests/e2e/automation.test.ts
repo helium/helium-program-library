@@ -124,6 +124,21 @@ describe("automation endpoints", () => {
       );
     });
 
+    it("prices a funding estimate from the same setup costs as the status", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      const status = await client.hotspots.getAutomationStatus({
+        walletAddress,
+      });
+      const estimate = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration: 1,
+      });
+
+      expect(estimate.rentFee).to.equal(status.rentFee);
+      // One claim costs at least the zero-claim setup transfers the status reports.
+      expect(estimate.operationalSol).to.be.at.least(status.operationalSol);
+    });
+
     it("returns NOT_FOUND when funding a non-existent automation", async () => {
       const walletAddress = payer.publicKey.toBase58();
       try {
