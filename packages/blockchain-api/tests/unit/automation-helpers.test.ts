@@ -30,8 +30,9 @@ describe("resolveScheduleToCron", () => {
 describe("estimateAutomationFunding", () => {
   const toLamports = (sol: number) => Math.round(sol * LAMPORTS_PER_SOL);
 
-  it("prices a first-time setup as the init rent plus the setup transfers", () => {
+  it("prices a first-time setup as the init rent and crank reward plus the setup transfers", () => {
     const baseAutomationRentLamports = 20_000_000;
+    const minCrankRewardLamports = 15_000;
     const taskReturnAccountFundingLamports = 10_000_000;
     const pdaWalletRentLamports = 890_880;
     const recipientRentLamports = 2_000_000;
@@ -43,6 +44,7 @@ describe("estimateAutomationFunding", () => {
     const estimate = estimateAutomationFunding({
       cronJobExists: false,
       baseAutomationRentLamports,
+      minCrankRewardLamports,
       // No cron job account yet, so no balance and no rent of its own.
       cronJobBalanceLamports: 0,
       cronJobRentLamports: 0,
@@ -56,9 +58,11 @@ describe("estimateAutomationFunding", () => {
       taskReturnAccountFundingLamports,
     });
 
-    // init_entity_claim_cron_v0 locks up the base rent. The cron job transfer
-    // carries the task-return funding once plus the claims; the PDA wallet
-    // transfer carries its rent, the recipient and ATA rent plus the claims.
+    // init_entity_claim_cron_v0 locks up the base rent and pays the schedule
+    // task its crank reward, both from the wallet. The cron job transfer
+    // carries only the task-return funding plus the claims, not the base rent
+    // init already paid; the PDA wallet transfer carries its rent, the
+    // recipient and ATA rent plus the claims.
     const cronJobTransfer =
       taskReturnAccountFundingLamports + duration * cronJobCostPerClaimLamports;
     const pdaWalletTransfer =
@@ -66,8 +70,16 @@ describe("estimateAutomationFunding", () => {
       recipientRentLamports +
       ataRentLamports +
       duration * pdaWalletCostPerClaimLamports;
+    expect(toLamports(estimate.rentFee)).to.equal(
+      baseAutomationRentLamports + minCrankRewardLamports,
+    );
+    expect(toLamports(estimate.cronJobFunding)).to.equal(cronJobTransfer);
+    expect(toLamports(estimate.pdaWalletFunding)).to.equal(pdaWalletTransfer);
     expect(toLamports(estimate.totalSolNeeded)).to.equal(
-      baseAutomationRentLamports + cronJobTransfer + pdaWalletTransfer,
+      baseAutomationRentLamports +
+        minCrankRewardLamports +
+        cronJobTransfer +
+        pdaWalletTransfer,
     );
   });
 
@@ -75,6 +87,7 @@ describe("estimateAutomationFunding", () => {
     const estimate = estimateAutomationFunding({
       cronJobExists: true,
       baseAutomationRentLamports: 0,
+      minCrankRewardLamports: 15_000,
       // 2_000_000 lamports above rent covers 200 claims at 10_000 each.
       cronJobBalanceLamports: 5_000_000,
       cronJobRentLamports: 3_000_000,
@@ -110,6 +123,7 @@ describe("estimateAutomationFunding", () => {
     const estimate = estimateAutomationFunding({
       cronJobExists: true,
       baseAutomationRentLamports: 0,
+      minCrankRewardLamports: 15_000,
       // The cron job already holds its rent plus the claims, so it needs nothing.
       cronJobBalanceLamports:
         cronJobRentLamports + duration * cronJobCostPerClaimLamports,

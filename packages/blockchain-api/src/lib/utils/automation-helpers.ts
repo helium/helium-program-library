@@ -436,6 +436,7 @@ export function calculateFundingForAdditionalDuration(
 export interface EstimateAutomationFundingParams extends CalculateFundingForAdditionalDurationParams {
   cronJobExists: boolean;
   baseAutomationRentLamports: number; // Rent init_entity_claim_cron_v0 locks up; only charged when the cron job does not exist yet
+  minCrankRewardLamports: number; // Task queue min_crank_reward init's queue_task_v0 moves from the wallet to the schedule task; only charged when the cron job does not exist yet
 }
 
 /**
@@ -452,13 +453,14 @@ export const estimateAutomationFunding = (
   operationalSol: number;
   totalSolNeeded: number;
 } => {
-  const { cronJobExists, baseAutomationRentLamports } = params;
+  const { cronJobExists, baseAutomationRentLamports, minCrankRewardLamports } =
+    params;
 
   // The task-return funding is left out: the cron job transfer below already
   // carries it.
   const rentFee = cronJobExists
     ? 0
-    : baseAutomationRentLamports / LAMPORTS_PER_SOL;
+    : (baseAutomationRentLamports + minCrankRewardLamports) / LAMPORTS_PER_SOL;
 
   const {
     cronJobFundingLamports,

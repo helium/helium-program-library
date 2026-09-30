@@ -20,6 +20,7 @@ import {
   TASK_RETURN_ACCOUNT_FUNDING_SPACE,
   USER_CRON_JOBS_SPACE,
 } from "@helium/hpl-crons-sdk";
+import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
@@ -66,6 +67,18 @@ describe("automation endpoints", () => {
       );
     }
     return signatures;
+  }
+
+  // The crank reward init_entity_claim_cron_v0 pays its schedule task, which
+  // the setup quote adds to the base rent.
+  async function minCrankRewardLamports() {
+    const tuktukProgram = await initTuktuk(
+      new AnchorProvider(connection, {} as any, {})
+    );
+    const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
+      new PublicKey(process.env.HPL_CRONS_TASK_QUEUE!)
+    );
+    return taskQueue.minCrankReward.toNumber();
   }
 
   before(async () => {
@@ -117,7 +130,9 @@ describe("automation endpoints", () => {
       expect(result.isOutOfSol).to.equal(false);
       expect(result.currentSchedule).to.be.undefined;
       expect(result.rentFee).to.equal(
-        (await getBaseAutomationRentLamports(connection)) / LAMPORTS_PER_SOL
+        ((await getBaseAutomationRentLamports(connection)) +
+          (await minCrankRewardLamports())) /
+          LAMPORTS_PER_SOL
       );
       expect(result.recipientFee).to.be.a("number").and.to.be.at.least(0);
       expect(result.operationalSol).to.be.a("number").and.to.be.at.least(0);
@@ -159,8 +174,10 @@ describe("automation endpoints", () => {
 
     it("prices the setup rent at the schedule createAutomation would use", async () => {
       const walletAddress = payer.publicKey.toBase58();
+      const crankReward = await minCrankRewardLamports();
       const baseRentSol = async (scheduleLen: number) =>
-        (await getBaseAutomationRentLamports(connection, scheduleLen)) /
+        ((await getBaseAutomationRentLamports(connection, scheduleLen)) +
+          crankReward) /
         LAMPORTS_PER_SOL;
       const unscheduled = await client.hotspots.getFundingEstimate({
         walletAddress,
@@ -192,6 +209,56 @@ describe("automation endpoints", () => {
       });
       expect(long.rentFee).to.equal(await baseRentSol(longCron.length));
       expect(long.rentFee).to.be.greaterThan(unscheduled.rentFee);
+    });
+
+    it("moves exactly the estimate, plus fees, on a first-time setup", async () => {
+      // A fresh wallet has no cron job, so createAutomation takes the init path.
+      const wallet = Keypair.generate();
+      const walletAddress = wallet.publicKey.toBase58();
+      await ensureFunds(wallet.publicKey, LAMPORTS_PER_SOL);
+      const duration = 5;
+
+      // A raw crontab prices the same length on both calls; a preset resolves
+      // from the clock and could differ between them.
+      const estimate = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration,
+        schedule: DAILY_CRON,
+      });
+      const result = await client.hotspots.createAutomation({
+        walletAddress,
+        schedule: DAILY_CRON,
+        duration,
+      });
+      const signatures = await signAndSubmitTransactionData(
+        connection,
+        result.transactionData,
+        wallet
+      );
+
+      // Lamports are conserved across a transaction except for its fee, so
+      // read each fee off the ledger. The wallet pays for every setup
+      // transaction, so it is account 0. A Jito tip transaction is neither
+      // setup nor part of the estimate.
+      const sum = (balances: number[]) => balances.reduce((a, b) => a + b, 0);
+      let spentLessFees = 0;
+      for (const [i, signature] of signatures.entries()) {
+        if (
+          result.transactionData.transactions[i].metadata?.type !==
+          "setup_automation"
+        ) {
+          continue;
+        }
+        const meta = (await connection.getTransaction(signature, {
+          commitment: "confirmed",
+          maxSupportedTransactionVersion: 1,
+        }))!.meta!;
+        const fee = sum(meta.preBalances) - sum(meta.postBalances);
+        spentLessFees += meta.preBalances[0] - meta.postBalances[0] - fee;
+      }
+      expect(spentLessFees).to.equal(
+        Math.round(estimate.totalSolNeeded * LAMPORTS_PER_SOL)
+      );
     });
 
     it("returns NOT_FOUND when funding a non-existent automation", async () => {

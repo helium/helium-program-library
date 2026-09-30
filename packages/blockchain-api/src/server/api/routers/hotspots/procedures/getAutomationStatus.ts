@@ -31,6 +31,7 @@ export const getAutomationStatus =
         pdaWalletRentLamports,
         ataRentLamports,
         taskReturnAccountFundingLamports,
+        minCrankReward,
       } = await fetchAutomationData(walletAddress, provider);
 
       // Price the status with the same helper as getFundingEstimate, at
@@ -41,6 +42,7 @@ export const getAutomationStatus =
           baseAutomationRentLamports: cronJobAccount
             ? 0
             : await getBaseAutomationRentLamports(provider.connection),
+          minCrankRewardLamports: minCrankReward,
           cronJobBalanceLamports,
           cronJobCostPerClaimLamports,
           pdaWalletBalanceLamports,

@@ -33,6 +33,7 @@ export const getFundingEstimate =
         pdaWalletRentLamports,
         ataRentLamports,
         taskReturnAccountFundingLamports,
+        minCrankReward,
       } = automationData;
 
       const funding = estimateAutomationFunding({
@@ -45,6 +46,7 @@ export const getFundingEstimate =
                 ? undefined
                 : resolveScheduleToCron(schedule).length,
             ),
+        minCrankRewardLamports: minCrankReward,
         cronJobBalanceLamports,
         cronJobCostPerClaimLamports,
         pdaWalletBalanceLamports,
