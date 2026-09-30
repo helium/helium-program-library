@@ -296,7 +296,14 @@ describe("transaction version precedence", () => {
     const wallet = adapterWallet(["legacy", 0, 1]);
     expect(await resolveTxVersion(connection, { wallet })).to.equal(0);
 
-    setWalletSignedTxVersionCeiling(1);
-    expect(await resolveTxVersion(connection, { wallet })).to.equal(1);
+    setWalletSignedTxVersionCeiling(0);
+    expect(await resolveTxVersion(connection, { wallet })).to.equal(0);
+  });
+
+  it("refuses a wallet ceiling of 1 and keeps the ceiling at 0", async () => {
+    const { connection } = fakeConnection();
+    const wallet = adapterWallet(["legacy", 0, 1]);
+    expect(() => setWalletSignedTxVersionCeiling(1)).to.throw(/web3\.js 1\.x/);
+    expect(await resolveTxVersion(connection, { wallet })).to.equal(0);
   });
 });
