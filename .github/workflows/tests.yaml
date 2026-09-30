@@ -155,6 +155,23 @@ jobs:
       - run: cargo build --locked
       - run: cargo test --lib
 
+  # These suites fake every RPC, so they need no chain and no anchor build.
+  # setup-ts would build @helium/idls, which needs target/types; the filtered
+  # turbo run builds only the four packages the suites import.
+  test-ts-unit:
+    name: spl-utils and sus Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run test --filter=@helium/spl-utils --filter=@helium/sus
+
   test-testing-guard:
     name: TESTING Build Guard
     runs-on: ubuntu-latest
