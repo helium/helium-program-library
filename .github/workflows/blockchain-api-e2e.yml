@@ -154,7 +154,6 @@ jobs:
       NEXT_PORT: 3000
       SOLANA_CLI_VERSION: 2.1.6
       SURFPOOL_RPC_URL: http://127.0.0.1:8899
-      ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
       NEXT_PUBLIC_SOLANA_CLUSTER: mainnet
       SURFPOOL_SHOW_LOGS: "0"
       SURFPOOL_HEALTH_TIMEOUT_MS: "180000"
@@ -198,7 +197,7 @@ jobs:
             ~/.cargo/bin/surfpool
             ~/.cargo/.crates2.json
             ~/.cargo/.crates.toml
-          key: ${{ runner.os }}-surfpool-bin-v1.6.0
+          key: ${{ runner.os }}-surfpool-bin-v1.6.0-050a81b9f366a813d2f3da810bf6fbc52f1047ac
 
       - name: Install Surfpool CLI
         if: steps.cache-surfpool.outputs.cache-hit != 'true'
@@ -208,7 +207,8 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
           CARGO_HTTP_MULTIPLEXING: "false"
         run: |
-          cargo install --git https://github.com/txtx/surfpool --tag v1.6.0 --locked --force
+          # The commit of the `v1.6.0` tag. A tag can move; a commit cannot.
+          cargo install --git https://github.com/txtx/surfpool --rev 050a81b9f366a813d2f3da810bf6fbc52f1047ac --locked --force
 
       - name: Download anchor types and IDLs
         uses: actions/download-artifact@v4
@@ -227,7 +227,10 @@ jobs:
           echo "${{ secrets.TESTING_KEY_2 }}" > testing_key_2.json
           test -s testing_key_2.json || (echo 'TESTING_KEY_2 is empty' && exit 1)
 
+      # Scoped to the steps that read it, so installs and builds never see it.
       - name: Validate ASSET_ENDPOINT secret
+        env:
+          ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
         run: |
           if [ -z "${ASSET_ENDPOINT}" ]; then
             echo "ASSET_ENDPOINT secret is not set. Please add it in repository secrets." >&2
@@ -236,6 +239,7 @@ jobs:
 
       - name: Run ${{ matrix.test.name }} tests
         env:
+          ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
           TEST_WALLET_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
           TEST_WALLET_2_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key_2.json
           FEE_PAYER_WALLET_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
