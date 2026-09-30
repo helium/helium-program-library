@@ -776,6 +776,7 @@ export async function batchParallelInstructions({
   maxSignatureBatch = TX_BATCH_SIZE,
   maxTxSize,
   addressLookupTableAddresses = [],
+  version: versionOption,
 }: {
   provider: AnchorProvider;
   instructions: TransactionInstruction[];
@@ -785,6 +786,7 @@ export async function batchParallelInstructions({
   extraSigners?: Keypair[];
   maxSignatureBatch?: number;
   addressLookupTableAddresses?: PublicKey[];
+  version?: TxVersionOption;
 }): Promise<void> {
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
   const addressLookupTables = await getAddressLookupTableAccounts(
@@ -792,6 +794,7 @@ export async function batchParallelInstructions({
     addressLookupTableAddresses
   );
   const version = await resolveTxVersion(provider.connection, {
+    version: versionOption,
     wallet: provider.wallet,
   });
   const toDraft = (
@@ -837,6 +840,7 @@ export async function batchSequentialParallelInstructions({
   triesRemaining = 10,
   extraSigners = [],
   maxSignatureBatch = TX_BATCH_SIZE,
+  version,
 }: {
   provider: AnchorProvider;
   instructions: TransactionInstruction[][];
@@ -845,6 +849,7 @@ export async function batchSequentialParallelInstructions({
   extraSigners?: Keypair[];
   maxSignatureBatch?: number;
   addressLookupTableAddresses?: PublicKey[];
+  version?: TxVersionOption;
 }): Promise<void> {
   for (const instruction of instructions) {
     await batchParallelInstructionsWithPriorityFee(provider, instruction, {
@@ -852,6 +857,7 @@ export async function batchSequentialParallelInstructions({
       triesRemaining,
       extraSigners,
       maxSignatureBatch,
+      version,
     });
   }
 }
@@ -1024,6 +1030,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     basePriorityFee,
     extraSigners,
     maxSignatureBatch = TX_BATCH_SIZE,
+    version,
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
@@ -1034,6 +1041,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     basePriorityFee?: number;
     extraSigners?: Keypair[];
     maxSignatureBatch?: number;
+    version?: TxVersionOption;
   } = {}
 ): Promise<void> {
   const transactions = await batchInstructionsToTxsWithPriorityFee(
@@ -1043,6 +1051,7 @@ export async function batchParallelInstructionsWithPriorityFee(
       computeUnitLimit,
       basePriorityFee,
       computeScaleUp,
+      version,
     }
   );
 
