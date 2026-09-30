@@ -284,6 +284,38 @@ export async function calculateRequiredBalance(
 }
 
 /**
+ * Funding for issue_data_only_entity_v0: the estimate a client tops up to
+ * (tx fee + issue cost) and the gate's threshold, which adds the wallet-rent
+ * floor. Deriving both here keeps the estimate from drifting below the gate.
+ */
+export const getDataOnlyIssueFunding = async (
+  connection: Connection,
+  {
+    txFeeLamports,
+    entityKeyLen,
+    newTreeFeeLamports,
+  }: {
+    txFeeLamports: number;
+    entityKeyLen: number;
+    newTreeFeeLamports: number;
+  },
+) => {
+  const estimatedLamports =
+    txFeeLamports +
+    (await getDataOnlyIssueCostLamports(connection, {
+      entityKeyLen,
+      newTreeFeeLamports,
+    }));
+  return {
+    estimatedLamports,
+    requiredLamports: await calculateRequiredBalance(
+      connection,
+      estimatedLamports,
+    ),
+  };
+};
+
+/**
  * Fee the cluster would charge for this transaction, via getFeeForMessage —
  * the validator's own fee calculation, so it tracks base, priority, and any
  * future fee components without local modeling. Falls back to a local
