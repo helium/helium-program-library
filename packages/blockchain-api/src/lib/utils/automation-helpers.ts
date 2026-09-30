@@ -13,7 +13,7 @@ export type Schedule = "daily" | "weekly" | "monthly";
 export { ENTITY_CLAIM_CRON_NAME };
 
 // Constants from useAutomateHotspotClaims hook
-export const TASK_RETURN_ACCOUNT_SIZE = 0.01;
+export const TASK_RETURN_ACCOUNT_FUNDING_SOL = 0.01;
 export const EST_TX_FEE = 0.000001;
 
 /**

@@ -4,7 +4,7 @@ import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 import {
   getBaseAutomationRentLamports,
-  TASK_RETURN_ACCOUNT_SIZE,
+  TASK_RETURN_ACCOUNT_FUNDING_SOL,
   calculateFundingForAdditionalDuration,
 } from "@/lib/utils/automation-helpers";
 import { fetchAutomationData } from "./automation-data-helpers";
@@ -42,7 +42,7 @@ export const getFundingEstimate =
         ? 0
         : (await getBaseAutomationRentLamports(provider.connection)) /
             LAMPORTS_PER_SOL +
-          TASK_RETURN_ACCOUNT_SIZE;
+          TASK_RETURN_ACCOUNT_FUNDING_SOL;
 
       const {
         cronJobFundingLamports,
