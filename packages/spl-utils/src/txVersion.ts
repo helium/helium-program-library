@@ -120,8 +120,9 @@ export async function resolveTxVersion(
   connection: Connection,
   { version = "auto", wallet }: { version?: TxVersionOption; wallet?: any } = {}
 ): Promise<0 | 1> {
-  if (version !== "auto") return version;
+  // Read before the pin check so a typo throws on pinned calls too.
   const env = envTxVersionOption();
+  if (version !== "auto") return version;
   if (env !== "auto") return env;
 
   const nodeVersion = await detectedTxVersion(connection);
