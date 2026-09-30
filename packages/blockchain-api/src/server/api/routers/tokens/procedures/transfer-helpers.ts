@@ -115,8 +115,8 @@ export function transferSolShortfall({
     return {
       message:
         transferLamports > 0
-          ? "Insufficient SOL balance for transfer and transaction fees"
-          : "Insufficient SOL balance for transaction fees",
+          ? "Insufficient SOL balance for transfer, transaction fees and account rent"
+          : "Insufficient SOL balance for transaction fees and account rent",
       required,
       available: payerBalance,
     };
@@ -124,7 +124,8 @@ export function transferSolShortfall({
 
   if (payerBalance < payerLamports) {
     return {
-      message: "Insufficient SOL balance for transaction fees",
+      message:
+        "Insufficient SOL balance for transaction fees and account rent",
       required: payerLamports,
       available: payerBalance,
     };
