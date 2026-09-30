@@ -3,6 +3,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { AnchorProvider } from "@anchor-lang/core";
 import {
@@ -380,6 +381,48 @@ describe("automation endpoints", () => {
       });
       expect(status.hasExistingAutomation).to.equal(false);
       expect(status.currentSchedule).to.be.undefined;
+    });
+  });
+
+  describe("close with more claims than one transaction holds", () => {
+    // 25 claims tear down in two v0 txs but fit one v1 tx, so without the
+    // pin the batcher picks v1 under HPL_TX_VERSION=v1. A wallet cannot sign
+    // v1.
+    const CLAIMS = 25;
+    let walletAddress: string;
+
+    before(async function () {
+      this.timeout(900_000);
+      walletAddress = payer.publicKey.toBase58();
+      await closeIfExists(walletAddress);
+      await ensureFunds(payer.publicKey, 2 * LAMPORTS_PER_SOL);
+
+      const result = await client.hotspots.createAutomation({
+        walletAddress,
+        schedule: DAILY_CRON,
+        duration: 1,
+      });
+      await submit(result.transactionData);
+      for (let i = 0; i < CLAIMS; i++) {
+        const add = await client.hotspots.addWalletToAutomation({
+          walletAddress,
+        });
+        await submit(add.transactionData);
+      }
+    });
+
+    it("returns only v0 transactions", async () => {
+      const result = await client.hotspots.closeAutomation({ walletAddress });
+      const txs = result.transactionData.transactions;
+      const teardownTxs = txs.filter((t) => t.metadata?.type !== "jito_tip");
+      expect(teardownTxs.length).to.be.greaterThan(1);
+      for (const t of txs) {
+        const tx = VersionedTransaction.deserialize(
+          Buffer.from(t.serializedTransaction, "base64")
+        );
+        expect(tx.version).to.equal(0);
+      }
+      await submit(result.transactionData);
     });
   });
 
