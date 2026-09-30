@@ -10,6 +10,7 @@ import {
   bulkSendRawTransactions,
   bulkSendTransactions,
 } from "../src/transaction";
+import { compileV1Transaction } from "../src/v1Transaction";
 
 // A node that confirms every signed tx it is sent and never lands one with a
 // zeroed signature slot, the way a real node drops it at sigverify. Each
@@ -97,23 +98,25 @@ describe("bulkSendTransactions", () => {
 });
 
 describe("bulkSendRawTransactions", () => {
-  it("sends the signed txs and fails the unsigned one without sending it", async () => {
+  it("sends the signed v0 tx and fails the unsigned v1 one without sending it", async () => {
     const { connection, sent } = fakeNode();
     const wallet = Keypair.generate();
     const stranger = Keypair.generate();
     const { blockhash, lastValidBlockHeight } =
       await connection.getLatestBlockhash();
-    const [signed, unsigned] = [wallet, stranger].map(
-      (from) =>
-        new VersionedTransaction(
-          new TransactionMessage({
-            payerKey: from.publicKey,
-            recentBlockhash: blockhash,
-            instructions: transferFrom(from).instructions,
-          }).compileToV0Message(),
-        ),
+    const signed = new VersionedTransaction(
+      new TransactionMessage({
+        payerKey: wallet.publicKey,
+        recentBlockhash: blockhash,
+        instructions: transferFrom(wallet).instructions,
+      }).compileToV0Message(),
     );
     signed.sign([wallet]);
+    const unsigned = compileV1Transaction({
+      feePayer: stranger.publicKey,
+      recentBlockhash: blockhash,
+      instructions: transferFrom(stranger).instructions,
+    });
 
     let error: Error | undefined;
     try {
