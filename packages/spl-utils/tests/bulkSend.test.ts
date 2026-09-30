@@ -1,5 +1,6 @@
 import {
   Keypair,
+  PublicKey,
   SystemProgram,
   TransactionMessage,
   VersionedTransaction,
@@ -15,7 +16,8 @@ import { compileV1Transaction } from "../src/v1Transaction";
 // A node that confirms every signed tx it is sent and never lands one with a
 // zeroed signature slot, the way a real node drops it at sigverify. Each
 // block height read moves the chain one block closer to blockhash expiry.
-const fakeNode = () => {
+// Txs paid by `stuckPayer` never land, so their blockhash expires.
+const fakeNode = (stuckPayer?: PublicKey) => {
   const sent: Buffer[] = [];
   const landed = new Set<string>();
   let height = 0;
@@ -30,7 +32,10 @@ const fakeNode = () => {
       sent.push(Buffer.from(raw));
       const tx = VersionedTransaction.deserialize(raw);
       const txid = bs58.encode(tx.signatures[0]);
-      if (tx.signatures.every((sig) => sig.some((b) => b !== 0))) {
+      if (
+        tx.signatures.every((sig) => sig.some((b) => b !== 0)) &&
+        !(stuckPayer && tx.message.staticAccountKeys[0].equals(stuckPayer))
+      ) {
         landed.add(txid);
       }
       return txid;
@@ -95,6 +100,42 @@ describe("bulkSendTransactions", () => {
       wallet.publicKey.toBase58(),
     ]);
   });
+
+  it("reports the unsigned tx when another tx's blockhash expires", async () => {
+    const wallet = Keypair.generate();
+    const stranger = Keypair.generate();
+    const { connection } = fakeNode(wallet.publicKey);
+    const provider: any = {
+      connection,
+      wallet: {
+        publicKey: wallet.publicKey,
+        signAllTransactions: async (txs: VersionedTransaction[]) => {
+          txs.forEach((tx) => {
+            if (tx.message.staticAccountKeys[0].equals(wallet.publicKey)) {
+              tx.sign([wallet]);
+            }
+          });
+          return txs;
+        },
+      },
+    };
+
+    let error: Error | undefined;
+    try {
+      await bulkSendTransactions(
+        provider,
+        [transferFrom(wallet), transferFrom(stranger)],
+        undefined,
+        1,
+      );
+    } catch (e: any) {
+      error = e;
+    }
+
+    expect(error?.message).to.equal(
+      `Missing signature for public key ${stranger.publicKey.toBase58()}`,
+    );
+  });
 });
 
 describe("bulkSendRawTransactions", () => {
@@ -136,5 +177,42 @@ describe("bulkSendRawTransactions", () => {
     expect(sent.map(payerOf).map((key) => key.toBase58())).to.deep.equal([
       wallet.publicKey.toBase58(),
     ]);
+  });
+
+  it("reports the unsigned tx when the signed tx's blockhash expires", async () => {
+    const wallet = Keypair.generate();
+    const stranger = Keypair.generate();
+    const { connection } = fakeNode(wallet.publicKey);
+    const { blockhash, lastValidBlockHeight } =
+      await connection.getLatestBlockhash();
+    const signed = new VersionedTransaction(
+      new TransactionMessage({
+        payerKey: wallet.publicKey,
+        recentBlockhash: blockhash,
+        instructions: transferFrom(wallet).instructions,
+      }).compileToV0Message(),
+    );
+    signed.sign([wallet]);
+    const unsigned = compileV1Transaction({
+      feePayer: stranger.publicKey,
+      recentBlockhash: blockhash,
+      instructions: transferFrom(stranger).instructions,
+    });
+
+    let error: Error | undefined;
+    try {
+      await bulkSendRawTransactions(
+        connection,
+        [signed, unsigned].map((tx) => Buffer.from(tx.serialize())),
+        undefined,
+        lastValidBlockHeight,
+      );
+    } catch (e: any) {
+      error = e;
+    }
+
+    expect(error?.message).to.equal(
+      `Missing signature for public key ${stranger.publicKey.toBase58()}`,
+    );
   });
 });

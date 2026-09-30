@@ -1,7 +1,7 @@
 name: Blockchain API E2E Tests
 
 on:
-  # These path filters gate every job below, the 19-job e2e matrix included.
+  # These path filters gate every job below, the 40-job e2e matrix included.
   # The typecheck step resolves the workspace SDKs (the *-sdk packages,
   # idls) too, so a change confined to those does not run it.
   push:
@@ -29,7 +29,7 @@ env:
 jobs:
   # Build anchor once and share the generated types/IDLs as an artifact. The
   # matrix jobs only need target/types (to build @helium/idls); having each of
-  # them run build-anchor meant 19 full rebuilds whenever the cache was evicted
+  # them run build-anchor meant one full rebuild per matrix job whenever the cache was evicted
   # (the repo sits at the 10GB Actions cache cap), and a cold anchor build
   # can't finish inside the matrix jobs' 20-minute timeout.
   build-idls:

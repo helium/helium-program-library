@@ -518,6 +518,7 @@ export async function bulkSendTransactions(
 
       triesRemaining--;
       if (triesRemaining <= 0) {
+        assertNoMissingSigners(missingSigners);
         throw new Error(
           `Failed to submit all txs after blockhashes expired, ${
             signedTxs.length - confirmedTxs.length

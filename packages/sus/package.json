@@ -37,7 +37,7 @@
     "@anchor-lang/core": "^0.31.2",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
     "@solana/spl-token": "^0.3.8",
-    "@solana/web3.js": "^1.91.1",
+    "@solana/web3.js": "^1.99.0",
     "axios": "^1.9.0",
     "bn.js": "^5.2.0",
     "bs58": "^4.0.1"

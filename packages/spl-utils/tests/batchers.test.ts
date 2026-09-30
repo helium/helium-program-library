@@ -15,6 +15,8 @@ import {
 import {
   batchInstructionsToTxsWithPriorityFee,
   batchParallelInstructions,
+  batchParallelInstructionsWithPriorityFee,
+  batchSequentialParallelInstructions,
   toVersionedTx,
 } from "../src/transaction";
 import { TransactionDraft } from "../src/draft";
@@ -349,3 +351,66 @@ describe("batchParallelInstructions", () => {
   });
 });
 
+describe("version pins on the priority-fee batchers", () => {
+  const SIGNED = new Error("signed");
+
+  // Captures the txs handed to the wallet, then stops before any send.
+  const packed = async (
+    send: (provider: AnchorProvider) => Promise<void>
+  ): Promise<VersionedTransaction[]> => {
+    process.env.HPL_TX_VERSION = "v1";
+    resetTxVersionCache();
+    let txs: VersionedTransaction[] = [];
+    const provider = {
+      connection: {
+        ...makeConnection(),
+        // batchSequentialParallelInstructions takes no computeUnitLimit, so
+        // it always simulates.
+        simulateTransaction: async () => ({
+          value: { err: null, unitsConsumed: 1000 },
+        }),
+      },
+      wallet: {
+        publicKey: FEE_PAYER,
+        signAllTransactions: async (signing: VersionedTransaction[]) => {
+          txs = signing;
+          throw SIGNED;
+        },
+      },
+    } as unknown as AnchorProvider;
+    try {
+      await send(provider);
+    } catch (e) {
+      if (e !== SIGNED) throw e;
+    }
+    return txs;
+  };
+
+  afterEach(() => {
+    delete process.env.HPL_TX_VERSION;
+    resetTxVersionCache();
+  });
+
+  it("batchSequentialParallelInstructions keeps a pinned version 0 when HPL_TX_VERSION is v1", async () => {
+    const ixs = [dataIx(1000), dataIx(1000), dataIx(1000)];
+    const txs = await packed((provider) =>
+      batchSequentialParallelInstructions({
+        provider,
+        instructions: [ixs],
+        version: 0,
+      })
+    );
+    expect(txs.map((tx) => tx.version)).to.deep.equal([0, 0, 0]);
+  });
+
+  it("batchParallelInstructionsWithPriorityFee keeps a pinned version 0 when HPL_TX_VERSION is v1", async () => {
+    const ixs = [dataIx(1000), dataIx(1000), dataIx(1000)];
+    const txs = await packed((provider) =>
+      batchParallelInstructionsWithPriorityFee(provider, ixs, {
+        computeUnitLimit: 200000,
+        version: 0,
+      })
+    );
+    expect(txs.map((tx) => tx.version)).to.deep.equal([0, 0, 0]);
+  });
+});

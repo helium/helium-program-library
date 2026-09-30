@@ -9,7 +9,6 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { expect } from "chai";
-import { tableComputeUnitsForInstructions } from "../src/computeUnitTable";
 import { setLoadedAccountsDataSizeLimit } from "../src/priorityFees";
 import { toVersionedTx } from "../src/transaction";
 import { toV1TransactionConfig } from "../src/v1Transaction";
@@ -67,7 +66,8 @@ describe("toV1TransactionConfig", () => {
   it("defaults a missing CU limit to the table and data size to 64 MiB", () => {
     const { config } = toV1TransactionConfig([transfer]);
     expect(config).to.deep.equal({
-      computeUnitLimit: tableComputeUnitsForInstructions([transfer]),
+      // System program ceiling 3000 × FALLBACK_CU_MARGIN 2.0.
+      computeUnitLimit: 6000,
       loadedAccountsDataSizeLimit: 64 * 1024 * 1024,
     });
     expect(config.computeUnitLimit).to.be.greaterThan(0);
