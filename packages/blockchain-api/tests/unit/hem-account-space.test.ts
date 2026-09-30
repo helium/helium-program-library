@@ -1,21 +1,27 @@
 import { BorshAccountsCoder, BN, Idl } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import { expect } from "chai";
-import { describe, it } from "mocha";
+import { existsSync, readFileSync } from "fs";
+import { resolve } from "path";
+import { before, describe, it } from "mocha";
 import {
   IOT_HOTSPOT_INFO_SPACE,
   keyToAssetSpace,
   MOBILE_HOTSPOT_INFO_SPACE,
 } from "../../../helium-entity-manager-sdk/src/constants";
-import heliumEntityManagerIdl from "../../../spl-utils/src/idl/helium_entity_manager.json";
 
 // The size literals in helium-entity-manager-sdk mirror
 // programs/helium-entity-manager/src/state.rs. These tests derive each size
-// from the program IDL, so a struct change that reaches the IDL, or a literal
-// edit, fails here instead of drifting silently.
+// from the IDL anchor build writes, not the committed spl-utils copy, so a
+// state.rs struct change fails here even when the committed IDL is not
+// regenerated.
 
-const idl = heliumEntityManagerIdl as Idl;
-const coder = new BorshAccountsCoder(idl);
+const BUILT_IDL = resolve(
+  __dirname,
+  "../../../../target/idl/helium_entity_manager.json"
+);
+let idl: Idl;
+let coder: BorshAccountsCoder;
 
 // Rules state.rs applies on top of the borsh layout; the IDL does not carry them.
 const PAD = 60;
@@ -66,6 +72,17 @@ const rustLayout = (type: unknown): [number, number] => {
 const key = PublicKey.default;
 
 describe("helium-entity-manager-sdk account sizes match the IDL", () => {
+  // Loaded here, not at import, so a missing build fails only this suite.
+  before(() => {
+    if (!existsSync(BUILT_IDL)) {
+      throw new Error(
+        `${BUILT_IDL} is missing. Run \`anchor build -p helium_entity_manager\` at the repo root first.`
+      );
+    }
+    idl = JSON.parse(readFileSync(BUILT_IDL, "utf8")) as Idl;
+    coder = new BorshAccountsCoder(idl);
+  });
+
   it("keyToAssetSpace carries size_of::<KeyToAssetV0>()", () => {
     // issue_data_only_entity_v0: 8 + size_of::<KeyToAssetV0>() + 1 + entity_key.len()
     expect(keyToAssetSpace(0) - 8 - 1).to.equal(rustSizeOf("KeyToAssetV0"));
