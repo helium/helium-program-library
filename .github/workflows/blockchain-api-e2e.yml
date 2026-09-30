@@ -18,6 +18,9 @@ on:
       # The matrix check below reads this file, so an edit here runs it.
       - ".github/workflows/blockchain-api-e2e.yml"
 
+permissions:
+  contents: read
+
 env:
   # The commit of the `v1.6.0` tag. A tag can move; a commit cannot.
   SURFPOOL_REV: 050a81b9f366a813d2f3da810bf6fbc52f1047ac
