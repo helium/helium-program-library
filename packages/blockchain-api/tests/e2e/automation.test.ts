@@ -40,7 +40,6 @@ import { ORPCError } from "@orpc/server";
 
 import {
   getBaseAutomationRentLamports,
-  resolveScheduleToCron,
 } from "../../src/lib/utils/automation-helpers";
 
 // Raw crontab string (6-field clockwork format: sec min hour dom month dow).
@@ -184,19 +183,14 @@ describe("automation endpoints", () => {
         duration: 1,
       });
 
-      // A preset resolves from the clock, so its length can change between
-      // this resolve and the server's; either side of the call is accepted.
-      const dailyLenBefore = resolveScheduleToCron("daily").length;
+      // A preset resolves from the clock, so it is priced at its longest
+      // crontab (14 chars for daily), not at whatever the clock gives now.
       const daily = await client.hotspots.getFundingEstimate({
         walletAddress,
         duration: 1,
         schedule: "daily",
       });
-      const dailyLenAfter = resolveScheduleToCron("daily").length;
-      expect([
-        await baseRentSol(dailyLenBefore),
-        await baseRentSol(dailyLenAfter),
-      ]).to.include(daily.rentFee);
+      expect(daily.rentFee).to.equal(await baseRentSol(14));
       // Every daily crontab is shorter than the unscheduled 15-char bound.
       expect(daily.rentFee).to.be.lessThan(unscheduled.rentFee);
 

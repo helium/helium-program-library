@@ -18,7 +18,7 @@ import {
 
 const BUILT_IDL = resolve(
   __dirname,
-  "../../../../target/idl/helium_entity_manager.json"
+  "../../../../target/idl/helium_entity_manager.json",
 );
 let idl: Idl;
 let coder: BorshAccountsCoder;
@@ -76,7 +76,7 @@ describe("helium-entity-manager-sdk account sizes match the IDL", () => {
   before(() => {
     if (!existsSync(BUILT_IDL)) {
       throw new Error(
-        `${BUILT_IDL} is missing. Run \`anchor build -p helium_entity_manager\` at the repo root first.`
+        `${BUILT_IDL} is missing. Run \`anchor build -p helium_entity_manager\` at the repo root first.`,
       );
     }
     idl = JSON.parse(readFileSync(BUILT_IDL, "utf8")) as Idl;

@@ -78,6 +78,24 @@ export function resolveScheduleToCron(scheduleOrCron: string): string {
     : scheduleOrCron;
 }
 
+/**
+ * Longest crontab a setup input can resolve to. Presets resolve from the clock
+ * without padding, so createAutomation can resolve a longer one than an
+ * earlier estimate did; pricing at the bound keeps the estimate from falling
+ * short.
+ */
+export const maxScheduleCronLength = (schedule: string): number => {
+  switch (schedule) {
+    case "daily":
+    case "weekly":
+      return 14;
+    case "monthly":
+      return 15;
+    default:
+      return schedule.length;
+  }
+};
+
 export interface CronScheduleInfo {
   schedule: Schedule;
   time: string;
@@ -411,11 +429,7 @@ export function calculateFundingForAdditionalDuration(
     fundingNeeded.pdaWalletFundingLamports + pdaWalletRentShortfall;
 
   // However, if there's no shortfall (balance already covers rent), we still need to add
-  // ATA rent and task return account funding if they don't exist yet (one-time creation costs)
-  const pdaWalletFundingWithAta =
-    pdaWalletFundingWithShortfall +
-    (pdaWalletRentShortfall === 0 && ataRentLamports > 0 ? ataRentLamports : 0);
-
+  // task return account funding if it doesn't exist yet (one-time creation cost)
   const cronJobFundingWithTaskReturn =
     cronJobFundingWithShortfall +
     (cronJobRentShortfall === 0 && taskReturnAccountFundingLamports > 0
@@ -424,7 +438,7 @@ export function calculateFundingForAdditionalDuration(
 
   return {
     cronJobFundingLamports: cronJobFundingWithTaskReturn,
-    pdaWalletFundingLamports: pdaWalletFundingWithAta,
+    pdaWalletFundingLamports: pdaWalletFundingWithShortfall,
     // The PDA wallet shortfall above already holds all of the recipient rent
     // whenever the balance does not cover it, so none is charged on top.
     recipientFeeLamports: 0,

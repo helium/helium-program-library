@@ -305,7 +305,7 @@ export const AutomationStatusOutputSchema = z.object({
     })
     .optional(),
   rentFee: z.number(), // Initial setup cost in SOL if automation doesn't exist, 0 otherwise: rent (cluster Rent sysvar) for the accounts init_entity_claim_cron_v0 creates, including the task return account, plus the task queue's min crank reward its schedule task takes; the 0.01 SOL cron-job task-return top-up is in operationalSol
-  recipientFee: z.number(), // Recipient rent in SOL that the PDA wallet funding does not already carry; 0 for a new wallet, whose recipient rent is in operationalSol
+  recipientFee: z.number(), // Always 0: pdaWalletFunding (in operationalSol) already carries all recipient rent; kept for schema compatibility
   operationalSol: z.number(), // Total operational SOL needed for automation claims (cronJobFunding + pdaWalletFunding)
   remainingClaims: z.number().optional(),
   fundingPeriodInfo: z
@@ -324,9 +324,9 @@ export const FundingEstimateOutputSchema = z.object({
   rentFee: z.number(), // Initial setup cost in SOL if automation doesn't exist, 0 otherwise: rent (cluster Rent sysvar) for the accounts init_entity_claim_cron_v0 creates, including the task return account, plus the task queue's min crank reward its schedule task takes; the 0.01 SOL cron-job task-return top-up is in operationalSol
   cronJobFunding: z.number(), // SOL needed for cron job account operations
   pdaWalletFunding: z.number(), // SOL needed for PDA wallet operations
-  recipientFee: z.number(), // Recipient rent in SOL that the PDA wallet funding does not already carry; 0 for a new wallet, whose recipient rent is in operationalSol
+  recipientFee: z.number(), // Always 0: pdaWalletFunding (in operationalSol) already carries all recipient rent; kept for schema compatibility
   operationalSol: z.number(), // Total operational SOL needed for automation claims (cronJobFunding + pdaWalletFunding)
-  totalSolNeeded: z.number(), // Total SOL needed including all fees (rentFee + operationalSol + recipientFee)
+  totalSolNeeded: z.number(), // Total SOL needed including all fees (rentFee + operationalSol; recipientFee is always 0)
   currentCronJobBalance: z.string(), // Current balance in cronJob (lamports as string)
   currentPdaWalletBalance: z.string(), // Current balance in pdaWallet (lamports as string)
 });

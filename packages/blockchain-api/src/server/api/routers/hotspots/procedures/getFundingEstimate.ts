@@ -4,7 +4,7 @@ import * as anchor from "@coral-xyz/anchor";
 import {
   getBaseAutomationRentLamports,
   estimateAutomationFunding,
-  resolveScheduleToCron,
+  maxScheduleCronLength,
 } from "@/lib/utils/automation-helpers";
 import { fetchAutomationData } from "./automation-data-helpers";
 
@@ -44,7 +44,7 @@ export const getFundingEstimate =
               provider.connection,
               schedule === undefined
                 ? undefined
-                : resolveScheduleToCron(schedule).length,
+                : maxScheduleCronLength(schedule),
             ),
         minCrankRewardLamports: minCrankReward,
         cronJobBalanceLamports,

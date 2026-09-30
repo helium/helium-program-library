@@ -147,8 +147,8 @@ export function assertNotDelegated({
 }
 
 /**
- * Refuses an update the owner cannot fund in DC. Only a location assert costs
- * DC, so this runs only when `locationAssertDcFee` priced one.
+ * Refuses a transaction whose DC fee the owner cannot fund, such as a location
+ * assert or a data-only onboard.
  */
 export function assertDcCovered({
   required,
@@ -168,7 +168,7 @@ export function assertDcCovered({
   if (available >= needed) return;
 
   throw errors.INSUFFICIENT_FUNDS({
-    message: "Insufficient DC balance to assert this hotspot's location",
+    message: "Insufficient DC balance to cover this hotspot's DC fee",
     data: { required: Number(needed), available: Number(available) },
   });
 }

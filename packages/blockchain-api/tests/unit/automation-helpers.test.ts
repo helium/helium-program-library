@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
   estimateAutomationFunding,
+  maxScheduleCronLength,
   resolveScheduleToCron,
 } from "../../src/lib/utils/automation-helpers";
 
@@ -24,6 +25,19 @@ describe("resolveScheduleToCron", () => {
   it("maps daily to an every-day crontab (wildcard dom/month/dow)", () => {
     const [, , , dom, month, dow] = resolveScheduleToCron("daily").split(" ");
     expect([dom, month, dow]).to.deep.equal(["*", "*", "*"]);
+  });
+});
+
+describe("maxScheduleCronLength", () => {
+  it("bounds each preset at its longest crontab", () => {
+    expect(maxScheduleCronLength("daily")).to.equal(14);
+    expect(maxScheduleCronLength("weekly")).to.equal(14);
+    expect(maxScheduleCronLength("monthly")).to.equal(15);
+  });
+
+  it("uses a raw crontab's own length", () => {
+    const raw = "0 0 0 1,15 * 1-5";
+    expect(maxScheduleCronLength(raw)).to.equal(raw.length);
   });
 });
 
@@ -148,6 +162,39 @@ describe("estimateAutomationFunding", () => {
     expect(estimate.recipientFee).to.equal(0);
     expect(toLamports(estimate.totalSolNeeded)).to.equal(
       pdaWalletRentShortfall + duration * pdaWalletCostPerClaimLamports,
+    );
+  });
+
+  it("charges the ATA rent once when the PDA balance already covers it", () => {
+    const pdaWalletRentLamports = 890_880;
+    const ataRentLamports = 2_039_280;
+    const recipientRentLamports = 1_767_840;
+    const duration = 30;
+    const cronJobCostPerClaimLamports = 10_000;
+    const pdaWalletCostPerClaimLamports = 40_000;
+    const cronJobRentLamports = 3_000_000;
+
+    const estimate = estimateAutomationFunding({
+      cronJobExists: true,
+      baseAutomationRentLamports: 0,
+      minCrankRewardLamports: 15_000,
+      cronJobBalanceLamports:
+        cronJobRentLamports + duration * cronJobCostPerClaimLamports,
+      cronJobRentLamports,
+      cronJobCostPerClaimLamports,
+      // Covers the PDA, recipient and missing ATA rent, but no claims.
+      pdaWalletBalanceLamports:
+        pdaWalletRentLamports + recipientRentLamports + ataRentLamports,
+      pdaWalletCostPerClaimLamports,
+      recipientRentLamports,
+      pdaWalletRentLamports,
+      additionalDuration: duration,
+      ataRentLamports,
+      taskReturnAccountFundingLamports: 0,
+    });
+
+    expect(toLamports(estimate.pdaWalletFunding)).to.equal(
+      duration * pdaWalletCostPerClaimLamports,
     );
   });
 });

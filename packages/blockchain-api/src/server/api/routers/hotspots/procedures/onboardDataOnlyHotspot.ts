@@ -206,7 +206,7 @@ export const onboardDataOnlyHotspot =
           actionMetadata: { type: "onboard_data_only_hotspot", network },
         },
         estimatedSolFee: await toTokenAmountOutput(
-          new BN(totalFee),
+          new BN(totalFee + infoRent),
           NATIVE_MINT.toBase58()
         ),
       };
