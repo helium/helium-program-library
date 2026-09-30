@@ -190,16 +190,7 @@ export async function sendInstructions(
   ) {
     tx = await provider.wallet.signTransaction(tx);
   }
-  // VersionedTransaction.serialize does not verify signatures, so an
-  // unsigned required signer would otherwise be resent until it expires.
-  const unsigned = tx.signatures.findIndex((sig) => sig.every((b) => b === 0));
-  if (unsigned >= 0) {
-    throw new Error(
-      `Missing signature for public key ${tx.message.staticAccountKeys[
-        unsigned
-      ].toBase58()}`
-    );
-  }
+  assertNoMissingSigners([missingSigner(tx)].filter(truthy), []);
 
   try {
     const { txid } = await sendAndConfirmWithRetry(
@@ -421,13 +412,50 @@ const missingSigner = (tx: VersionedTransaction): PublicKey | undefined => {
   return unsigned >= 0 ? tx.message.staticAccountKeys[unsigned] : undefined;
 };
 
-const assertNoMissingSigners = (missingSigners: PublicKey[]) => {
-  if (missingSigners.length > 0) {
-    throw new Error(
-      `Missing signature for public key ${missingSigners
-        .map((key) => key.toBase58())
-        .join(", ")}`
+/**
+ * Thrown for an on-chain failure, a missing signer, or any error after a tx
+ * landed. Read `landedSignatures` rather than using `instanceof`: the CJS and
+ * ESM builds each define this class.
+ */
+export class BulkSendError extends Error {
+  /** Txs that landed before the throw, ordered by confirmation. */
+  landedSignatures: string[];
+  /** The error that ended the send, if one did. */
+  cause?: unknown;
+
+  constructor({
+    message,
+    missingSigners,
+    landedSignatures,
+    cause,
+  }: {
+    message?: string;
+    missingSigners: PublicKey[];
+    landedSignatures: string[];
+    cause?: unknown;
+  }) {
+    super(
+      [
+        message,
+        missingSigners.length > 0 &&
+          `Missing signature for public key ${missingSigners
+            .map((key) => key.toBase58())
+            .join(", ")}`,
+      ]
+        .filter(truthy)
+        .join(". ")
     );
+    this.landedSignatures = landedSignatures;
+    this.cause = cause;
+  }
+}
+
+const assertNoMissingSigners = (
+  missingSigners: PublicKey[],
+  landedSignatures: string[]
+) => {
+  if (missingSigners.length > 0) {
+    throw new BulkSendError({ missingSigners, landedSignatures });
   }
 };
 
@@ -445,91 +473,110 @@ export async function bulkSendTransactions(
   // attempt to chunk by blockhash bounds (so signing doesn't take too long)
   for (let chunk of chunks(txs, maxSignatureBatch)) {
     const thisRet: string[] = [];
-    // Continually send in bulk while resetting blockhash until we send them all
-    while (true) {
-      const recentBlockhash = await withRetries(5, () =>
-        provider.connection.getLatestBlockhash("confirmed")
-      );
-      const blockhashedTxs = await Promise.all(
-        chunk.map(async (tx) => {
-          await populateMissingDraftInfo(provider.connection, tx);
-          return toVersionedTx({
-            instructions: tx.instructions,
-            recentBlockhash: recentBlockhash.blockhash,
-            addressLookupTableAddresses: tx.addressLookupTableAddresses,
-            addressLookupTables: tx.addressLookupTables!,
-            feePayer: tx.feePayer,
-            version: tx.version,
-          });
-        })
-      );
-      let signedTxs = (
-        await (provider as AnchorProvider).wallet.signAllTransactions(
-          blockhashedTxs
-        )
-      ).map((tx, i) => {
-        extraSigners.forEach((signer: Keypair) => {
-          if (
-            chunk[i].signers?.some((sig) =>
-              sig.publicKey.equals(signer.publicKey)
-            )
-          ) {
-            tx.sign([signer]);
-          }
-        }, tx);
-        return tx;
-      });
-      const missing = signedTxs.map(missingSigner);
-      missingSigners.push(...missing.filter(truthy));
-      signedTxs = signedTxs.filter((_, i) => !missing[i]);
-      chunk = chunk.filter((_, i) => !missing[i]);
-
-      const txsWithSigs = signedTxs.map((tx, index) => {
-        return {
-          transaction: chunk[index],
-          sig: bs58.encode(tx.signatures[0]),
-        };
-      });
-      const confirmedTxs = await bulkSendRawTransactions(
-        provider.connection,
-        signedTxs.map((s) => Buffer.from(s.serialize())),
-        ({ totalProgress, ...rest }) =>
-          onProgress &&
-          onProgress({
-            ...rest,
-            totalTxs: txs.length,
-            totalProgress: totalProgress + ret.length + thisRet.length,
-          }),
-        recentBlockhash.lastValidBlockHeight,
-        // Hail mary, try with preflight enabled. Sometimes this causes
-        // errors that wouldn't otherwise happen
-        triesRemaining != 1
-      );
-      thisRet.push(...confirmedTxs);
-      if (confirmedTxs.length == signedTxs.length) {
-        break;
-      }
-
-      const retSet = new Set(thisRet);
-
-      chunk = txsWithSigs
-        .filter(({ sig }) => !retSet.has(sig))
-        .map(({ transaction }) => transaction);
-
-      triesRemaining--;
-      if (triesRemaining <= 0) {
-        assertNoMissingSigners(missingSigners);
-        throw new Error(
-          `Failed to submit all txs after blockhashes expired, ${
-            signedTxs.length - confirmedTxs.length
-          } remain`
+    try {
+      // Continually send in bulk while resetting blockhash until we send them all
+      while (true) {
+        const recentBlockhash = await withRetries(5, () =>
+          provider.connection.getLatestBlockhash("confirmed")
         );
+        const blockhashedTxs = await Promise.all(
+          chunk.map(async (tx) => {
+            await populateMissingDraftInfo(provider.connection, tx);
+            return toVersionedTx({
+              instructions: tx.instructions,
+              recentBlockhash: recentBlockhash.blockhash,
+              addressLookupTableAddresses: tx.addressLookupTableAddresses,
+              addressLookupTables: tx.addressLookupTables!,
+              feePayer: tx.feePayer,
+              version: tx.version,
+            });
+          })
+        );
+        let signedTxs = (
+          await (provider as AnchorProvider).wallet.signAllTransactions(
+            blockhashedTxs
+          )
+        ).map((tx, i) => {
+          extraSigners.forEach((signer: Keypair) => {
+            if (
+              chunk[i].signers?.some((sig) =>
+                sig.publicKey.equals(signer.publicKey)
+              )
+            ) {
+              tx.sign([signer]);
+            }
+          }, tx);
+          return tx;
+        });
+        const missing = signedTxs.map(missingSigner);
+        missingSigners.push(...missing.filter(truthy));
+        signedTxs = signedTxs.filter((_, i) => !missing[i]);
+        chunk = chunk.filter((_, i) => !missing[i]);
+
+        const txsWithSigs = signedTxs.map((tx, index) => {
+          return {
+            transaction: chunk[index],
+            sig: bs58.encode(tx.signatures[0]),
+          };
+        });
+        const confirmedTxs = await bulkSendRawTransactions(
+          provider.connection,
+          signedTxs.map((s) => Buffer.from(s.serialize())),
+          ({ totalProgress, ...rest }) =>
+            onProgress &&
+            onProgress({
+              ...rest,
+              // Unsigned drafts are not sent. One found in a later chunk
+              // lowers this count then.
+              totalTxs: txs.length - missingSigners.length,
+              totalProgress: totalProgress + ret.length + thisRet.length,
+            }),
+          recentBlockhash.lastValidBlockHeight,
+          // Hail mary, try with preflight enabled. Sometimes this causes
+          // errors that wouldn't otherwise happen
+          triesRemaining != 1
+        );
+        thisRet.push(...confirmedTxs);
+        if (confirmedTxs.length == signedTxs.length) {
+          break;
+        }
+
+        const retSet = new Set(thisRet);
+
+        chunk = txsWithSigs
+          .filter(({ sig }) => !retSet.has(sig))
+          .map(({ transaction }) => transaction);
+
+        triesRemaining--;
+        if (triesRemaining <= 0) {
+          throw new Error(
+            `Failed to submit all txs after blockhashes expired, ${
+              signedTxs.length - confirmedTxs.length
+            } remain`
+          );
+        }
       }
+    } catch (e: any) {
+      const landedSignatures = [
+        ...ret,
+        ...thisRet,
+        ...(e.landedSignatures ?? []),
+      ];
+      // Nothing to add: keep the original error, e.g. a wallet rejection.
+      if (landedSignatures.length === 0 && missingSigners.length === 0) {
+        throw e;
+      }
+      throw new BulkSendError({
+        message: e.message,
+        missingSigners,
+        landedSignatures,
+        cause: e,
+      });
     }
     ret.push(...thisRet);
   }
 
-  assertNoMissingSigners(missingSigners);
+  assertNoMissingSigners(missingSigners, ret);
   return ret;
 }
 
@@ -572,7 +619,7 @@ export async function bulkSendRawTransactions(
         (await withRetries(5, () => connection.getBlockHeight())) >
         lastValidBlockHeight
       ) {
-        assertNoMissingSigners(missingSigners);
+        assertNoMissingSigners(missingSigners, ret);
         return ret;
       }
 
@@ -619,7 +666,16 @@ export async function bulkSendRawTransactions(
         for (const tx of failedTxs) {
           console.error(tx?.meta?.logMessages?.join("\n"));
         }
-        throw new Error("Failed to run txs");
+        throw new BulkSendError({
+          message: "Failed to run txs",
+          missingSigners,
+          landedSignatures: [
+            ...ret,
+            ...txids.filter(
+              (_, index) => statuses[index] && !statuses[index]!.meta?.err
+            ),
+          ],
+        });
       }
       ret.push(
         ...txids
@@ -633,7 +689,7 @@ export async function bulkSendRawTransactions(
     }
   }
 
-  assertNoMissingSigners(missingSigners);
+  assertNoMissingSigners(missingSigners, ret);
   return ret;
 }
 
