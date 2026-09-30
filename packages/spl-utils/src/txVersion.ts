@@ -30,12 +30,16 @@ function envTxVersionOption(): TxVersionOption {
 }
 
 // Called once by the host app. Caps wallet-shaped signers only; a
-// keypair-backed wallet is never capped. Raising it to 1 does not work yet
-// under web3.js 1.x: a wallet-standard adapter returns a plain
-// VersionedTransaction whose v1 message web3.js cannot serialize, so
-// sendInstructions throws after signing. The caller must re-wrap the signed
-// transaction into a V1Transaction first.
+// keypair-backed wallet is never capped. Raising it to 1 is refused under
+// web3.js 1.x: a wallet-standard adapter returns a plain VersionedTransaction
+// whose v1 message web3.js cannot serialize, so sendInstructions would throw
+// after the user has signed.
 export function setWalletSignedTxVersionCeiling(ceiling: 0 | 1): void {
+  if (ceiling === 1) {
+    throw new Error(
+      "setWalletSignedTxVersionCeiling: a ceiling of 1 does not work under web3.js 1.x, which cannot serialize a v1 transaction a wallet adapter signed"
+    );
+  }
   walletSignedTxVersionCeiling = ceiling;
 }
 
