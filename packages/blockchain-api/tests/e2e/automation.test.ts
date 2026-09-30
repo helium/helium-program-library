@@ -135,8 +135,9 @@ describe("automation endpoints", () => {
       });
 
       expect(estimate.rentFee).to.equal(status.rentFee);
-      // One claim costs at least the zero-claim setup transfers the status reports.
-      expect(estimate.operationalSol).to.be.at.least(status.operationalSol);
+      // One claim costs more than the zero-claim setup transfers the status
+      // reports, so a status priced at any duration above 0 goes red here.
+      expect(estimate.operationalSol).to.be.greaterThan(status.operationalSol);
       // rentFee and recipientFee do not depend on the duration, so the status
       // fields sum to the duration-0 estimate: the duration-1 estimate less its
       // one-claim operational delta. The input schema rejects duration 0.
@@ -145,11 +146,11 @@ describe("automation endpoints", () => {
       expect(
         toLamports(status.rentFee) +
           toLamports(status.recipientFee) +
-          toLamports(status.operationalSol)
+          toLamports(status.operationalSol),
       ).to.equal(
         toLamports(estimate.totalSolNeeded) -
           (toLamports(estimate.operationalSol) -
-            toLamports(status.operationalSol))
+            toLamports(status.operationalSol)),
       );
     });
 
