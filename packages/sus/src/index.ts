@@ -29,10 +29,12 @@ import {
   AccountMeta,
   AddressLookupTableAccount,
   Connection,
+  Ed25519Program,
   MessageAccountKeys,
   MessageV1,
   PublicKey,
   RpcResponseAndContext,
+  Secp256k1Program,
   SimulatedTransactionResponse,
   SystemProgram,
   TransactionError,
@@ -573,11 +575,22 @@ export async function sus({
       let priorityFee = 0;
 
       if (transaction.version === 1) {
-        // Read the header, not getFeeForMessage: that returns null once the
-        // blockhash expires, which would price the fee at 0.
-        priorityFee = Number(
-          (transaction.message as MessageV1).transactionConfig.priorityFee ?? 0
-        );
+        const v1Message = transaction.message as MessageV1;
+        // Read the header, not the node's price: getFeeForMessage returns
+        // null once the blockhash expires.
+        priorityFee = Number(v1Message.transactionConfig.priorityFee ?? 0);
+        const nodeFee = await rpcRequest(connection, "getFeeForMessage", [
+          message,
+          { commitment: "confirmed" },
+        ])
+          .then((res) => res.value as number | null)
+          .catch(() => null);
+        solFee =
+          nodeFee !== null
+            ? nodeFee - priorityFee
+            : (transaction.signatures.length +
+                precompileSignatureCount(v1Message)) *
+              5000;
       } else {
         const fee =
           (await connection?.getFeeForMessage(transaction.message, "confirmed"))
@@ -691,6 +704,20 @@ export async function sus({
   }
 
   return results;
+}
+
+// The runtime charges the base fee for each precompile signature too. A
+// precompile instruction's first data byte is its signature count.
+function precompileSignatureCount(message: MessageV1): number {
+  return message.compiledInstructions
+    .filter((ix) => {
+      const programId = message.staticAccountKeys[ix.programIdIndex];
+      return (
+        programId.equals(Ed25519Program.programId) ||
+        programId.equals(Secp256k1Program.programId)
+      );
+    })
+    .reduce((count, ix) => count + (ix.data[0] ?? 0), 0);
 }
 
 // v1 wire layout: the message, then the signatures with no length prefix.
