@@ -37,10 +37,7 @@ import type { appRouter } from "@/server/api";
 import type { RouterClient } from "@orpc/server";
 import { ORPCError } from "@orpc/server";
 
-import {
-  getBaseAutomationRentLamports,
-  TASK_RETURN_ACCOUNT_FUNDING_SOL,
-} from "../../src/lib/utils/automation-helpers";
+import { getBaseAutomationRentLamports } from "../../src/lib/utils/automation-helpers";
 
 // Raw crontab string (6-field clockwork format: sec min hour dom month dow).
 const DAILY_CRON = "0 0 0 * * *";
@@ -117,8 +114,7 @@ describe("automation endpoints", () => {
       expect(result.isOutOfSol).to.equal(false);
       expect(result.currentSchedule).to.be.undefined;
       expect(result.rentFee).to.equal(
-        (await getBaseAutomationRentLamports(connection)) / LAMPORTS_PER_SOL +
-          TASK_RETURN_ACCOUNT_FUNDING_SOL
+        (await getBaseAutomationRentLamports(connection)) / LAMPORTS_PER_SOL
       );
       expect(result.recipientFee).to.be.a("number").and.to.be.at.least(0);
       expect(result.operationalSol).to.be.a("number").and.to.be.at.least(0);

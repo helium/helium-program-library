@@ -1,7 +1,6 @@
 import { createSolanaConnection } from "@/lib/solana";
 import {
   getBaseAutomationRentLamports,
-  TASK_RETURN_ACCOUNT_FUNDING_SOL,
   calculateFundingForAdditionalDuration,
   calculatePeriodsRemaining,
   interpretCronString,
@@ -51,11 +50,11 @@ export const getAutomationStatus =
           taskReturnAccountFundingLamports,
         });
 
+      // The task-return funding is left out: operationalSol already carries it.
       const rentFee = cronJobAccount
         ? 0
         : (await getBaseAutomationRentLamports(provider.connection)) /
-            LAMPORTS_PER_SOL +
-          TASK_RETURN_ACCOUNT_FUNDING_SOL;
+          LAMPORTS_PER_SOL;
       const recipientFee = recipientRentLamports / LAMPORTS_PER_SOL;
       const operationalSol =
         (cronJobFundingLamports + pdaWalletFundingLamports) / LAMPORTS_PER_SOL;

@@ -484,10 +484,11 @@ export const estimateAutomationFunding = (
 } => {
   const { cronJobExists, baseAutomationRentLamports } = params;
 
+  // The task-return funding is left out: the cron job transfer below already
+  // carries it.
   const rentFee = cronJobExists
     ? 0
-    : baseAutomationRentLamports / LAMPORTS_PER_SOL +
-      TASK_RETURN_ACCOUNT_FUNDING_SOL;
+    : baseAutomationRentLamports / LAMPORTS_PER_SOL;
 
   const {
     cronJobFundingLamports,
