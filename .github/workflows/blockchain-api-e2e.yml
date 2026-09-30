@@ -58,7 +58,8 @@ jobs:
   # 20-minute timeout.
   build-surfpool:
     runs-on: ubuntu-latest
-    # The cold build of 1.6.0 has not been timed; 0.11.2 took about 10 minutes.
+    permissions: {}
+    # A cold build of 0.11.2 took about 10 minutes; 60 leaves room for 1.6.0.
     timeout-minutes: 60
     steps:
       - name: Setup Rust toolchain
