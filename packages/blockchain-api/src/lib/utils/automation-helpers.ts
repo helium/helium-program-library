@@ -340,7 +340,7 @@ export function calculateFundingForAdditionalDuration(
 ): {
   cronJobFundingLamports: number;
   pdaWalletFundingLamports: number;
-  recipientFeeLamports: number; // Recipient fee to show separately (0 if already included in shortfall)
+  recipientFeeLamports: number; // Always 0; kept for the client schema's recipientFee
   currentMinPeriods: number;
   targetPeriods: number;
 } {
@@ -377,30 +377,6 @@ export function calculateFundingForAdditionalDuration(
     0,
     pdaWalletBalanceAfterRent,
   );
-
-  // Calculate how much of the shortfall covers recipient rent
-  // The shortfall covers rent in order: PDA wallet rent, then recipient rent, then ATA rent
-  // Calculate PDA wallet rent shortfall (how much shortfall is just for PDA wallet rent)
-  const pdaWalletBalanceAfterPdaRentOnly =
-    pdaWalletBalanceLamports - pdaWalletRentLamports;
-  const pdaWalletRentShortfallOnly = Math.max(
-    0,
-    -pdaWalletBalanceAfterPdaRentOnly,
-  );
-  // The remaining shortfall (after covering PDA wallet rent) goes to recipient rent and ATA rent
-  // Recipient rent covered = min(remaining shortfall, recipientRentLamports)
-  const shortfallAfterPdaRent = Math.max(
-    0,
-    pdaWalletRentShortfall - pdaWalletRentShortfallOnly,
-  );
-  const recipientRentCoveredByShortfall = Math.min(
-    shortfallAfterPdaRent,
-    recipientRentLamports,
-  );
-
-  // If there's no shortfall, the balance covers all rent including recipient rent,
-  // which means recipients are already funded, so no additional recipient rent needed
-  const recipientRentAlreadyFunded = pdaWalletRentShortfall === 0;
 
   // Calculate current periods for each pool
   const cronJobPeriods = calculatePoolPeriods(
@@ -446,18 +422,12 @@ export function calculateFundingForAdditionalDuration(
       ? taskReturnAccountFundingLamports
       : 0);
 
-  // Recipient fee: return only the ADDITIONAL recipient rent that still needs to be paid.
-  // - If there's no shortfall: balance covers all rent, so recipients are already funded (fee = 0)
-  // - If there's a shortfall: calculate how much recipient rent is covered by shortfall,
-  //   and return the remaining amount that still needs to be paid
-  const recipientFeeLamports = recipientRentAlreadyFunded
-    ? 0
-    : Math.max(0, recipientRentLamports - recipientRentCoveredByShortfall);
-
   return {
     cronJobFundingLamports: cronJobFundingWithTaskReturn,
     pdaWalletFundingLamports: pdaWalletFundingWithAta,
-    recipientFeeLamports,
+    // The PDA wallet shortfall above already holds all of the recipient rent
+    // whenever the balance does not cover it, so none is charged on top.
+    recipientFeeLamports: 0,
     currentMinPeriods,
     targetPeriods,
   };
@@ -500,8 +470,7 @@ export const estimateAutomationFunding = (
   const pdaWalletFunding = pdaWalletFundingLamports / LAMPORTS_PER_SOL;
   const recipientFee = recipientFeeLamports / LAMPORTS_PER_SOL;
   const operationalSol = cronJobFunding + pdaWalletFunding;
-  // recipientFeeLamports already represents only the ADDITIONAL recipient rent needed
-  // (0 if already included in shortfall, full amount if not)
+  // recipientFee is 0: pdaWalletFunding already carries the recipient rent.
   const totalSolNeeded = rentFee + operationalSol + recipientFee;
 
   return {

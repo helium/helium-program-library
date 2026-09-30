@@ -95,4 +95,45 @@ describe("estimateAutomationFunding", () => {
       30 * 10_000 + 3 * 40_000,
     );
   });
+
+  it("charges the recipient rent once when the PDA balance covers part of it", () => {
+    const pdaWalletRentLamports = 890_880;
+    const ataRentLamports = 2_039_280;
+    const recipientRentLamports = 2 * 1_767_840;
+    // Above the PDA and ATA rent, below the PDA, ATA and recipient rent.
+    const pdaWalletBalanceLamports = 4_000_000;
+    const duration = 30;
+    const cronJobCostPerClaimLamports = 10_000;
+    const pdaWalletCostPerClaimLamports = 40_000;
+    const cronJobRentLamports = 3_000_000;
+
+    const estimate = estimateAutomationFunding({
+      cronJobExists: true,
+      baseAutomationRentLamports: 0,
+      // The cron job already holds its rent plus the claims, so it needs nothing.
+      cronJobBalanceLamports:
+        cronJobRentLamports + duration * cronJobCostPerClaimLamports,
+      cronJobRentLamports,
+      cronJobCostPerClaimLamports,
+      pdaWalletBalanceLamports,
+      pdaWalletCostPerClaimLamports,
+      recipientRentLamports,
+      pdaWalletRentLamports,
+      additionalDuration: duration,
+      ataRentLamports,
+      taskReturnAccountFundingLamports: 0,
+    });
+
+    // The PDA wallet transfer tops the balance up to all its rent, which
+    // already includes every recipient's rent, then adds the claims.
+    const pdaWalletRentShortfall =
+      pdaWalletRentLamports +
+      recipientRentLamports +
+      ataRentLamports -
+      pdaWalletBalanceLamports;
+    expect(estimate.recipientFee).to.equal(0);
+    expect(toLamports(estimate.totalSolNeeded)).to.equal(
+      pdaWalletRentShortfall + duration * pdaWalletCostPerClaimLamports,
+    );
+  });
 });
