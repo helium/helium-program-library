@@ -245,6 +245,20 @@ describe("transaction version precedence", () => {
     }
   });
 
+  it("rejects an invalid HPL_TX_VERSION on a pinned call", async () => {
+    process.env.HPL_TX_VERSION = "v1x";
+    const { connection } = fakeConnection();
+    let error: Error | undefined;
+    try {
+      await resolveTxVersion(connection, { version: 0 });
+    } catch (e: any) {
+      error = e;
+    }
+    expect(error?.message).to.equal(
+      "HPL_TX_VERSION must be v0, v1 or auto; got v1x"
+    );
+  });
+
   it("HPL_TX_VERSION=auto defers to detection", async () => {
     process.env.HPL_TX_VERSION = "auto";
     const { connection } = fakeConnection();
