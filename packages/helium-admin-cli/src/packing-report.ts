@@ -2,7 +2,6 @@ import * as anchor from "@anchor-lang/core";
 import {
   epochTrackerKey,
   init as initHplCrons,
-  taskReturnAccountKey,
   TASK_QUEUE_ID,
 } from "@helium/hpl-crons-sdk";
 import { init as initMfan } from "@helium/mini-fanout-sdk";
@@ -28,7 +27,6 @@ import {
   ComputeBudgetProgram,
   Connection,
   PublicKey,
-  SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
 import yargs from "yargs/yargs";
@@ -259,25 +257,27 @@ async function endEpochRequeue(
     ixs.push(
       await program.methods
         .updateEpochTracker({ epoch: null, authority: null, taskQueue })
-        .accountsStrict({ authority: tracker.authority, epochTracker })
+        .accounts({ epochTracker })
         .instruction()
     );
   }
+  // The resolver would fill payer with the provider wallet (it defaults signers
+  // before deriving PDAs) and read taskQueue from the fetched tracker, which is
+  // the old queue when updateEpochTracker above runs first. Pass both. A
+  // variable, not a literal, since the IDL types leave them out of .accounts().
+  const queueEndEpochAccounts = {
+    payer: customWallet,
+    taskQueue,
+    dao,
+    iotSubDao,
+    mobileSubDao,
+    hntPriceOracle: HNT_PYTH_PRICE_FEED,
+  };
   const { transaction, remainingAccounts } = compileTransaction(
     [
       await program.methods
         .queueEndEpoch()
-        .accountsStrict({
-          payer: customWallet,
-          taskReturnAccount: taskReturnAccountKey()[0],
-          epochTracker,
-          taskQueue,
-          dao,
-          iotSubDao,
-          mobileSubDao,
-          hntPriceOracle: HNT_PYTH_PRICE_FEED,
-          systemProgram: SystemProgram.programId,
-        })
+        .accounts(queueEndEpochAccounts)
         .instruction(),
     ],
     [[Buffer.from("helium", "utf-8"), bumpBuffer]]
@@ -292,7 +292,7 @@ async function endEpochRequeue(
         transaction: { compiledV0: [transaction] },
         description: `queue end epoch ${tracker.epoch}`,
       })
-      .accountsPartial({ task: taskKey(taskQueue, index)[0], taskQueue })
+      .accounts({ task: taskKey(taskQueue, index)[0], taskQueue })
       .remainingAccounts(remainingAccounts)
       .instruction()
   );
