@@ -32,7 +32,8 @@
     "build": "tsc -b tsconfig.json",
     "test": "mocha -r @swc-node/register \"tests/**/*.test.ts\" --timeout 10000",
     "sample-cu": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/sample-cu.ts",
-    "check-cu-table": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/check-cu-table.ts"
+    "check-cu-table": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/check-cu-table.ts",
+    "update-hem-idl": "cd ../.. && anchor idl build -p helium_entity_manager -o packages/spl-utils/src/idl/helium_entity_manager.json"
   },
   "dependencies": {
     "@anchor-lang/core": "^0.31.2",

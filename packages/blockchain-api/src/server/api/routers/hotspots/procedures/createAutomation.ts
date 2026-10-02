@@ -1,6 +1,6 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
-  calculateFundingForAdditionalDuration,
+  estimateAutomationFunding,
   getBaseAutomationRentLamports,
   ENTITY_CLAIM_CRON_NAME,
   resolveScheduleToCron,
@@ -23,6 +23,7 @@ import {
 } from "@helium/spl-utils";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import {
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -79,10 +80,10 @@ export const createAutomation =
       const instructions: TransactionInstruction[] = [];
 
       // If cronJob doesn't exist or schedule changed, create/recreate it
-      if (
+      const recreatesCronJob =
         !cronJobAccount ||
-        (cronJobAccount.schedule && cronJobAccount.schedule !== cronSchedule)
-      ) {
+        (!!cronJobAccount.schedule && cronJobAccount.schedule !== cronSchedule);
+      if (recreatesCronJob) {
         // If it exists but schedule changed, remove it first. Skip holes left
         // by individually-removed claims (nextTransactionId is monotonic).
         if (cronJobAccount) {
@@ -140,7 +141,6 @@ export const createAutomation =
 
       // fetchAutomationData always returns a valid object, even if cron job doesn't exist
       const {
-        cronJobAccount: existingCronJobAccount,
         cronJobBalanceLamports,
         cronJobRentLamports,
         pdaWalletBalanceLamports,
@@ -149,41 +149,45 @@ export const createAutomation =
         recipientRentLamports,
         pdaWalletRentLamports,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
+        minCrankReward,
         pdaWallet,
       } = await fetchAutomationData(walletAddress, provider);
 
-      // If cron job doesn't exist, estimate the rent that will be needed
-      // This is important because the funding calculation needs to account for
-      // rent that will be locked up when the account is created
-      const effectiveCronJobRentLamports = existingCronJobAccount
-        ? cronJobRentLamports
-        : await getBaseAutomationRentLamports(
-            provider.connection,
-            cronSchedule.length,
-          );
-
-      // ATA rent and task return account rent are included from automationData
-      const { cronJobFundingLamports, pdaWalletFundingLamports } =
-        calculateFundingForAdditionalDuration({
+      // Price with the same helper as getFundingEstimate. When init runs (first
+      // setup or a schedule change) init_entity_claim_cron_v0 pays the base
+      // rent and the schedule task's crank reward from the wallet, so the cron
+      // job transfer below carries neither and the total counts them once. The
+      // new cron job starts empty, so it is funded for the whole duration.
+      const { cronJobFunding, pdaWalletFunding, totalSolNeeded } =
+        estimateAutomationFunding({
+          cronJobExists: !recreatesCronJob,
+          baseAutomationRentLamports: recreatesCronJob
+            ? await getBaseAutomationRentLamports(
+                provider.connection,
+                cronSchedule.length,
+              )
+            : 0,
+          minCrankRewardLamports: minCrankReward,
           cronJobBalanceLamports,
           cronJobCostPerClaimLamports,
           pdaWalletBalanceLamports,
           pdaWalletCostPerClaimLamports,
           recipientRentLamports,
-          cronJobRentLamports: effectiveCronJobRentLamports,
+          cronJobRentLamports,
           pdaWalletRentLamports,
           additionalDuration: duration,
           ataRentLamports,
-          taskReturnAccountRentLamports,
+          taskReturnAccountFundingLamports,
         });
+      const toLamports = (sol: number) => Math.round(sol * LAMPORTS_PER_SOL);
 
       // Always add at least minimal funding to ensure transaction is created
-      const minCrankSolFee = Math.max(0, cronJobFundingLamports);
-      const minPdaWalletSolFee = Math.max(0, pdaWalletFundingLamports);
+      const minCrankSolFee = Math.max(0, toLamports(cronJobFunding));
+      const minPdaWalletSolFee = Math.max(0, toLamports(pdaWalletFunding));
 
       // Check wallet has sufficient balance (same pattern as fundAutomation)
-      const totalFundingNeeded = minCrankSolFee + minPdaWalletSolFee;
+      const totalFundingNeeded = toLamports(totalSolNeeded);
       const walletBalance = await provider.connection.getBalance(wallet);
       const estimatedTxFees = BASE_TX_FEE_LAMPORTS * 2; // Estimate for multiple potential txs
       const cluster = getCluster();
@@ -194,7 +198,13 @@ export const createAutomation =
       const totalNeededWithFees =
         totalFundingNeeded + estimatedTxFees + estimatedJitoTipCost;
 
-      if (walletBalance < totalNeededWithFees) {
+      // The teardown runs before init and the transfers, so the old cron job's
+      // lamports are back in the wallet by the time they spend.
+      const teardownRefundLamports = recreatesCronJob
+        ? cronJobBalanceLamports
+        : 0;
+
+      if (walletBalance + teardownRefundLamports < totalNeededWithFees) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance to set up automation",
           data: {
@@ -251,7 +261,7 @@ export const createAutomation =
         vtxs.push(await getJitoTipTransaction(wallet));
       }
 
-      // Estimated fee includes tx fees + operational funding (cronJob + pdaWallet)
+      // Estimated fee includes tx fees + setup rent and crank reward + operational funding (cronJob + pdaWallet)
       const txFees = await getTotalTransactionFees(provider.connection, vtxs);
       const estimatedSolFeeLamports = txFees + totalFundingNeeded;
 

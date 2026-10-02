@@ -21,6 +21,7 @@ import {
   TASK_RETURN_ACCOUNT_FUNDING_SPACE,
   USER_CRON_JOBS_SPACE,
 } from "@helium/hpl-crons-sdk";
+import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
@@ -40,7 +41,6 @@ import { ORPCError } from "@orpc/server";
 
 import {
   getBaseAutomationRentLamports,
-  TASK_RETURN_ACCOUNT_SIZE,
 } from "../../src/lib/utils/automation-helpers";
 
 // Raw crontab string (6-field clockwork format: sec min hour dom month dow).
@@ -67,6 +67,18 @@ describe("automation endpoints", () => {
       );
     }
     return signatures;
+  }
+
+  // The crank reward init_entity_claim_cron_v0 pays its schedule task, which
+  // the setup quote adds to the base rent.
+  async function minCrankRewardLamports() {
+    const tuktukProgram = await initTuktuk(
+      new AnchorProvider(connection, {} as any, {})
+    );
+    const taskQueue = await tuktukProgram.account.taskQueueV0.fetch(
+      new PublicKey(process.env.HPL_CRONS_TASK_QUEUE!)
+    );
+    return taskQueue.minCrankReward.toNumber();
   }
 
   before(async () => {
@@ -118,14 +130,129 @@ describe("automation endpoints", () => {
       expect(result.isOutOfSol).to.equal(false);
       expect(result.currentSchedule).to.be.undefined;
       expect(result.rentFee).to.equal(
-        (await getBaseAutomationRentLamports(connection)) / LAMPORTS_PER_SOL +
-          TASK_RETURN_ACCOUNT_SIZE
+        ((await getBaseAutomationRentLamports(connection)) +
+          (await minCrankRewardLamports())) /
+          LAMPORTS_PER_SOL
       );
       expect(result.recipientFee).to.be.a("number").and.to.be.at.least(0);
       expect(result.operationalSol).to.be.a("number").and.to.be.at.least(0);
       expect(result.cronJobBalance).to.equal("0");
       expect(Number.isNaN(parseInt(result.pdaWalletBalance, 10))).to.equal(
         false
+      );
+    });
+
+    it("prices a funding estimate from the same setup costs as the status", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      const status = await client.hotspots.getAutomationStatus({
+        walletAddress,
+      });
+      const estimate = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration: 1,
+      });
+
+      expect(estimate.rentFee).to.equal(status.rentFee);
+      // One claim costs more than the zero-claim setup transfers the status
+      // reports, so a status priced at any duration above 0 goes red here.
+      expect(estimate.operationalSol).to.be.greaterThan(status.operationalSol);
+      // rentFee and recipientFee do not depend on the duration, so the status
+      // fields sum to the duration-0 estimate: the duration-1 estimate less its
+      // one-claim operational delta. The input schema rejects duration 0.
+      expect(status.recipientFee).to.equal(estimate.recipientFee);
+      const toLamports = (sol: number) => Math.round(sol * LAMPORTS_PER_SOL);
+      expect(
+        toLamports(status.rentFee) +
+          toLamports(status.recipientFee) +
+          toLamports(status.operationalSol),
+      ).to.equal(
+        toLamports(estimate.totalSolNeeded) -
+          (toLamports(estimate.operationalSol) -
+            toLamports(status.operationalSol)),
+      );
+    });
+
+    it("prices the setup rent at the schedule createAutomation would use", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      const crankReward = await minCrankRewardLamports();
+      const baseRentSol = async (scheduleLen: number) =>
+        ((await getBaseAutomationRentLamports(connection, scheduleLen)) +
+          crankReward) /
+        LAMPORTS_PER_SOL;
+      const unscheduled = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration: 1,
+      });
+
+      // A preset resolves from the clock, so it is priced at its longest
+      // crontab (14 chars for daily), not at whatever the clock gives now.
+      const daily = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration: 1,
+        schedule: "daily",
+      });
+      expect(daily.rentFee).to.equal(await baseRentSol(14));
+      // Every daily crontab is shorter than the unscheduled 15-char bound.
+      expect(daily.rentFee).to.be.lessThan(unscheduled.rentFee);
+
+      // A raw crontab over 15 chars is priced at its own length, not the bound.
+      const longCron = "0 0 0 1,15 * 1-5";
+      const long = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration: 1,
+        schedule: longCron,
+      });
+      expect(long.rentFee).to.equal(await baseRentSol(longCron.length));
+      expect(long.rentFee).to.be.greaterThan(unscheduled.rentFee);
+    });
+
+    it("moves exactly the estimate, plus fees, on a first-time setup", async () => {
+      // A fresh wallet has no cron job, so createAutomation takes the init path.
+      const wallet = Keypair.generate();
+      const walletAddress = wallet.publicKey.toBase58();
+      await ensureFunds(wallet.publicKey, LAMPORTS_PER_SOL);
+      const duration = 5;
+
+      // A raw crontab prices the same length on both calls; a preset resolves
+      // from the clock and could differ between them.
+      const estimate = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration,
+        schedule: DAILY_CRON,
+      });
+      const result = await client.hotspots.createAutomation({
+        walletAddress,
+        schedule: DAILY_CRON,
+        duration,
+      });
+      const signatures = await signAndSubmitTransactionData(
+        connection,
+        result.transactionData,
+        wallet
+      );
+
+      // Lamports are conserved across a transaction except for its fee, so
+      // read each fee off the ledger. The wallet pays for every setup
+      // transaction, so it is account 0. A Jito tip transaction is neither
+      // setup nor part of the estimate.
+      const sum = (balances: number[]) => balances.reduce((a, b) => a + b, 0);
+      let spentLessFees = 0;
+      for (const [i, signature] of signatures.entries()) {
+        if (
+          result.transactionData.transactions[i].metadata?.type !==
+          "setup_automation"
+        ) {
+          continue;
+        }
+        const meta = (await connection.getTransaction(signature, {
+          commitment: "confirmed",
+          maxSupportedTransactionVersion: 1,
+        }))!.meta!;
+        const fee = sum(meta.preBalances) - sum(meta.postBalances);
+        spentLessFees += meta.preBalances[0] - meta.postBalances[0] - fee;
+      }
+      expect(spentLessFees).to.equal(
+        Math.round(estimate.totalSolNeeded * LAMPORTS_PER_SOL)
       );
     });
 
@@ -366,6 +493,45 @@ describe("automation endpoints", () => {
         expect(error).to.be.instanceOf(ORPCError);
         expect(error.code).to.equal("NOT_FOUND");
       }
+    });
+
+    it("funds the cron a schedule change re-creates for the whole duration", async () => {
+      // A raw crontab, not a preset, so the estimate and the call below
+      // resolve to the same schedule whatever the clock reads between them.
+      const schedule = "0 0 1 * * *";
+      const estimate = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration,
+        schedule,
+      });
+      const result = await client.hotspots.createAutomation({
+        walletAddress,
+        schedule,
+        duration,
+      });
+      await submit(result.transactionData);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // The teardown closes the old cron job and init reuses its address.
+      const cronJob = cronJobKey(
+        entityCronAuthorityKey(payer.publicKey)[0],
+        0
+      )[0];
+      const cronJobInfo = await connection.getAccountInfo(cronJob);
+      expect(cronJobInfo?.data.length).to.equal(cronJobSpace(schedule.length));
+      expect(cronJobInfo?.lamports).to.equal(
+        (await connection.getMinimumBalanceForRentExemption(
+          cronJobSpace(schedule.length)
+        )) + Math.round(estimate.cronJobFunding * LAMPORTS_PER_SOL)
+      );
+
+      const status = await client.hotspots.getAutomationStatus({
+        walletAddress,
+      });
+      expect(status.currentSchedule?.cron).to.equal(schedule);
+      expect(status.fundingPeriodInfo?.cronJobPeriodsRemaining).to.be.at.least(
+        duration
+      );
     });
 
     it("closes automation and verifies removal", async () => {

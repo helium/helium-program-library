@@ -219,7 +219,8 @@ describe("transferSolShortfall", () => {
           authorityBalance: null,
         })
       ).to.deep.eq({
-        message: "Insufficient SOL balance for transaction fees",
+        message:
+          "Insufficient SOL balance for transaction fees and account rent",
         required: FEE,
         available: FEE - 1,
       });
@@ -243,7 +244,8 @@ describe("transferSolShortfall", () => {
           authorityBalance: null,
         })
       ).to.deep.eq({
-        message: "Insufficient SOL balance for transfer and transaction fees",
+        message:
+          "Insufficient SOL balance for transfer, transaction fees and account rent",
         required: FEE + 500,
         available: FEE + 499,
       });
@@ -282,7 +284,8 @@ describe("transferSolShortfall", () => {
           authorityBalance: 500,
         })
       ).to.deep.eq({
-        message: "Insufficient SOL balance for transaction fees",
+        message:
+          "Insufficient SOL balance for transaction fees and account rent",
         required: FEE,
         available: FEE - 1,
       });

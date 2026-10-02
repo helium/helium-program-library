@@ -3,6 +3,11 @@ import {
   VersionedTransaction,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
+import {
+  IOT_HOTSPOT_INFO_SPACE,
+  keyToAssetSpace,
+  MOBILE_HOTSPOT_INFO_SPACE,
+} from "@helium/helium-entity-manager-sdk";
 import { recipientSpace } from "@helium/lazy-distributor-sdk";
 import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
@@ -206,6 +211,35 @@ export const getWelcomePackRentParts = async (
 };
 
 /**
+ * Lamports issue_data_only_entity_v0 takes from the payer: rent for the
+ * KeyToAssetV0 it creates plus the per-leaf tree fee it moves to the
+ * data-only escrow. The fee quoted is the stored
+ * DataOnlyConfigV0.new_tree_fee_lamports. Programs that derive the fee from
+ * rent transfer `ceil(rent(new_tree_space) / 2^new_tree_depth)` instead, which
+ * is below the stored value on mainnet, so the stored value never under-quotes
+ * there.
+ */
+export const getDataOnlyIssueCostLamports = async (
+  connection: Connection,
+  {
+    entityKeyLen,
+    newTreeFeeLamports,
+  }: { entityKeyLen: number; newTreeFeeLamports: number },
+) =>
+  (await getRentLamports(connection, keyToAssetSpace(entityKeyLen))) +
+  newTreeFeeLamports;
+
+/** Rent for the hotspot info account onboard_data_only_{iot,mobile}_hotspot_v0 creates. */
+export const getDataOnlyOnboardRentLamports = (
+  connection: Connection,
+  network: "iot" | "mobile",
+) =>
+  getRentLamports(
+    connection,
+    network === "iot" ? IOT_HOTSPOT_INFO_SPACE : MOBILE_HOTSPOT_INFO_SPACE,
+  );
+
+/**
  * Lamports the payer spends on the pack account itself. The escrow (gift +
  * fanout cost) is transferred into the pack account on top of whatever its
  * init rent already left there, so the pack costs the larger of the two
@@ -248,6 +282,38 @@ export async function calculateRequiredBalance(
     (await getMinWalletRentLamports(connection))
   );
 }
+
+/**
+ * Funding for issue_data_only_entity_v0: the estimate a client tops up to
+ * (tx fee + issue cost) and the gate's threshold, which adds the wallet-rent
+ * floor. Deriving both here keeps the estimate from drifting below the gate.
+ */
+export const getDataOnlyIssueFunding = async (
+  connection: Connection,
+  {
+    txFeeLamports,
+    entityKeyLen,
+    newTreeFeeLamports,
+  }: {
+    txFeeLamports: number;
+    entityKeyLen: number;
+    newTreeFeeLamports: number;
+  },
+) => {
+  const estimatedLamports =
+    txFeeLamports +
+    (await getDataOnlyIssueCostLamports(connection, {
+      entityKeyLen,
+      newTreeFeeLamports,
+    }));
+  return {
+    estimatedLamports,
+    requiredLamports: await calculateRequiredBalance(
+      connection,
+      estimatedLamports,
+    ),
+  };
+};
 
 /**
  * Fee the cluster would charge for this transaction, via getFeeForMessage —

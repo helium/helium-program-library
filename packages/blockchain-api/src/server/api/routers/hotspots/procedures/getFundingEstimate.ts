@@ -1,11 +1,11 @@
 import { publicProcedure } from "../../../procedures";
 import { createSolanaConnection } from "@/lib/solana";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import * as anchor from "@anchor-lang/core";
 import {
   getBaseAutomationRentLamports,
-  TASK_RETURN_ACCOUNT_SIZE,
-  calculateFundingForAdditionalDuration,
+  estimateAutomationFunding,
+  maxScheduleCronLength,
+  resolveScheduleToCron,
 } from "@/lib/utils/automation-helpers";
 import { fetchAutomationData } from "./automation-data-helpers";
 
@@ -16,7 +16,7 @@ import { fetchAutomationData } from "./automation-data-helpers";
 export const getFundingEstimate =
   publicProcedure.hotspots.getFundingEstimate.handler(
     async ({ input, errors }) => {
-      const { walletAddress, duration } = input;
+      const { walletAddress, duration, schedule } = input;
 
       const { provider } = createSolanaConnection(walletAddress);
       anchor.setProvider(provider);
@@ -33,22 +33,29 @@ export const getFundingEstimate =
         recipientRentLamports,
         pdaWalletRentLamports,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
+        minCrankReward,
       } = automationData;
 
-      // Calculate initial setup rent if automation doesn't exist
-      // This matches the logic in getAutomationStatus
-      const rentFee = cronJobAccount
-        ? 0
-        : (await getBaseAutomationRentLamports(provider.connection)) /
-            LAMPORTS_PER_SOL +
-          TASK_RETURN_ACCOUNT_SIZE;
+      // createAutomation re-creates a cron job on another schedule, so with a
+      // schedule given, price that as a new cron job too.
+      const recreatesCronJob =
+        !cronJobAccount ||
+        (schedule !== undefined &&
+          !!cronJobAccount.schedule &&
+          cronJobAccount.schedule !== resolveScheduleToCron(schedule));
 
-      const {
-        cronJobFundingLamports,
-        pdaWalletFundingLamports,
-        recipientFeeLamports,
-      } = calculateFundingForAdditionalDuration({
+      const funding = estimateAutomationFunding({
+        cronJobExists: !recreatesCronJob,
+        baseAutomationRentLamports: recreatesCronJob
+          ? await getBaseAutomationRentLamports(
+              provider.connection,
+              schedule === undefined
+                ? undefined
+                : maxScheduleCronLength(schedule),
+            )
+          : 0,
+        minCrankRewardLamports: minCrankReward,
         cronJobBalanceLamports,
         cronJobCostPerClaimLamports,
         pdaWalletBalanceLamports,
@@ -58,24 +65,11 @@ export const getFundingEstimate =
         pdaWalletRentLamports,
         additionalDuration: duration,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
       });
 
-      const cronJobFunding = cronJobFundingLamports / LAMPORTS_PER_SOL;
-      const pdaWalletFunding = pdaWalletFundingLamports / LAMPORTS_PER_SOL;
-      const recipientFee = recipientFeeLamports / LAMPORTS_PER_SOL;
-      const operationalSol = cronJobFunding + pdaWalletFunding;
-      // recipientFeeLamports already represents only the ADDITIONAL recipient rent needed
-      // (0 if already included in shortfall, full amount if not)
-      const totalSolNeeded = rentFee + operationalSol + recipientFee;
-
       return {
-        rentFee,
-        cronJobFunding,
-        pdaWalletFunding,
-        recipientFee,
-        operationalSol,
-        totalSolNeeded,
+        ...funding,
         currentCronJobBalance: cronJobBalanceLamports.toString(),
         currentPdaWalletBalance: pdaWalletBalanceLamports.toString(),
       };

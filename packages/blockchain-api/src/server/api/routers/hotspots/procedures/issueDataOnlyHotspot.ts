@@ -7,13 +7,13 @@ import {
 } from "@solana/web3.js";
 import { env } from "@/lib/env";
 import { createSolanaConnection } from "@/lib/solana";
-import { init } from "@helium/helium-entity-manager-sdk";
+import { dataOnlyConfigKey, init } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
 import { helium } from "@helium/proto";
 import Address from "@helium/address";
 import {
-  calculateRequiredBalance,
+  getDataOnlyIssueFunding,
   getTransactionFee,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
@@ -76,9 +76,11 @@ export const issueDataOnlyHotspot =
       const program = await init(provider);
       const dao = daoKey(HNT_MINT)[0];
 
+      const entityKeyBytes = Buffer.from(bs58.decode(entityKey));
+
       const issueIx = await program.methods
         .issueDataOnlyEntityV0({
-          entityKey: Buffer.from(bs58.decode(entityKey)),
+          entityKey: entityKeyBytes,
         })
         .accountsPartial({
           payer: owner,
@@ -160,14 +162,21 @@ export const issueDataOnlyHotspot =
         });
       }
 
-      const [totalFee, walletBalance] = await Promise.all([
+      const [totalFee, walletBalance, dataOnlyConfig] = await Promise.all([
         getTransactionFee(connection, eccSignedTx),
         connection.getBalance(owner),
+        program.account.dataOnlyConfigV0.fetch(dataOnlyConfigKey(dao)[0]),
       ]);
-      const required = await calculateRequiredBalance(connection, totalFee, 0);
+      const { estimatedLamports, requiredLamports: required } =
+        await getDataOnlyIssueFunding(connection, {
+          txFeeLamports: totalFee,
+          entityKeyLen: entityKeyBytes.length,
+          newTreeFeeLamports: dataOnlyConfig.newTreeFeeLamports.toNumber(),
+        });
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
-          message: "Insufficient SOL balance for transaction fees",
+          message:
+            "Insufficient SOL balance for transaction fees and account rent",
           data: { required, available: walletBalance },
         });
       }
@@ -188,7 +197,7 @@ export const issueDataOnlyHotspot =
           actionMetadata: { type: "issue_data_only_hotspot" },
         },
         estimatedSolFee: await toTokenAmountOutput(
-          new BN(totalFee),
+          new BN(estimatedLamports),
           NATIVE_MINT.toBase58()
         ),
       };

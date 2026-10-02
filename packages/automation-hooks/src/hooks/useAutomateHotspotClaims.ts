@@ -133,7 +133,7 @@ export const interpretCronString = (
   };
 };
 
-const TASK_RETURN_ACCOUNT_SIZE = 0.01;
+const TASK_RETURN_ACCOUNT_FUNDING_SOL = 0.01;
 const EST_TX_FEE = 0.000001;
 
 // Byte sizes of the accounts automation setup pays rent for, priced at
@@ -349,7 +349,7 @@ export const useAutomateHotspotClaims = ({
               crankSolFee +
               (cronJobAccount
                 ? 0
-                : TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL),
+                : TASK_RETURN_ACCOUNT_FUNDING_SOL * LAMPORTS_PER_SOL),
           })
         );
       }
@@ -442,7 +442,7 @@ export const useAutomateHotspotClaims = ({
 
   const rentFee = cronJobAccount
     ? 0
-    : (rent?.baseAutomation ?? 0) / LAMPORTS_PER_SOL + TASK_RETURN_ACCOUNT_SIZE;
+    : (rent?.baseAutomation ?? 0) / LAMPORTS_PER_SOL + TASK_RETURN_ACCOUNT_FUNDING_SOL;
 
   const recipientFee =
     (hotspotsNeedingRecipient * (rent?.recipient ?? 0)) / LAMPORTS_PER_SOL;

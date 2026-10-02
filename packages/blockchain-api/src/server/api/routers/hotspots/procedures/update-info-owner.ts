@@ -14,8 +14,17 @@ import {
   MOBILE_MINT,
 } from "@helium/spl-utils";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import type { AccountMeta, TransactionInstruction } from "@solana/web3.js";
+import {
+  getAccount,
+  getAssociatedTokenAddressSync,
+  TokenAccountNotFoundError,
+  TokenInvalidAccountOwnerError,
+} from "@solana/spl-token";
+import type {
+  AccountMeta,
+  Connection,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import { PublicKey } from "@solana/web3.js";
 
 /** The helium-entity-manager Anchor program, as the SDK builds it. */
@@ -60,6 +69,24 @@ export function hotspotInfoKey(
 /** The DC associated token account an owner-paid update burns from. */
 export function dcBurnerFor(owner: PublicKey): PublicKey {
   return getAssociatedTokenAddressSync(DC_MINT, owner, true);
+}
+
+/** DC the owner holds, treating a missing token account as a zero balance. */
+export async function dcBalance(
+  connection: Connection,
+  owner: PublicKey
+): Promise<bigint> {
+  try {
+    return (await getAccount(connection, dcBurnerFor(owner))).amount;
+  } catch (e) {
+    if (
+      e instanceof TokenAccountNotFoundError ||
+      e instanceof TokenInvalidAccountOwnerError
+    ) {
+      return BigInt(0);
+    }
+    throw e;
+  }
 }
 
 /**
@@ -120,8 +147,8 @@ export function assertNotDelegated({
 }
 
 /**
- * Refuses an update the owner cannot fund in DC. Only a location assert costs
- * DC, so this runs only when `locationAssertDcFee` priced one.
+ * Refuses a transaction whose DC fee the owner cannot fund, such as a location
+ * assert or a data-only onboard.
  */
 export function assertDcCovered({
   required,
@@ -141,7 +168,7 @@ export function assertDcCovered({
   if (available >= needed) return;
 
   throw errors.INSUFFICIENT_FUNDS({
-    message: "Insufficient DC balance to assert this hotspot's location",
+    message: "Insufficient DC balance to cover this hotspot's DC fee",
     data: { required: Number(needed), available: Number(available) },
   });
 }
@@ -299,6 +326,26 @@ export function locationStakingFee(
     (entry) => variantName(entry.deviceType) === wanted
   );
   return fees ? fees.locationStakingFee : null;
+}
+
+/**
+ * DC `onboard_data_only_iot_hotspot_v0` burns: the sub-DAO's data-only
+ * onboarding fee, plus the data-only location staking fee when a location is
+ * asserted.
+ */
+export function dataOnlyIotOnboardDcFee({
+  onboardingFee,
+  settings,
+  assertsLocation,
+}: {
+  onboardingFee: BN;
+  settings: RewardableEntityConfigSettings;
+  assertsLocation: boolean;
+}): BN {
+  const locationFee = assertsLocation
+    ? locationStakingFee(settings, { network: "iot", isFullHotspot: false })
+    : null;
+  return locationFee ? onboardingFee.add(locationFee) : onboardingFee;
 }
 
 /** The single key of an Anchor-decoded unit enum, e.g. `wifiIndoor`. */

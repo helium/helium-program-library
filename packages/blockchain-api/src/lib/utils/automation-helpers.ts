@@ -3,7 +3,7 @@ import {
   ENTITY_CLAIM_CRON_NAME,
   MAX_PRESET_SCHEDULE_LEN,
 } from "@helium/hpl-crons-sdk";
-import { Connection } from "@solana/web3.js";
+import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { getRentLamports } from "./balance-validation";
 
 export type Schedule = "daily" | "weekly" | "monthly";
@@ -13,7 +13,7 @@ export type Schedule = "daily" | "weekly" | "monthly";
 export { ENTITY_CLAIM_CRON_NAME };
 
 // Constants from useAutomateHotspotClaims hook
-export const TASK_RETURN_ACCOUNT_SIZE = 0.01;
+export const TASK_RETURN_ACCOUNT_FUNDING_SOL = 0.01;
 export const EST_TX_FEE = 0.000001;
 
 /**
@@ -77,6 +77,24 @@ export function resolveScheduleToCron(scheduleOrCron: string): string {
     ? getScheduleCronString(scheduleOrCron as Schedule)
     : scheduleOrCron;
 }
+
+/**
+ * Longest crontab a setup input can resolve to. Presets resolve from the clock
+ * without padding, so createAutomation can resolve a longer one than an
+ * earlier estimate did; pricing at the bound keeps the estimate from falling
+ * short.
+ */
+export const maxScheduleCronLength = (schedule: string): number => {
+  switch (schedule) {
+    case "daily":
+    case "weekly":
+      return 14;
+    case "monthly":
+      return 15;
+    default:
+      return schedule.length;
+  }
+};
 
 export interface CronScheduleInfo {
   schedule: Schedule;
@@ -191,7 +209,7 @@ export interface CalculatePeriodsRemainingParams {
   cronJobRentLamports: number; // Minimum rent for cron job account (calculated from account data length)
   pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet, priced from the cluster
   ataRentLamports?: number; // ATA rent if ATA doesn't exist (will be locked up)
-  taskReturnAccountRentLamports?: number; // Task return account rent if it doesn't exist (will be locked up)
+  taskReturnAccountFundingLamports?: number; // Fixed 0.01 SOL the cron job is topped up with for its task return accounts on first funding; not rent
 }
 
 /**
@@ -221,16 +239,16 @@ export function calculatePeriodsRemaining(
     cronJobRentLamports,
     pdaWalletRentLamports,
     ataRentLamports = 0,
-    taskReturnAccountRentLamports = 0,
+    taskReturnAccountFundingLamports = 0,
   } = params;
 
-  // Subtract minimum rent, task return account rent, and recipient rent from balances since they're already committed
+  // Subtract minimum rent, task return account funding, and recipient rent from balances since they're already committed
   // Cron job must maintain rent for the account and task return account
   const availableCronJobBalance = Math.max(
     0,
     cronJobBalanceLamports -
       cronJobRentLamports -
-      taskReturnAccountRentLamports,
+      taskReturnAccountFundingLamports,
   );
 
   // PDA wallet must maintain minimum rent, plus any recipient rent and ATA rent
@@ -328,7 +346,7 @@ export interface CalculateFundingForAdditionalDurationParams {
   pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet, priced from the cluster
   additionalDuration: number;
   ataRentLamports?: number; // ATA rent if ATA doesn't exist (will be locked up)
-  taskReturnAccountRentLamports?: number; // Task return account rent if it doesn't exist (will be locked up)
+  taskReturnAccountFundingLamports?: number; // Fixed 0.01 SOL the cron job is topped up with for its task return accounts on first funding; not rent
 }
 
 /**
@@ -340,7 +358,7 @@ export function calculateFundingForAdditionalDuration(
 ): {
   cronJobFundingLamports: number;
   pdaWalletFundingLamports: number;
-  recipientFeeLamports: number; // Recipient fee to show separately (0 if already included in shortfall)
+  recipientFeeLamports: number; // Always 0; kept for the client schema's recipientFee
   currentMinPeriods: number;
   targetPeriods: number;
 } {
@@ -354,16 +372,16 @@ export function calculateFundingForAdditionalDuration(
     pdaWalletRentLamports,
     additionalDuration,
     ataRentLamports = 0,
-    taskReturnAccountRentLamports = 0,
+    taskReturnAccountFundingLamports = 0,
   } = params;
 
   // Calculate available balances (subtract rent that's already committed)
-  // Task return account rent is part of cron job funding, so subtract it from cron job balance
+  // Task return account funding is part of cron job funding, so subtract it from cron job balance
   // If balance goes negative, that's a shortfall that needs to be funded
   const cronJobBalanceAfterRent =
     cronJobBalanceLamports -
     cronJobRentLamports -
-    taskReturnAccountRentLamports;
+    taskReturnAccountFundingLamports;
   const cronJobRentShortfall = Math.max(0, -cronJobBalanceAfterRent);
   const availableCronJobBalanceLamports = Math.max(0, cronJobBalanceAfterRent);
 
@@ -377,30 +395,6 @@ export function calculateFundingForAdditionalDuration(
     0,
     pdaWalletBalanceAfterRent,
   );
-
-  // Calculate how much of the shortfall covers recipient rent
-  // The shortfall covers rent in order: PDA wallet rent, then recipient rent, then ATA rent
-  // Calculate PDA wallet rent shortfall (how much shortfall is just for PDA wallet rent)
-  const pdaWalletBalanceAfterPdaRentOnly =
-    pdaWalletBalanceLamports - pdaWalletRentLamports;
-  const pdaWalletRentShortfallOnly = Math.max(
-    0,
-    -pdaWalletBalanceAfterPdaRentOnly,
-  );
-  // The remaining shortfall (after covering PDA wallet rent) goes to recipient rent and ATA rent
-  // Recipient rent covered = min(remaining shortfall, recipientRentLamports)
-  const shortfallAfterPdaRent = Math.max(
-    0,
-    pdaWalletRentShortfall - pdaWalletRentShortfallOnly,
-  );
-  const recipientRentCoveredByShortfall = Math.min(
-    shortfallAfterPdaRent,
-    recipientRentLamports,
-  );
-
-  // If there's no shortfall, the balance covers all rent including recipient rent,
-  // which means recipients are already funded, so no additional recipient rent needed
-  const recipientRentAlreadyFunded = pdaWalletRentShortfall === 0;
 
   // Calculate current periods for each pool
   const cronJobPeriods = calculatePoolPeriods(
@@ -427,7 +421,7 @@ export function calculateFundingForAdditionalDuration(
 
   // Add rent shortfalls (when balance doesn't cover required rent)
   // The shortfall already includes all rent (PDA wallet rent, recipient rent, ATA rent for PDA wallet;
-  // cron job rent, task return account rent for cron job)
+  // cron job rent, task return account funding for cron job)
   // So we just add the shortfall - no need to add rent separately
   const cronJobFundingWithShortfall =
     fundingNeeded.cronJobFundingLamports + cronJobRentShortfall;
@@ -435,30 +429,90 @@ export function calculateFundingForAdditionalDuration(
     fundingNeeded.pdaWalletFundingLamports + pdaWalletRentShortfall;
 
   // However, if there's no shortfall (balance already covers rent), we still need to add
-  // ATA rent and task return account rent if they don't exist yet (one-time creation costs)
-  const pdaWalletFundingWithAta =
-    pdaWalletFundingWithShortfall +
-    (pdaWalletRentShortfall === 0 && ataRentLamports > 0 ? ataRentLamports : 0);
-
+  // task return account funding if it doesn't exist yet (one-time creation cost)
   const cronJobFundingWithTaskReturn =
     cronJobFundingWithShortfall +
-    (cronJobRentShortfall === 0 && taskReturnAccountRentLamports > 0
-      ? taskReturnAccountRentLamports
+    (cronJobRentShortfall === 0 && taskReturnAccountFundingLamports > 0
+      ? taskReturnAccountFundingLamports
       : 0);
-
-  // Recipient fee: return only the ADDITIONAL recipient rent that still needs to be paid.
-  // - If there's no shortfall: balance covers all rent, so recipients are already funded (fee = 0)
-  // - If there's a shortfall: calculate how much recipient rent is covered by shortfall,
-  //   and return the remaining amount that still needs to be paid
-  const recipientFeeLamports = recipientRentAlreadyFunded
-    ? 0
-    : Math.max(0, recipientRentLamports - recipientRentCoveredByShortfall);
 
   return {
     cronJobFundingLamports: cronJobFundingWithTaskReturn,
-    pdaWalletFundingLamports: pdaWalletFundingWithAta,
-    recipientFeeLamports,
+    pdaWalletFundingLamports: pdaWalletFundingWithShortfall,
+    // The PDA wallet shortfall above already holds all of the recipient rent
+    // whenever the balance does not cover it, so none is charged on top.
+    recipientFeeLamports: 0,
     currentMinPeriods,
     targetPeriods,
   };
 }
+
+export interface EstimateAutomationFundingParams extends CalculateFundingForAdditionalDurationParams {
+  cronJobExists: boolean; // False when init_entity_claim_cron_v0 creates the cron job the funding lands in, including the re-init after a schedule change tears the old one down
+  baseAutomationRentLamports: number; // Rent init_entity_claim_cron_v0 locks up; only charged when the cron job does not exist yet
+  minCrankRewardLamports: number; // Task queue min_crank_reward init's queue_task_v0 moves from the wallet to the schedule task; only charged when the cron job does not exist yet
+}
+
+/**
+ * Price the SOL a wallet needs to add `additionalDuration` to its automation,
+ * including the initial setup rent when the cron job does not exist yet.
+ */
+export const estimateAutomationFunding = (
+  params: EstimateAutomationFundingParams,
+): {
+  rentFee: number;
+  cronJobFunding: number;
+  pdaWalletFunding: number;
+  recipientFee: number;
+  operationalSol: number;
+  totalSolNeeded: number;
+} => {
+  const { cronJobExists, baseAutomationRentLamports, minCrankRewardLamports } =
+    params;
+
+  // The task-return funding is left out: the cron job transfer below already
+  // carries it.
+  const rentFee = cronJobExists
+    ? 0
+    : (baseAutomationRentLamports + minCrankRewardLamports) / LAMPORTS_PER_SOL;
+
+  const {
+    cronJobFundingLamports,
+    pdaWalletFundingLamports,
+    recipientFeeLamports,
+  } = calculateFundingForAdditionalDuration(
+    cronJobExists
+      ? params
+      : {
+          // A cron job init is about to create starts with only its rent, no
+          // claims and no task-return accounts, whatever an old cron job a
+          // teardown refunds held.
+          ...params,
+          cronJobBalanceLamports: 0,
+          cronJobRentLamports: 0,
+          cronJobCostPerClaimLamports: calculateCronJobCostPerClaim(
+            minCrankRewardLamports,
+            0,
+          ),
+          taskReturnAccountFundingLamports: Math.ceil(
+            TASK_RETURN_ACCOUNT_FUNDING_SOL * LAMPORTS_PER_SOL,
+          ),
+        },
+  );
+
+  const cronJobFunding = cronJobFundingLamports / LAMPORTS_PER_SOL;
+  const pdaWalletFunding = pdaWalletFundingLamports / LAMPORTS_PER_SOL;
+  const recipientFee = recipientFeeLamports / LAMPORTS_PER_SOL;
+  const operationalSol = cronJobFunding + pdaWalletFunding;
+  // recipientFee is 0: pdaWalletFunding already carries the recipient rent.
+  const totalSolNeeded = rentFee + operationalSol + recipientFee;
+
+  return {
+    rentFee,
+    cronJobFunding,
+    pdaWalletFunding,
+    recipientFee,
+    operationalSol,
+    totalSolNeeded,
+  };
+};

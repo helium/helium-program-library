@@ -55,7 +55,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
       recipientRentLamports,
       pdaWalletRentLamports,
       ataRentLamports,
-      taskReturnAccountRentLamports,
+      taskReturnAccountFundingLamports,
       minCrankReward,
       cronJob,
       pdaWallet,
@@ -74,7 +74,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
         pdaWalletRentLamports,
         additionalDuration,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
       });
 
     // Note: recipient rent is already included in pdaWalletFundingLamports via the shortfall calculation

@@ -179,6 +179,8 @@ pub struct DataOnlyConfigV0 {
   pub new_tree_depth: u32, // parameters for new merkle trees when old is full
   pub new_tree_buffer_size: u32,
   pub new_tree_space: u64,
+  /// Dead: `issue_data_only_entity_v0` derives the fee from rent and never reads this.
+  /// Kept so the account layout does not change.
   pub new_tree_fee_lamports: u64,
 }
 
