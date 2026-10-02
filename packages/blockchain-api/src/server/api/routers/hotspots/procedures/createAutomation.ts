@@ -80,10 +80,10 @@ export const createAutomation =
       const instructions: TransactionInstruction[] = [];
 
       // If cronJob doesn't exist or schedule changed, create/recreate it
-      if (
+      const recreatesCronJob =
         !cronJobAccount ||
-        (cronJobAccount.schedule && cronJobAccount.schedule !== cronSchedule)
-      ) {
+        (!!cronJobAccount.schedule && cronJobAccount.schedule !== cronSchedule);
+      if (recreatesCronJob) {
         // If it exists but schedule changed, remove it first. Skip holes left
         // by individually-removed claims (nextTransactionId is monotonic).
         if (cronJobAccount) {
@@ -141,7 +141,6 @@ export const createAutomation =
 
       // fetchAutomationData always returns a valid object, even if cron job doesn't exist
       const {
-        cronJobAccount: existingCronJobAccount,
         cronJobBalanceLamports,
         cronJobRentLamports,
         pdaWalletBalanceLamports,
@@ -155,19 +154,20 @@ export const createAutomation =
         pdaWallet,
       } = await fetchAutomationData(walletAddress, provider);
 
-      // Price with the same helper as getFundingEstimate. On a first-time setup
-      // init_entity_claim_cron_v0 pays the base rent and the schedule task's
-      // crank reward from the wallet, so the cron job transfer below carries
-      // neither and the total counts them once.
+      // Price with the same helper as getFundingEstimate. When init runs (first
+      // setup or a schedule change) init_entity_claim_cron_v0 pays the base
+      // rent and the schedule task's crank reward from the wallet, so the cron
+      // job transfer below carries neither and the total counts them once. The
+      // new cron job starts empty, so it is funded for the whole duration.
       const { cronJobFunding, pdaWalletFunding, totalSolNeeded } =
         estimateAutomationFunding({
-          cronJobExists: !!existingCronJobAccount,
-          baseAutomationRentLamports: existingCronJobAccount
-            ? 0
-            : await getBaseAutomationRentLamports(
+          cronJobExists: !recreatesCronJob,
+          baseAutomationRentLamports: recreatesCronJob
+            ? await getBaseAutomationRentLamports(
                 provider.connection,
                 cronSchedule.length,
-              ),
+              )
+            : 0,
           minCrankRewardLamports: minCrankReward,
           cronJobBalanceLamports,
           cronJobCostPerClaimLamports,
@@ -198,7 +198,13 @@ export const createAutomation =
       const totalNeededWithFees =
         totalFundingNeeded + estimatedTxFees + estimatedJitoTipCost;
 
-      if (walletBalance < totalNeededWithFees) {
+      // The teardown runs before init and the transfers, so the old cron job's
+      // lamports are back in the wallet by the time they spend.
+      const teardownRefundLamports = recreatesCronJob
+        ? cronJobBalanceLamports
+        : 0;
+
+      if (walletBalance + teardownRefundLamports < totalNeededWithFees) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance to set up automation",
           data: {

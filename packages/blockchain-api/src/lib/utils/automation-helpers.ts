@@ -448,7 +448,7 @@ export function calculateFundingForAdditionalDuration(
 }
 
 export interface EstimateAutomationFundingParams extends CalculateFundingForAdditionalDurationParams {
-  cronJobExists: boolean;
+  cronJobExists: boolean; // False when init_entity_claim_cron_v0 creates the cron job the funding lands in, including the re-init after a schedule change tears the old one down
   baseAutomationRentLamports: number; // Rent init_entity_claim_cron_v0 locks up; only charged when the cron job does not exist yet
   minCrankRewardLamports: number; // Task queue min_crank_reward init's queue_task_v0 moves from the wallet to the schedule task; only charged when the cron job does not exist yet
 }
@@ -480,7 +480,25 @@ export const estimateAutomationFunding = (
     cronJobFundingLamports,
     pdaWalletFundingLamports,
     recipientFeeLamports,
-  } = calculateFundingForAdditionalDuration(params);
+  } = calculateFundingForAdditionalDuration(
+    cronJobExists
+      ? params
+      : {
+          // A cron job init is about to create starts with only its rent, no
+          // claims and no task-return accounts, whatever an old cron job a
+          // teardown refunds held.
+          ...params,
+          cronJobBalanceLamports: 0,
+          cronJobRentLamports: 0,
+          cronJobCostPerClaimLamports: calculateCronJobCostPerClaim(
+            minCrankRewardLamports,
+            0,
+          ),
+          taskReturnAccountFundingLamports: Math.ceil(
+            TASK_RETURN_ACCOUNT_FUNDING_SOL * LAMPORTS_PER_SOL,
+          ),
+        },
+  );
 
   const cronJobFunding = cronJobFundingLamports / LAMPORTS_PER_SOL;
   const pdaWalletFunding = pdaWalletFundingLamports / LAMPORTS_PER_SOL;

@@ -494,6 +494,45 @@ describe("automation endpoints", () => {
       }
     });
 
+    it("funds the cron a schedule change re-creates for the whole duration", async () => {
+      // A raw crontab, not a preset, so the estimate and the call below
+      // resolve to the same schedule whatever the clock reads between them.
+      const schedule = "0 0 1 * * *";
+      const estimate = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration,
+        schedule,
+      });
+      const result = await client.hotspots.createAutomation({
+        walletAddress,
+        schedule,
+        duration,
+      });
+      await submit(result.transactionData);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // The teardown closes the old cron job and init reuses its address.
+      const cronJob = cronJobKey(
+        entityCronAuthorityKey(payer.publicKey)[0],
+        0
+      )[0];
+      const cronJobInfo = await connection.getAccountInfo(cronJob);
+      expect(cronJobInfo?.data.length).to.equal(cronJobSpace(schedule.length));
+      expect(cronJobInfo?.lamports).to.equal(
+        (await connection.getMinimumBalanceForRentExemption(
+          cronJobSpace(schedule.length)
+        )) + Math.round(estimate.cronJobFunding * LAMPORTS_PER_SOL)
+      );
+
+      const status = await client.hotspots.getAutomationStatus({
+        walletAddress,
+      });
+      expect(status.currentSchedule?.cron).to.equal(schedule);
+      expect(status.fundingPeriodInfo?.cronJobPeriodsRemaining).to.be.at.least(
+        duration
+      );
+    });
+
     it("closes automation and verifies removal", async () => {
       const result = await client.hotspots.closeAutomation({ walletAddress });
       expect(result.transactionData.tag).to.equal(

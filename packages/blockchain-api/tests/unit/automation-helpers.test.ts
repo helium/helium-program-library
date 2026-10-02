@@ -52,7 +52,8 @@ describe("estimateAutomationFunding", () => {
     const recipientRentLamports = 2_000_000;
     const ataRentLamports = 2_039_280;
     const duration = 30;
-    const cronJobCostPerClaimLamports = 10_000;
+    // A new cron job has no claims, so each run costs one crank reward.
+    const cronJobCostPerClaimLamports = minCrankRewardLamports;
     const pdaWalletCostPerClaimLamports = 40_000;
 
     const estimate = estimateAutomationFunding({
@@ -94,6 +95,42 @@ describe("estimateAutomationFunding", () => {
         minCrankRewardLamports +
         cronJobTransfer +
         pdaWalletTransfer,
+    );
+  });
+
+  it("funds a re-created cron job from empty, not from the balance its teardown refunds", () => {
+    const baseAutomationRentLamports = 20_000_000;
+    const minCrankRewardLamports = 15_000;
+    const duration = 30;
+
+    // A schedule change tears down this cron job and inits a new one. The old
+    // one holds its rent, two claims and far more runs than the PDA wallet,
+    // and its task-return account exists, so the fetch reports no funding owed.
+    const estimate = estimateAutomationFunding({
+      cronJobExists: false,
+      baseAutomationRentLamports,
+      minCrankRewardLamports,
+      cronJobBalanceLamports: 50_000_000,
+      cronJobRentLamports: 3_000_000,
+      cronJobCostPerClaimLamports: 3 * minCrankRewardLamports,
+      pdaWalletBalanceLamports: 890_880,
+      pdaWalletCostPerClaimLamports: 40_000,
+      recipientRentLamports: 0,
+      pdaWalletRentLamports: 890_880,
+      additionalDuration: duration,
+      ataRentLamports: 0,
+      taskReturnAccountFundingLamports: 0,
+    });
+
+    // The new cron job holds only the rent init gives it, has no claims, and
+    // pays for its task-return accounts on its first run, so the transfer
+    // carries that funding plus one crank reward per run.
+    const taskReturnAccountFundingLamports = 10_000_000;
+    expect(toLamports(estimate.cronJobFunding)).to.equal(
+      taskReturnAccountFundingLamports + duration * minCrankRewardLamports,
+    );
+    expect(toLamports(estimate.rentFee)).to.equal(
+      baseAutomationRentLamports + minCrankRewardLamports,
     );
   });
 

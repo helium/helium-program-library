@@ -5,6 +5,7 @@ import {
   getBaseAutomationRentLamports,
   estimateAutomationFunding,
   maxScheduleCronLength,
+  resolveScheduleToCron,
 } from "@/lib/utils/automation-helpers";
 import { fetchAutomationData } from "./automation-data-helpers";
 
@@ -36,16 +37,24 @@ export const getFundingEstimate =
         minCrankReward,
       } = automationData;
 
+      // createAutomation re-creates a cron job on another schedule, so with a
+      // schedule given, price that as a new cron job too.
+      const recreatesCronJob =
+        !cronJobAccount ||
+        (schedule !== undefined &&
+          !!cronJobAccount.schedule &&
+          cronJobAccount.schedule !== resolveScheduleToCron(schedule));
+
       const funding = estimateAutomationFunding({
-        cronJobExists: !!cronJobAccount,
-        baseAutomationRentLamports: cronJobAccount
-          ? 0
-          : await getBaseAutomationRentLamports(
+        cronJobExists: !recreatesCronJob,
+        baseAutomationRentLamports: recreatesCronJob
+          ? await getBaseAutomationRentLamports(
               provider.connection,
               schedule === undefined
                 ? undefined
                 : maxScheduleCronLength(schedule),
-            ),
+            )
+          : 0,
         minCrankRewardLamports: minCrankReward,
         cronJobBalanceLamports,
         cronJobCostPerClaimLamports,
