@@ -199,10 +199,10 @@ export const createAutomation =
         totalFundingNeeded + estimatedTxFees + estimatedJitoTipCost;
 
       // The teardown runs before init and the transfers, so the old cron job's
-      // lamports are back in the wallet by the time they spend.
-      const teardownRefundLamports = recreatesCronJob
-        ? cronJobBalanceLamports
-        : 0;
+      // lamports are back in the wallet by the time they spend. Lamports donated
+      // to a cron job PDA with no data get no teardown, so they never come back.
+      const teardownRefundLamports =
+        cronJobAccount && recreatesCronJob ? cronJobBalanceLamports : 0;
 
       if (walletBalance + teardownRefundLamports < totalNeededWithFees) {
         throw errors.INSUFFICIENT_FUNDS({
