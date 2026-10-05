@@ -1,5 +1,7 @@
 # Helium Program Library - Cursor Rules
 
+See CODING_STANDARDS.md for the full standards.
+
 ## Anchor Account Initialization
 
 When initializing new Anchor accounts in instruction handlers, always use the `set_inner()` syntax instead of setting fields individually.
@@ -32,7 +34,7 @@ This pattern is cleaner, ensures all fields are explicitly initialized, and make
 
 ## Anchor Method Account Resolution
 
-When calling Anchor program methods in TypeScript/JavaScript, always use `.accounts()` instead of `.accountsPartial()` or `.accountsStrict()`. Anchor's account resolvers will automatically derive the remaining accounts.
+When calling Anchor program methods in TypeScript/JavaScript, use `.accounts()` and pass only the accounts Anchor cannot resolve. Its type rejects a resolvable account. Use `.accountsPartial()` only when you must pass an account Anchor would resolve. Do not use `.accountsStrict()`.
 
 **Preferred:**
 ```typescript
@@ -47,12 +49,13 @@ await program.methods.someInstruction(args)
 
 **Not preferred:**
 ```typescript
-// Don't use accountsPartial
+// Don't use accountsPartial to pass accounts Anchor resolves
 await program.methods.someInstruction(args)
   .accountsPartial({
     payer: authority,
     authority,
     someAccount: myAccount,
+    somePda: somePdaKey(myAccount)[0], // Anchor derives this PDA itself
   })
   .instruction()
 

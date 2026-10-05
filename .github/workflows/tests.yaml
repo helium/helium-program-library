@@ -42,6 +42,19 @@ jobs:
       # never frees, so errors that are never returned still consume it.
       - run: cargo clippy --all-targets -- -D warnings -D clippy::or_fun_call -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs
 
+  check-release-bumps:
+    name: Check Version Bumps and Changesets
+    # A develop-to-master release PR carries every change since the last release, after
+    # `changeset version` has consumed the changesets, so the check runs on feature PRs only.
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: scripts/check-release-bumps.sh ${{ github.event.pull_request.base.sha }}
+
   check-idls-changeset:
     name: Check @helium/idls Changeset
     if: github.event_name == 'pull_request'
