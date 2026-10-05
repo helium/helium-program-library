@@ -1051,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "ecc-sig-verifier"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "anchor-lang",
  "bincode",

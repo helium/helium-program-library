@@ -13,6 +13,7 @@ use rocket::{
 };
 use solana_sdk::{
   bs58,
+  message::VersionedMessage,
   signature::{read_keypair_file, Signature},
   signer::{Signer, SignerError},
   transaction::VersionedTransaction,
@@ -116,6 +117,11 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
       Status::InternalServerError
     })?;
 
+  if !is_read_only_signer(&solana_txn.message, &keypair.pubkey()) {
+    error!("Verifier is not a read-only signer");
+    return Err(Status::BadRequest);
+  }
+
   let start_index = compute_end_ix + 1;
   // Second real ix (may) be a transfer
   if instructions.len() - (compute_end_ix + 1) > 1 {
@@ -206,6 +212,20 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   }))
 }
 
+/// Read-only signers follow the writable signers in the account keys, and the runtime requires
+/// the fee payer to be writable, so a read-only signer is never the fee payer and no instruction
+/// can debit it.
+fn is_read_only_signer(message: &VersionedMessage, key: &Pubkey) -> bool {
+  let header = message.header();
+  let num_signers = usize::from(header.num_required_signatures);
+  let read_only_signers =
+    num_signers.saturating_sub(usize::from(header.num_readonly_signed_accounts))..num_signers;
+  matches!(
+    message.static_account_keys().iter().position(|k| k == key),
+    Some(index) if read_only_signers.contains(&index)
+  )
+}
+
 #[launch]
 fn rocket() -> _ {
   rocket::build().mount("/", routes![health, verify])
@@ -218,4 +238,136 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
   sighash
     .copy_from_slice(&anchor_lang::solana_program::hash::hash(preimage.as_bytes()).to_bytes()[..8]);
   sighash
+}
+
+#[cfg(test)]
+mod tests {
+  use std::sync::Once;
+
+  use helium_crypto::{KeyTag, Keypair as EccKeypair, Sign};
+  use rocket::{http::ContentType, local::blocking::Client};
+  use solana_sdk::{
+    compute_budget::ComputeBudgetInstruction,
+    instruction::{AccountMeta, Instruction},
+    message::Message,
+    signature::{keypair_from_seed, write_keypair_file, Keypair},
+  };
+
+  use super::*;
+
+  static WRITE_VERIFIER_KEYPAIR: Once = Once::new();
+
+  // The handler reads its keypair from ANCHOR_WALLET, so every test writes the same one there.
+  fn verifier() -> Keypair {
+    let keypair = keypair_from_seed(&[7; 32]).expect("derive verifier keypair");
+    WRITE_VERIFIER_KEYPAIR.call_once(|| {
+      let path = env::temp_dir().join(format!("ecc-sig-verifier-test-{}.json", std::process::id()));
+      write_keypair_file(&keypair, &path).expect("write verifier keypair");
+      env::set_var("ANCHOR_WALLET", &path);
+    });
+    keypair
+  }
+
+  // An issue_data_only_entity_v0 behind the two compute budget instructions the handler expects,
+  // with a valid gateway signature, so only the fee payer and the `payer` account vary.
+  fn issue_request(fee_payer: &Pubkey, payer: &Pubkey) -> String {
+    let gateway = EccKeypair::generate_from_entropy(KeyTag::default(), &[9; 32])
+      .expect("derive gateway keypair");
+    let entity_key = bs58::decode(gateway.public_key().to_string())
+      .into_vec()
+      .expect("decode gateway key");
+    let mut data = sighash("global", "issue_data_only_entity_v0").to_vec();
+    data.extend(
+      IssueDataOnlyEntityArgsV0 { entity_key }
+        .try_to_vec()
+        .expect("serialize issue args"),
+    );
+    let issue = Instruction::new_with_bytes(
+      Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").expect("parse program id"),
+      &data,
+      vec![
+        AccountMeta::new(*payer, true),
+        AccountMeta::new_readonly(verifier().pubkey(), true),
+      ],
+    );
+    let message = Message::new(
+      &[
+        ComputeBudgetInstruction::set_compute_unit_limit(200_000),
+        ComputeBudgetInstruction::set_compute_unit_price(1),
+        issue,
+      ],
+      Some(fee_payer),
+    );
+    let transaction = VersionedTransaction {
+      signatures: vec![Signature::default(); usize::from(message.header.num_required_signatures)],
+      message: VersionedMessage::Legacy(message),
+    };
+    let msg = b"add gateway";
+    format!(
+      r#"{{"transaction":"{}","msg":"{}","signature":"{}"}}"#,
+      hex::encode(bincode::serialize(&transaction).expect("serialize transaction")),
+      hex::encode(msg),
+      hex::encode(gateway.sign(msg).expect("sign msg")),
+    )
+  }
+
+  fn post(body: String) -> Status {
+    Client::tracked(rocket())
+      .expect("build client")
+      .post("/verify")
+      .header(ContentType::JSON)
+      .body(body)
+      .dispatch()
+      .status()
+  }
+
+  #[test]
+  fn signs_as_a_read_only_signer() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(post(issue_request(&owner, &owner)), Status::Ok);
+  }
+
+  #[test]
+  fn refuses_to_be_the_fee_payer() {
+    let verifier = verifier().pubkey();
+    assert_eq!(
+      post(issue_request(&verifier, &verifier)),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_to_be_a_writable_signer() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      post(issue_request(&owner, &verifier().pubkey())),
+      Status::BadRequest
+    );
+  }
+
+  fn message_with_read_only_account(key: &Pubkey) -> VersionedMessage {
+    VersionedMessage::Legacy(Message::new(
+      &[Instruction::new_with_bytes(
+        Pubkey::new_unique(),
+        &[],
+        vec![AccountMeta::new_readonly(*key, false)],
+      )],
+      Some(&Pubkey::new_unique()),
+    ))
+  }
+
+  #[test]
+  fn a_read_only_non_signer_is_not_a_read_only_signer() {
+    let key = Pubkey::new_unique();
+    assert!(!is_read_only_signer(
+      &message_with_read_only_account(&key),
+      &key
+    ));
+  }
+
+  #[test]
+  fn an_absent_key_is_not_a_read_only_signer() {
+    let message = message_with_read_only_account(&Pubkey::new_unique());
+    assert!(!is_read_only_signer(&message, &Pubkey::new_unique()));
+  }
 }
