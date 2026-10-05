@@ -211,7 +211,7 @@ jobs:
       SOLANA_CLI_VERSION: 2.1.6
       SURFPOOL_RPC_URL: http://127.0.0.1:8899
       NEXT_PUBLIC_SOLANA_CLUSTER: mainnet
-      SURFPOOL_SHOW_LOGS: "1"
+      SURFPOOL_SHOW_LOGS: "0"
       SURFPOOL_HEALTH_TIMEOUT_MS: "180000"
       HPL_TX_VERSION: ${{ matrix.tx-version }}
 
