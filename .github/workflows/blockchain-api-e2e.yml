@@ -269,6 +269,9 @@ jobs:
       - name: Run ${{ matrix.test.name }} tests
         env:
           ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
+          # A keyed datasource for the fork; empty on fork PRs, where the
+          # helper falls back to the public mainnet-beta endpoint.
+          SURFPOOL_DATASOURCE_RPC_URL: ${{ secrets.SURFPOOL_DATASOURCE_RPC_URL }}
           TEST_WALLET_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
           TEST_WALLET_2_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key_2.json
           FEE_PAYER_WALLET_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json

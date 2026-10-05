@@ -129,6 +129,10 @@ export async function ensureSurfpool(
       opts.startArgs ||
       (process.env.SURFPOOL_START_ARGS
         ? process.env.SURFPOOL_START_ARGS.split(" ")
+        : process.env.SURFPOOL_DATASOURCE_RPC_URL
+        ? // The CLI reads the URL from this env itself, which keeps the key
+          // out of the start log; it cannot be combined with --network.
+          ["start", "--no-tui"]
         : ["start", "--network", "mainnet", "--no-tui"]);
     const healthTimeoutMs =
       opts.healthTimeoutMs ??
