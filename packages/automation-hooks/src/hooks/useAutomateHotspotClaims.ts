@@ -29,6 +29,7 @@ import {
 } from "@solana/web3.js";
 import { useMemo } from "react";
 import { useAsync, useAsyncCallback } from "react-async-hook";
+import { cronJobFunding } from "./cronJobFunding";
 import { useCronJob } from "./useCronJob";
 import { useTaskQueue } from "./useTaskQueue";
 import { AnchorProvider } from "@anchor-lang/core";
@@ -133,7 +134,6 @@ export const interpretCronString = (
   };
 };
 
-const TASK_RETURN_ACCOUNT_FUNDING_SOL = 0.01;
 const EST_TX_FEE = 0.000001;
 
 // Byte sizes of the accounts automation setup pays rent for, priced at
@@ -190,10 +190,11 @@ export const useAutomateHotspotClaims = ({
     return getAssociatedTokenAddressSync(HNT_MINT, wallet, true);
   }, [wallet]);
 
-  const crankFundingNeeded = useMemo(() => {
-    const minCrankReward = taskQueue?.minCrankReward?.toNumber() || 10000;
-    return duration * minCrankReward;
-  }, [duration, totalHotspots, taskQueue]);
+  // A schedule change tears the cron job down and inits a new one.
+  const recreatesCronJob =
+    !cronJobAccount ||
+    (!!cronJobAccount.schedule &&
+      interpretCronString(cronJobAccount.schedule).schedule !== schedule);
   const { account } = useAccount(ata);
   const {
     result: rent,
@@ -231,9 +232,18 @@ export const useAutomateHotspotClaims = ({
       duration * minCrankReward * Math.ceil((totalHotspots || 1) / 5)
     );
   }, [duration, totalHotspots, taskQueue, rent, account]);
-  const crankSolFee = useMemo(() => {
-    return crankFundingNeeded - (cronJobSolanaAccount?.lamports || 0);
-  }, [crankFundingNeeded, cronJobSolanaAccount]);
+  const cronFunding = useMemo(
+    () =>
+      cronJobFunding({
+        recreatesCronJob,
+        duration,
+        minCrankRewardLamports: taskQueue?.minCrankReward?.toNumber() || 10000,
+        existingCronJobLamports: cronJobSolanaAccount?.lamports || 0,
+        baseAutomationRentLamports: rent?.baseAutomation ?? 0,
+      }),
+    [recreatesCronJob, duration, taskQueue, cronJobSolanaAccount, rent]
+  );
+  const crankSolFee = cronFunding.crankSolFee;
   const pdaWalletSolFee = useMemo(() => {
     return pdaWalletFundingNeeded - Number(pdaWalletSol?.toString() || 0);
   }, [pdaWalletFundingNeeded, pdaWalletSol]);
@@ -265,11 +275,7 @@ export const useAutomateHotspotClaims = ({
       const instructions: TransactionInstruction[] = [];
 
       // If cronJob doesn't exist or schedule changed, create/recreate it
-      if (
-        !cronJobAccount ||
-        (cronJobAccount.schedule &&
-          interpretCronString(cronJobAccount.schedule).schedule !== schedule)
-      ) {
+      if (recreatesCronJob) {
         // If it exists but schedule changed, remove it first
         if (cronJobAccount) {
           const maxTxId = cronJobAccount.nextTransactionId || 0;
@@ -340,16 +346,12 @@ export const useAutomateHotspotClaims = ({
       }
 
       // Add SOL if needed
-      if (crankSolFee > 0) {
+      if (cronFunding.transferLamports > 0) {
         instructions.push(
           SystemProgram.transfer({
             fromPubkey: wallet,
             toPubkey: cronJob,
-            lamports:
-              crankSolFee +
-              (cronJobAccount
-                ? 0
-                : TASK_RETURN_ACCOUNT_FUNDING_SOL * LAMPORTS_PER_SOL),
+            lamports: cronFunding.transferLamports,
           })
         );
       }
@@ -440,9 +442,7 @@ export const useAutomateHotspotClaims = ({
     }
   );
 
-  const rentFee = cronJobAccount
-    ? 0
-    : (rent?.baseAutomation ?? 0) / LAMPORTS_PER_SOL + TASK_RETURN_ACCOUNT_FUNDING_SOL;
+  const rentFee = cronFunding.rentFeeLamports / LAMPORTS_PER_SOL;
 
   const recipientFee =
     (hotspotsNeedingRecipient * (rent?.recipient ?? 0)) / LAMPORTS_PER_SOL;
