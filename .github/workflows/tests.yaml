@@ -45,7 +45,8 @@ jobs:
   check-release-bumps:
     name: Check Version Bumps and Changesets
     # A develop-to-master release PR carries every change since the last release, after
-    # `changeset version` has consumed the changesets, so the check runs on feature PRs only.
+    # `changeset version` has consumed the changesets, so the job runs only on PRs into develop.
+    # A Version Packages PR into develop passes because it changes no src/.
     if: github.event_name == 'pull_request' && github.base_ref == 'develop'
     runs-on: ubuntu-latest
     timeout-minutes: 5

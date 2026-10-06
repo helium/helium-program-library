@@ -6,7 +6,7 @@
 set -uo pipefail
 
 BASE=${1:?usage: $0 <base-ref>}
-MERGE_BASE=$(git merge-base "$BASE" HEAD)
+MERGE_BASE=$(git merge-base "$BASE" HEAD) || { echo "error: cannot resolve merge base of $BASE" >&2; exit 2; }
 fail=0
 
 error() {
@@ -18,18 +18,21 @@ error() {
   fail=1
 }
 
-changed() { git diff --name-only --diff-filter=ACMR "$MERGE_BASE" HEAD -- "$@"; }
+changed() { git diff --name-only --diff-filter=ACMRD "$MERGE_BASE" HEAD -- "$@"; }
 
 # A program source change bumps that program's crate version, so the deployed
-# binary can be traced to a release.
+# binary can be traced to a release. Changes to shared crates under utils/
+# (e.g. shared-utils) are not checked; bump the programs that ship the change by hand.
 for p in $(changed 'programs/*/src/*' | cut -d/ -f2 | sort -u); do
+  [ -f "programs/$p/Cargo.toml" ] || continue
   if ! git diff "$MERGE_BASE" HEAD -- "programs/$p/Cargo.toml" | grep -q '^+version'; then
     error "programs/$p/src changed but programs/$p/Cargo.toml version did not"
   fi
 done
 
 # A source change to a published package carries a changeset that names it.
-added_changesets=$(git diff --name-only --diff-filter=A "$MERGE_BASE" HEAD -- '.changeset/*.md')
+# The changeset can be new, or an unreleased one that this PR edits.
+pr_changesets=$(git diff --name-only --diff-filter=AM "$MERGE_BASE" HEAD -- '.changeset/*.md')
 for dir in $(changed 'packages/*/src/*' | cut -d/ -f1-2 | sort -u); do
   [ -f "$dir/package.json" ] || continue
   if [ "$(node -p "require('./$dir/package.json').private === true")" = "true" ]; then
@@ -37,8 +40,8 @@ for dir in $(changed 'packages/*/src/*' | cut -d/ -f1-2 | sort -u); do
   fi
   name=$(node -p "require('./$dir/package.json').name")
   # shellcheck disable=SC2086
-  if [ -z "$added_changesets" ] || ! grep -q "\"$name\"" $added_changesets; then
-    error "$dir/src changed but no new .changeset/*.md names \"$name\". Run: pnpm changeset"
+  if [ -z "$pr_changesets" ] || ! grep -q "\"$name\"" $pr_changesets; then
+    error "$dir/src changed but no .changeset/*.md added or edited in this PR names \"$name\". Run: pnpm changeset"
   fi
 done
 

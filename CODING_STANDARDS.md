@@ -55,6 +55,6 @@ CI checks these. Do not report what they catch:
 - rustfmt and clippy.
 - blockchain-api lint, typecheck, and the e2e matrix list (`.github/workflows/blockchain-api-e2e.yml`).
 - `scripts/check-release-bumps.sh`, on PRs into develop:
-  - a change under `programs/<p>/src` bumps `programs/<p>/Cargo.toml` `version`;
+  - a change under `programs/<p>/src` bumps `programs/<p>/Cargo.toml` `version`. Changes to shared crates under `utils/` (e.g. shared-utils) are not checked; bump the programs that ship the change by hand;
   - a change under the `src/` of a published package has a changeset that names it.
 - An IDL change has an `@helium/idls` changeset.

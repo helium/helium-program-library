@@ -14,7 +14,7 @@ Initialize a new account with `set_inner(AccountV0 { .. })` and list every field
 
 ## Bindings
 
-- Bind every signed, queued, or oracle-supplied input to the exact account it acts on: the recipient, the task, `queued_at`. A signature valid for one recipient is not valid for another (the 2026-09-14 lazy-distributor drain).
+- Bind every signed, queued, or oracle-supplied input to the exact account it acts on: the recipient, the task, `queued_at`. A signature valid for one recipient is not valid for another.
 - A service wallet (oracle, fee payer, crank) never pays rent or fees that a user can make it pay. The user repays it, or the instruction refunds it in the same transaction.
 - Staking and reward math rules out a second claim for the same period, and checks that a snapshot still matches the deposit it came from.
 

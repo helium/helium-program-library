@@ -2,7 +2,7 @@
 
 ## Anchor clients
 
-- Pass only the accounts Anchor cannot resolve, with `.accounts()`. Its type rejects a resolvable account, so the compiler keeps the call short. Use `accountsPartial()` only when you must pass an account Anchor would resolve. Do not use `accountsStrict()`.
+- Pass only the accounts Anchor cannot resolve, with `.accounts()`. Its type omits resolvable accounts, so an object literal that passes one fails to compile. Use `accountsPartial()` only when you must pass an account Anchor would resolve. Do not use `accountsStrict()`.
 - Anchor `Program.idl` names are camelCase in TS. Read a field name from the IDL file. Never recall it (#1332).
 
 ## Amounts
