@@ -12,7 +12,9 @@ use rocket::{
   serde::{json::Json, Deserialize, Serialize},
 };
 use solana_sdk::{
-  bs58, compute_budget,
+  borsh0_10::try_from_slice_unchecked,
+  bs58,
+  compute_budget::{self, ComputeBudgetInstruction},
   instruction::CompiledInstruction,
   message::VersionedMessage,
   signature::{read_keypair_file, Signature},
@@ -89,18 +91,31 @@ async fn verify(verify: Json<VerifyRequest<'_>>) -> Result<Json<VerifyResult>, S
     Status::BadRequest
   })?;
 
-  // Every account index and the signature count are in range from here on.
+  // From here on every program id is a static account key, and there is one signature per
+  // required signer, each for a static account key.
   solana_txn.sanitize(true).map_err(|e| {
     error!("invalid transaction: {:?}", e);
     Status::BadRequest
   })?;
   let account_keys = solana_txn.message.static_account_keys();
   let program_id = |ixn: &CompiledInstruction| account_keys[usize::from(ixn.program_id_index)];
+  let compute_budget_ixn = |ixn: &CompiledInstruction| {
+    (program_id(ixn) == compute_budget::id())
+      .then(|| try_from_slice_unchecked::<ComputeBudgetInstruction>(&ixn.data).ok())
+      .flatten()
+  };
 
-  // The verifier signs exactly two compute budget instructions followed by the issue instruction.
+  // The verifier signs a compute unit limit and a compute unit price followed by the issue
+  // instruction, and nothing else.
   let ixn = match solana_txn.message.instructions() {
     [limit, price, issue]
-      if program_id(limit) == compute_budget::id() && program_id(price) == compute_budget::id() =>
+      if matches!(
+        compute_budget_ixn(limit),
+        Some(ComputeBudgetInstruction::SetComputeUnitLimit(_))
+      ) && matches!(
+        compute_budget_ixn(price),
+        Some(ComputeBudgetInstruction::SetComputeUnitPrice(_))
+      ) =>
     {
       issue
     }
@@ -229,9 +244,12 @@ mod tests {
   use helium_crypto::{KeyTag, Keypair as EccKeypair, Sign};
   use rocket::{http::ContentType, local::blocking::Client};
   use solana_sdk::{
-    compute_budget::ComputeBudgetInstruction,
+    hash::Hash,
     instruction::{AccountMeta, Instruction},
-    message::Message,
+    message::{
+      v0::{self, MessageAddressTableLookup},
+      Message, MessageHeader,
+    },
     signature::{keypair_from_seed, write_keypair_file, Keypair},
   };
 
@@ -389,6 +407,93 @@ mod tests {
       ]),
       Status::BadRequest
     );
+  }
+
+  #[test]
+  fn refuses_a_heap_frame_request_in_place_of_the_compute_unit_limit() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        ComputeBudgetInstruction::request_heap_frame(32 * 1024),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_compute_unit_limit_data_sent_to_another_program() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        Instruction::new_with_bytes(Pubkey::new_unique(), &compute_limit().data, vec![]),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_second_compute_unit_limit_in_place_of_the_price() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        compute_limit(),
+        compute_limit(),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_program_id_index_past_the_account_keys() {
+    let owner = Pubkey::new_unique();
+    let mut transaction = transaction(
+      &owner,
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ],
+    );
+    let VersionedMessage::Legacy(message) = &mut transaction.message else {
+      unreachable!("transaction() builds a legacy message")
+    };
+    message.instructions[2].program_id_index = 200;
+    assert_eq!(post(request(&transaction)), Status::BadRequest);
+  }
+
+  #[test]
+  fn refuses_a_program_id_loaded_from_a_lookup_table() {
+    let owner = Pubkey::new_unique();
+    let message = v0::Message {
+      header: MessageHeader {
+        num_required_signatures: 2,
+        num_readonly_signed_accounts: 1,
+        num_readonly_unsigned_accounts: 1,
+      },
+      account_keys: vec![owner, verifier().pubkey(), compute_budget::id()],
+      recent_blockhash: Hash::default(),
+      instructions: vec![
+        CompiledInstruction::new_from_raw_parts(2, compute_limit().data, vec![]),
+        CompiledInstruction::new_from_raw_parts(2, compute_price().data, vec![]),
+        // Index 3 is the first key the lookup table loads.
+        CompiledInstruction::new_from_raw_parts(3, issue_data(&signing_gateway()), vec![0, 1]),
+      ],
+      address_table_lookups: vec![MessageAddressTableLookup {
+        account_key: Pubkey::new_unique(),
+        writable_indexes: vec![],
+        readonly_indexes: vec![0],
+      }],
+    };
+    let transaction = VersionedTransaction {
+      signatures: vec![Signature::default(); 2],
+      message: VersionedMessage::V0(message),
+    };
+    assert_eq!(post(request(&transaction)), Status::BadRequest);
   }
 
   #[test]
