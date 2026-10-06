@@ -12,7 +12,8 @@ use rocket::{
   serde::{json::Json, Deserialize, Serialize},
 };
 use solana_sdk::{
-  bs58,
+  bs58, compute_budget,
+  instruction::CompiledInstruction,
   message::VersionedMessage,
   signature::{read_keypair_file, Signature},
   signer::{Signer, SignerError},
@@ -78,7 +79,7 @@ impl Signer for ExistingSigner {
 }
 
 #[post("/verify", format = "application/json", data = "<verify>")]
-async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Status> {
+async fn verify(verify: Json<VerifyRequest<'_>>) -> Result<Json<VerifyResult>, Status> {
   let solana_txn_hex = hex::decode(verify.transaction).map_err(|e| {
     error!("failed to decode transaction: {:?}", e);
     Status::BadRequest
@@ -88,28 +89,26 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     Status::BadRequest
   })?;
 
+  // Every account index and the signature count are in range from here on.
+  solana_txn.sanitize(true).map_err(|e| {
+    error!("invalid transaction: {:?}", e);
+    Status::BadRequest
+  })?;
   let account_keys = solana_txn.message.static_account_keys();
-  let instructions = solana_txn.message.instructions();
-  if instructions.len() > 3 {
-    error!("Invalid instruction count");
-    return Err(Status::BadRequest);
-  }
+  let program_id = |ixn: &CompiledInstruction| account_keys[usize::from(ixn.program_id_index)];
 
-  // Up to the first 2 instructions are compute budget
-  let mut compute_end_ix = 0;
-  for i in 0..2 {
-    compute_end_ix = i;
-    if i >= instructions.len() {
-      break;
-    }
-    let compute_ixn = &instructions[i];
-    let compute_program_id = account_keys[compute_ixn.program_id_index as usize];
-    if compute_program_id
-      != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap()
+  // The verifier signs exactly two compute budget instructions followed by the issue instruction.
+  let ixn = match solana_txn.message.instructions() {
+    [limit, price, issue]
+      if program_id(limit) == compute_budget::id() && program_id(price) == compute_budget::id() =>
     {
-      break;
+      issue
     }
-  }
+    _ => {
+      error!("Unexpected instructions");
+      return Err(Status::BadRequest);
+    }
+  };
 
   let keypair = read_keypair_file(env::var("ANCHOR_WALLET").unwrap_or("keypair.json".to_string()))
     .map_err(|_| {
@@ -122,26 +121,8 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     return Err(Status::BadRequest);
   }
 
-  let start_index = compute_end_ix + 1;
-  // Second real ix (may) be a transfer
-  if instructions.len() - (compute_end_ix + 1) > 1 {
-    let transfer_ixn = &instructions[start_index + 1];
-    let transfer_program_id = account_keys[transfer_ixn.program_id_index as usize];
-    let transfer_from_acct = account_keys[transfer_ixn.accounts[0] as usize];
-    if transfer_program_id != Pubkey::from_str("11111111111111111111111111111111").unwrap() {
-      error!("Second instruction is not System transfer");
-      return Err(Status::BadRequest);
-    }
-    if transfer_from_acct == keypair.pubkey() {
-      error!("Cannot transfer from the verifier");
-      return Err(Status::BadRequest);
-    }
-  }
-
   // Verify it's entity manager instruction
-  let ixn = &instructions[start_index];
-  let program_id = account_keys[ixn.program_id_index as usize];
-  if program_id != Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").unwrap() {
+  if program_id(ixn) != Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").unwrap() {
     error!("Pubkey mismatch");
     return Err(Status::BadRequest);
   }
@@ -149,12 +130,13 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   // Verify it's issue_entity or issue_data_only_entity
   let issue_sighash = sighash("global", "issue_entity_v0");
   let issue_do_sighash = sighash("global", "issue_data_only_entity_v0");
-  if issue_sighash != ixn.data[0..8] && issue_do_sighash != ixn.data[0..8] {
+  let discriminator = ixn.data.get(..8);
+  if discriminator != Some(&issue_sighash[..]) && discriminator != Some(&issue_do_sighash[..]) {
     error!("Sighash mismatch");
     return Err(Status::BadRequest);
   }
 
-  let pubkey: PublicKey = if issue_sighash == ixn.data[0..8] {
+  let pubkey: PublicKey = if discriminator == Some(&issue_sighash[..]) {
     let issue_entity = IssueEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
       error!("Failed to decode instruction: {:?}", e);
       Status::BadRequest
@@ -268,11 +250,17 @@ mod tests {
     keypair
   }
 
-  // An issue_data_only_entity_v0 behind the two compute budget instructions the handler expects,
-  // with a valid gateway signature, so only the fee payer and the `payer` account vary.
-  fn issue_request(fee_payer: &Pubkey, payer: &Pubkey) -> String {
-    let gateway = EccKeypair::generate_from_entropy(KeyTag::default(), &[9; 32])
-      .expect("derive gateway keypair");
+  fn gateway(seed: u8) -> EccKeypair {
+    EccKeypair::generate_from_entropy(KeyTag::default(), &[seed; 32])
+      .expect("derive gateway keypair")
+  }
+
+  // The gateway whose signature every request carries.
+  fn signing_gateway() -> EccKeypair {
+    gateway(9)
+  }
+
+  fn issue_data(gateway: &EccKeypair) -> Vec<u8> {
     let entity_key = bs58::decode(gateway.public_key().to_string())
       .into_vec()
       .expect("decode gateway key");
@@ -282,33 +270,61 @@ mod tests {
         .try_to_vec()
         .expect("serialize issue args"),
     );
-    let issue = Instruction::new_with_bytes(
+    data
+  }
+
+  fn hem_ix(payer: &Pubkey, data: &[u8]) -> Instruction {
+    Instruction::new_with_bytes(
       Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").expect("parse program id"),
-      &data,
+      data,
       vec![
         AccountMeta::new(*payer, true),
         AccountMeta::new_readonly(verifier().pubkey(), true),
       ],
-    );
-    let message = Message::new(
-      &[
-        ComputeBudgetInstruction::set_compute_unit_limit(200_000),
-        ComputeBudgetInstruction::set_compute_unit_price(1),
-        issue,
-      ],
-      Some(fee_payer),
-    );
-    let transaction = VersionedTransaction {
+    )
+  }
+
+  fn issue_ix(payer: &Pubkey, gateway: &EccKeypair) -> Instruction {
+    hem_ix(payer, &issue_data(gateway))
+  }
+
+  fn compute_limit() -> Instruction {
+    ComputeBudgetInstruction::set_compute_unit_limit(200_000)
+  }
+
+  fn compute_price() -> Instruction {
+    ComputeBudgetInstruction::set_compute_unit_price(1)
+  }
+
+  fn transaction(fee_payer: &Pubkey, instructions: &[Instruction]) -> VersionedTransaction {
+    let message = Message::new(instructions, Some(fee_payer));
+    VersionedTransaction {
       signatures: vec![Signature::default(); usize::from(message.header.num_required_signatures)],
       message: VersionedMessage::Legacy(message),
-    };
+    }
+  }
+
+  // A request carrying a valid signature from `signing_gateway`.
+  fn request(transaction: &VersionedTransaction) -> String {
     let msg = b"add gateway";
     format!(
       r#"{{"transaction":"{}","msg":"{}","signature":"{}"}}"#,
-      hex::encode(bincode::serialize(&transaction).expect("serialize transaction")),
+      hex::encode(bincode::serialize(transaction).expect("serialize transaction")),
       hex::encode(msg),
-      hex::encode(gateway.sign(msg).expect("sign msg")),
+      hex::encode(signing_gateway().sign(msg).expect("sign msg")),
     )
+  }
+
+  // The shape clients send, so only the fee payer and the `payer` account vary.
+  fn issue_request(fee_payer: &Pubkey, payer: &Pubkey) -> String {
+    request(&transaction(
+      fee_payer,
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(payer, &signing_gateway()),
+      ],
+    ))
   }
 
   fn post(body: String) -> Status {
@@ -343,6 +359,83 @@ mod tests {
       post(issue_request(&owner, &verifier().pubkey())),
       Status::BadRequest
     );
+  }
+
+  fn shape_status(instructions: &[Instruction]) -> Status {
+    post(request(&transaction(&Pubkey::new_unique(), instructions)))
+  }
+
+  #[test]
+  fn refuses_another_instruction_in_place_of_the_compute_unit_limit() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        issue_ix(&owner, &gateway(10)),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_another_instruction_in_place_of_the_compute_unit_price() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        compute_limit(),
+        issue_ix(&owner, &gateway(10)),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_an_instruction_after_the_issue() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+        issue_ix(&owner, &gateway(10)),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_missing_compute_budget_instruction() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[compute_price(), issue_ix(&owner, &signing_gateway())]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_issue_data_shorter_than_a_discriminator() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[compute_limit(), compute_price(), hem_ix(&owner, &[1, 2, 3])]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_transaction_missing_its_signature_slots() {
+    let owner = Pubkey::new_unique();
+    let mut unsigned = transaction(
+      &owner,
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ],
+    );
+    unsigned.signatures.clear();
+    assert_eq!(post(request(&unsigned)), Status::BadRequest);
   }
 
   fn message_with_read_only_account(key: &Pubkey) -> VersionedMessage {
