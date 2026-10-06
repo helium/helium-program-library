@@ -447,3 +447,22 @@ jobs:
         working-directory: packages/spl-utils
         env:
           RPC_URL: http://localhost:8899
+      # A transaction sent with skipPreflight fails without its program logs, so a failed suite
+      # keeps what `anchor localnet` streamed for each program, and the validator's own log.
+      - name: Name localnet logs
+        id: localnet-logs
+        if: failure()
+        run: echo "name=localnet-logs-$(basename "$TEST" .ts)" >> "$GITHUB_OUTPUT"
+        env:
+          TEST: ${{ matrix.test }}
+      - name: Upload localnet logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.localnet-logs.outputs.name }}
+          path: |
+            .anchor/program-logs/
+            .anchor/test-ledger/test-ledger-log.txt
+            /tmp/localnet.log
+          if-no-files-found: warn
+          retention-days: 14
