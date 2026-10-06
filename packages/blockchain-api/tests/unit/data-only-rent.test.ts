@@ -30,20 +30,47 @@ describe("getDataOnlyIssueCostLamports", () => {
     const cost = await getDataOnlyIssueCostLamports(connection, {
       entityKeyLen: 38,
       newTreeFeeLamports: 69_215,
+      // ceil(1_234_567 / 2^20) = 2, below the stored fee.
+      newTreeSpace: 1000,
+      newTreeDepth: 20,
     });
 
-    expect(requestedSpaces).to.deep.equal([8 + 96 + 1 + 38]);
+    expect(requestedSpaces).to.deep.equal([8 + 96 + 1 + 38, 1000]);
     expect(cost).to.equal(1_234_567 + 69_215);
+  });
+
+  it("quotes the rent-derived tree fee, rounded up, when it exceeds the stored fee", async () => {
+    const connection = stubConnection(() => 1_234_567);
+
+    const cost = await getDataOnlyIssueCostLamports(connection, {
+      entityKeyLen: 38,
+      newTreeFeeLamports: 69_215,
+      // 1_234_567 / 2^3 = 154_320.875, above the stored fee.
+      newTreeSpace: 1000,
+      newTreeDepth: 3,
+    });
+
+    expect(cost).to.equal(1_234_567 + 154_321);
   });
 
   it("follows the cluster rent rather than a fixed figure", async () => {
     const low = await getDataOnlyIssueCostLamports(
       stubConnection((space) => space * 1000),
-      { entityKeyLen: 38, newTreeFeeLamports: 0 },
+      {
+        entityKeyLen: 38,
+        newTreeFeeLamports: 0,
+        newTreeSpace: 0,
+        newTreeDepth: 0,
+      },
     );
     const high = await getDataOnlyIssueCostLamports(
       stubConnection((space) => space * 6960),
-      { entityKeyLen: 38, newTreeFeeLamports: 0 },
+      {
+        entityKeyLen: 38,
+        newTreeFeeLamports: 0,
+        newTreeSpace: 0,
+        newTreeDepth: 0,
+      },
     );
 
     expect(low).to.equal(143 * 1000);
@@ -63,6 +90,8 @@ describe("getDataOnlyIssueFunding", () => {
         txFeeLamports: 10_000,
         entityKeyLen: 38,
         newTreeFeeLamports: 69_215,
+        newTreeSpace: 1000,
+        newTreeDepth: 20,
       });
 
     expect(estimatedLamports).to.equal(10_000 + 1_234_567 + 69_215);

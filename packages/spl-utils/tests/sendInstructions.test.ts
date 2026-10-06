@@ -1,7 +1,15 @@
 import { ed25519 } from "@noble/curves/ed25519";
-import { Keypair, SystemProgram, VersionedTransaction } from "@solana/web3.js";
+import {
+  Keypair,
+  SystemProgram,
+  TransactionInstruction,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { expect } from "chai";
-import { sendInstructions } from "../src/transaction";
+import {
+  sendInstructions,
+  sendInstructionsWithPriorityFee,
+} from "../src/transaction";
 import { resetTxVersionCache } from "../src/txVersion";
 
 // A 4.2 node with `enable_tx_v1` active that confirms whatever it is sent
@@ -139,5 +147,65 @@ describe("sendInstructions", () => {
       `Missing signature for public key ${payer.publicKey.toBase58()}`,
     );
     expect(sent).to.have.length(0);
+  });
+
+  it("sends v0 for a keypair wallet on a v1 node when the ixs exceed v1 limits", async () => {
+    const { connection, sent } = fakeV1Node();
+    const payer = Keypair.generate();
+    const provider: any = { connection, wallet: keypairWallet(payer) };
+    const tiny = new TransactionInstruction({
+      programId: SystemProgram.programId,
+      keys: [],
+      data: Buffer.alloc(0),
+    });
+
+    await sendInstructions(provider, Array(65).fill(tiny));
+
+    expect(VersionedTransaction.deserialize(sent[0]).version).to.equal(0);
+  });
+
+  it("sends v0 through the priority-fee path when the ixs exceed v1 limits", async () => {
+    const { connection, sent } = fakeV1Node();
+    connection._rpcRequest = async () => ({
+      result: { priorityFeeEstimate: 1 },
+    });
+    connection._buildArgs = (args: unknown[]) => args;
+    const payer = Keypair.generate();
+    const provider: any = { connection, wallet: keypairWallet(payer) };
+    const tiny = new TransactionInstruction({
+      programId: SystemProgram.programId,
+      keys: [],
+      data: Buffer.alloc(0),
+    });
+
+    await sendInstructionsWithPriorityFee(provider, Array(65).fill(tiny), {
+      computeUnitLimit: 200000,
+    });
+
+    expect(VersionedTransaction.deserialize(sent[0]).version).to.equal(0);
+  });
+
+  it("sends the per-call version over node detection", async () => {
+    const { connection, sent } = fakeV1Node();
+    const payer = Keypair.generate();
+    const provider: any = { connection, wallet: keypairWallet(payer) };
+
+    await sendInstructions(
+      provider,
+      [
+        SystemProgram.transfer({
+          fromPubkey: payer.publicKey,
+          toPubkey: Keypair.generate().publicKey,
+          lamports: 1,
+        }),
+      ],
+      [],
+      payer.publicKey,
+      "confirmed",
+      new Map(),
+      0,
+    );
+
+    expect(VersionedTransaction.deserialize(sent[0]).version).to.equal(0);
   });
 });

@@ -4,6 +4,7 @@ import {
   getBaseAutomationRentLamports,
   ENTITY_CLAIM_CRON_NAME,
   resolveScheduleToCron,
+  scheduleChanged,
 } from "@/lib/utils/automation-helpers";
 import * as anchor from "@anchor-lang/core";
 import {
@@ -23,7 +24,6 @@ import {
 } from "@helium/spl-utils";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import {
-  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
@@ -82,7 +82,8 @@ export const createAutomation =
       // If cronJob doesn't exist or schedule changed, create/recreate it
       const recreatesCronJob =
         !cronJobAccount ||
-        (!!cronJobAccount.schedule && cronJobAccount.schedule !== cronSchedule);
+        (!!cronJobAccount.schedule &&
+          scheduleChanged(cronJobAccount.schedule, schedule));
       if (recreatesCronJob) {
         // If it exists but schedule changed, remove it first. Skip holes left
         // by individually-removed claims (nextTransactionId is monotonic).
@@ -159,35 +160,37 @@ export const createAutomation =
       // rent and the schedule task's crank reward from the wallet, so the cron
       // job transfer below carries neither and the total counts them once. The
       // new cron job starts empty, so it is funded for the whole duration.
-      const { cronJobFunding, pdaWalletFunding, totalSolNeeded } =
-        estimateAutomationFunding({
-          cronJobExists: !recreatesCronJob,
-          baseAutomationRentLamports: recreatesCronJob
-            ? await getBaseAutomationRentLamports(
-                provider.connection,
-                cronSchedule.length,
-              )
-            : 0,
-          minCrankRewardLamports: minCrankReward,
-          cronJobBalanceLamports,
-          cronJobCostPerClaimLamports,
-          pdaWalletBalanceLamports,
-          pdaWalletCostPerClaimLamports,
-          recipientRentLamports,
-          cronJobRentLamports,
-          pdaWalletRentLamports,
-          additionalDuration: duration,
-          ataRentLamports,
-          taskReturnAccountFundingLamports,
-        });
-      const toLamports = (sol: number) => Math.round(sol * LAMPORTS_PER_SOL);
+      const {
+        cronJobFundingLamports,
+        pdaWalletFundingLamports,
+        totalLamports,
+      } = estimateAutomationFunding({
+        cronJobExists: !recreatesCronJob,
+        baseAutomationRentLamports: recreatesCronJob
+          ? await getBaseAutomationRentLamports(
+              provider.connection,
+              cronSchedule.length,
+            )
+          : 0,
+        minCrankRewardLamports: minCrankReward,
+        cronJobBalanceLamports,
+        cronJobCostPerClaimLamports,
+        pdaWalletBalanceLamports,
+        pdaWalletCostPerClaimLamports,
+        recipientRentLamports,
+        cronJobRentLamports,
+        pdaWalletRentLamports,
+        additionalDuration: duration,
+        ataRentLamports,
+        taskReturnAccountFundingLamports,
+      });
 
       // Always add at least minimal funding to ensure transaction is created
-      const minCrankSolFee = Math.max(0, toLamports(cronJobFunding));
-      const minPdaWalletSolFee = Math.max(0, toLamports(pdaWalletFunding));
+      const minCrankSolFee = Math.max(0, cronJobFundingLamports);
+      const minPdaWalletSolFee = Math.max(0, pdaWalletFundingLamports);
 
       // Check wallet has sufficient balance (same pattern as fundAutomation)
-      const totalFundingNeeded = toLamports(totalSolNeeded);
+      const totalFundingNeeded = totalLamports;
       const walletBalance = await provider.connection.getBalance(wallet);
       const estimatedTxFees = BASE_TX_FEE_LAMPORTS * 2; // Estimate for multiple potential txs
       const cluster = getCluster();
@@ -264,6 +267,9 @@ export const createAutomation =
       // Estimated fee includes tx fees + setup rent and crank reward + operational funding (cronJob + pdaWallet)
       const txFees = await getTotalTransactionFees(provider.connection, vtxs);
       const estimatedSolFeeLamports = txFees + totalFundingNeeded;
+      const effectiveSchedule = recreatesCronJob
+        ? cronSchedule
+        : cronJobAccount!.schedule;
 
       return {
         transactionData: {
@@ -272,14 +278,18 @@ export const createAutomation =
             {
               type: "setup_automation",
               description: "Set up hotspot claim automation",
-              cronSchedule,
+              cronSchedule: effectiveSchedule,
               duration,
             },
             useJito,
           ),
           parallel: false,
           tag: `setup_automation:${walletAddress}`,
-          actionMetadata: { type: "setup_automation", cronSchedule, duration },
+          actionMetadata: {
+            type: "setup_automation",
+            cronSchedule: effectiveSchedule,
+            duration,
+          },
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),

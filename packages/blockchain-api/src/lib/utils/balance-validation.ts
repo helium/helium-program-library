@@ -213,21 +213,33 @@ export const getWelcomePackRentParts = async (
 /**
  * Lamports issue_data_only_entity_v0 takes from the payer: rent for the
  * KeyToAssetV0 it creates plus the per-leaf tree fee it moves to the
- * data-only escrow. The fee quoted is the stored
- * DataOnlyConfigV0.new_tree_fee_lamports. Programs that derive the fee from
- * rent transfer `ceil(rent(new_tree_space) / 2^new_tree_depth)` instead, which
- * is below the stored value on mainnet, so the stored value never under-quotes
- * there.
+ * data-only escrow. The fee quoted is the larger of the stored
+ * `new_tree_fee_lamports` (what the program charged before it derived the
+ * fee) and `ceil(rent(new_tree_space) / 2^new_tree_depth)` (what it charges
+ * after), so the quote never falls below the program in either era. Drop the
+ * stored term once the derived-fee program is live.
  */
 export const getDataOnlyIssueCostLamports = async (
   connection: Connection,
   {
     entityKeyLen,
     newTreeFeeLamports,
-  }: { entityKeyLen: number; newTreeFeeLamports: number },
+    newTreeSpace,
+    newTreeDepth,
+  }: {
+    entityKeyLen: number;
+    newTreeFeeLamports: number;
+    newTreeSpace: number;
+    newTreeDepth: number;
+  },
 ) =>
   (await getRentLamports(connection, keyToAssetSpace(entityKeyLen))) +
-  newTreeFeeLamports;
+  Math.max(
+    newTreeFeeLamports,
+    Math.ceil(
+      (await getRentLamports(connection, newTreeSpace)) / 2 ** newTreeDepth,
+    ),
+  );
 
 /** Rent for the hotspot info account onboard_data_only_{iot,mobile}_hotspot_v0 creates. */
 export const getDataOnlyOnboardRentLamports = (
@@ -294,10 +306,14 @@ export const getDataOnlyIssueFunding = async (
     txFeeLamports,
     entityKeyLen,
     newTreeFeeLamports,
+    newTreeSpace,
+    newTreeDepth,
   }: {
     txFeeLamports: number;
     entityKeyLen: number;
     newTreeFeeLamports: number;
+    newTreeSpace: number;
+    newTreeDepth: number;
   },
 ) => {
   const estimatedLamports =
@@ -305,6 +321,8 @@ export const getDataOnlyIssueFunding = async (
     (await getDataOnlyIssueCostLamports(connection, {
       entityKeyLen,
       newTreeFeeLamports,
+      newTreeSpace,
+      newTreeDepth,
     }));
   return {
     estimatedLamports,

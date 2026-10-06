@@ -4,7 +4,6 @@ import {
   resetTxVersionCache,
   resolveSignerVersions,
   resolveTxVersion,
-  setWalletSignedTxVersionCeiling,
 } from "../src/txVersion";
 
 const TX_V1_GATE = "txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL";
@@ -182,7 +181,6 @@ describe("transaction version precedence", () => {
   beforeEach(() => resetTxVersionCache());
   afterEach(() => {
     delete process.env.HPL_TX_VERSION;
-    setWalletSignedTxVersionCeiling(0);
     resetTxVersionCache();
   });
 
@@ -206,12 +204,14 @@ describe("transaction version precedence", () => {
     expect(await resolveTxVersion(v1Node)).to.equal(0);
   });
 
-  it("HPL_TX_VERSION wins over signer capability", async () => {
+  it("signer capability caps HPL_TX_VERSION=v1", async () => {
     process.env.HPL_TX_VERSION = "v1";
     const { connection } = fakeConnection();
     expect(
-      await resolveTxVersion(connection, { wallet: adapterWallet(["legacy", 0]) })
-    ).to.equal(1);
+      await resolveTxVersion(connection, {
+        wallet: adapterWallet(["legacy", 0]),
+      })
+    ).to.equal(0);
   });
 
   it("per-call version wins over HPL_TX_VERSION", async () => {
@@ -284,6 +284,15 @@ describe("transaction version precedence", () => {
     ).to.equal(0);
   });
 
+  it("builds v0 for a v1-capable wallet adapter without a payer", async () => {
+    const { connection } = fakeConnection();
+    expect(
+      await resolveTxVersion(connection, {
+        wallet: adapterWallet(["legacy", 0, 1]),
+      })
+    ).to.equal(0);
+  });
+
   it("builds v0 for a keypair signer on a node without v1", async () => {
     const { connection } = fakeConnection({ solanaCore: "4.1.5" });
     expect(
@@ -291,19 +300,19 @@ describe("transaction version precedence", () => {
     ).to.equal(0);
   });
 
-  it("caps a v1-capable wallet adapter at the default ceiling of 0", async () => {
-    const { connection } = fakeConnection();
-    const wallet = adapterWallet(["legacy", 0, 1]);
-    expect(await resolveTxVersion(connection, { wallet })).to.equal(0);
-
-    setWalletSignedTxVersionCeiling(0);
-    expect(await resolveTxVersion(connection, { wallet })).to.equal(0);
-  });
-
-  it("refuses a wallet ceiling of 1 and keeps the ceiling at 0", async () => {
-    const { connection } = fakeConnection();
-    const wallet = adapterWallet(["legacy", 0, 1]);
-    expect(() => setWalletSignedTxVersionCeiling(1)).to.throw(/web3\.js 1\.x/);
-    expect(await resolveTxVersion(connection, { wallet })).to.equal(0);
+  it("resolves 0 for a v0-only wallet without calling the node", async () => {
+    const calls: string[] = [];
+    const connection: any = {
+      rpcEndpoint: "http://node",
+      getVersion: async () => calls.push("getVersion"),
+      getAccountInfo: async () => calls.push("getAccountInfo"),
+      getSlot: async () => calls.push("getSlot"),
+    };
+    expect(
+      await resolveTxVersion(connection, {
+        wallet: adapterWallet(["legacy", 0]),
+      })
+    ).to.equal(0);
+    expect(calls).to.be.empty;
   });
 });

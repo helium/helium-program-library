@@ -23,7 +23,8 @@ import { TransactionDraft } from "../src/draft";
 import { setLoadedAccountsDataSizeLimit } from "../src/priorityFees";
 import { resetTxVersionCache } from "../src/txVersion";
 
-const FEE_PAYER = Keypair.generate().publicKey;
+const FEE_PAYER_KEYPAIR = Keypair.generate();
+const FEE_PAYER = FEE_PAYER_KEYPAIR.publicKey;
 const NOOP_PROGRAM = Keypair.generate().publicKey;
 const BLOCKHASH = "EkSnNWid2cvwEVnVx9aBqawnmiCNiDgp3gUdkDPTKN1N";
 
@@ -299,6 +300,7 @@ describe("batchParallelInstructions", () => {
       connection: makeConnection(),
       wallet: {
         publicKey: FEE_PAYER,
+        payer: FEE_PAYER_KEYPAIR,
         signAllTransactions: async (signing: VersionedTransaction[]) => {
           txs = signing;
           throw SIGNED;
@@ -348,6 +350,45 @@ describe("batchParallelInstructions", () => {
       error = e;
     }
     expect(error?.message).to.include("4096").and.include("1232");
+  });
+
+  it("signs each chunk only with the extra signers its ixs need", async () => {
+    const signer = Keypair.generate();
+    const signerIx = new TransactionInstruction({
+      programId: NOOP_PROGRAM,
+      keys: [{ pubkey: signer.publicKey, isSigner: true, isWritable: false }],
+      data: Buffer.alloc(800, 1),
+    });
+    const sent: VersionedTransaction[] = [];
+    const provider = {
+      connection: {
+        ...makeConnection(),
+        getBlockHeight: async () => 0,
+        sendRawTransaction: async (raw: Buffer) => {
+          sent.push(VersionedTransaction.deserialize(raw));
+          return `sig${sent.length}`;
+        },
+        getTransactions: async (txids: string[]) =>
+          txids.map(() => ({ meta: { err: null } })),
+      },
+      wallet: {
+        publicKey: FEE_PAYER,
+        signAllTransactions: async (signing: VersionedTransaction[]) => {
+          signing.forEach((tx) => tx.sign([FEE_PAYER_KEYPAIR]));
+          return signing;
+        },
+      },
+    } as unknown as AnchorProvider;
+
+    await batchParallelInstructions({
+      provider,
+      instructions: [signerIx, dataIx(800)],
+      extraSigners: [signer],
+    });
+
+    expect(
+      sent.map((tx) => tx.message.header.numRequiredSignatures)
+    ).to.deep.equal([2, 1]);
   });
 });
 

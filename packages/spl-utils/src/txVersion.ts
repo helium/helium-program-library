@@ -13,7 +13,6 @@ const detectedVersions = new Map<string, Promise<0 | 1>>();
 const warnedEndpoints = new Set<string>();
 const loggedCapabilitySets = new Set<string>();
 let envTxVersion: TxVersionOption | undefined;
-let walletSignedTxVersionCeiling: 0 | 1 = 0;
 
 // Env is read once and only under Node; browser bundles have no process.env.
 function envTxVersionOption(): TxVersionOption {
@@ -27,20 +26,6 @@ function envTxVersionOption(): TxVersionOption {
     else throw new Error(`HPL_TX_VERSION must be v0, v1 or auto; got ${env}`);
   }
   return envTxVersion;
-}
-
-// Called once by the host app. Caps wallet-shaped signers only; a
-// keypair-backed wallet is never capped. Raising it to 1 is refused under
-// web3.js 1.x: a wallet-standard adapter returns a plain VersionedTransaction
-// whose v1 message web3.js cannot serialize, so sendInstructions would throw
-// after the user has signed.
-export function setWalletSignedTxVersionCeiling(ceiling: 0 | 1): void {
-  if (ceiling === 1) {
-    throw new Error(
-      "setWalletSignedTxVersionCeiling: a ceiling of 1 does not work under web3.js 1.x, which cannot serialize a v1 transaction a wallet adapter signed"
-    );
-  }
-  walletSignedTxVersionCeiling = ceiling;
 }
 
 // Signer capability (4.2 SPEC §2.2). A wallet-adapter object carries its own
@@ -59,10 +44,10 @@ export function resolveSignerVersions(
     versions = new Set<SignerTransactionVersion>(["legacy", 0]);
   }
 
-  // Logged so the team learns when a wallet vendor adds v1 and a ceiling-raise
-  // smoke is due; the ceiling never moves on its own. Keyed on the capability
-  // set, not the signer: signers come from request input, so a per-signer key
-  // grows without bound.
+  // Logged so the team learns when a wallet vendor adds v1. A wallet-signed tx
+  // is capped at v0 anyway, because web3.js 1.x cannot serialize a
+  // wallet-signed v1 tx. Keyed on the capability set, not the signer: signers
+  // come from request input, so a per-signer key grows without bound.
   const signer = wallet?.publicKey?.toBase58?.() ?? "unknown";
   const capabilitySet = [...versions].map(String).sort().join(",");
   if (!loggedCapabilitySets.has(capabilitySet)) {
@@ -116,10 +101,9 @@ function detectedTxVersion(connection: Connection): Promise<0 | 1> {
   return detected;
 }
 
-// Precedence (4.2 SPEC §2.2): per-call `version` > HPL_TX_VERSION > the
-// highest version both the node and the signer support, capped by the
-// wallet ceiling for wallet-shaped signers. Without a wallet only the node
-// is consulted.
+// Precedence (4.2 SPEC §2.2): per-call `version` > HPL_TX_VERSION=v0 (kill
+// switch) > signer capability > HPL_TX_VERSION=v1 or node detection. The
+// signer check runs before any RPC.
 export async function resolveTxVersion(
   connection: Connection,
   { version = "auto", wallet }: { version?: TxVersionOption; wallet?: any } = {}
@@ -127,12 +111,12 @@ export async function resolveTxVersion(
   // Read before the pin check so a typo throws on pinned calls too.
   const env = envTxVersionOption();
   if (version !== "auto") return version;
-  if (env !== "auto") return env;
-
-  const nodeVersion = await detectedTxVersion(connection);
+  if (env === 0) return 0;
+  if (wallet && !resolveSignerVersions(wallet).has(1)) return 0;
+  const nodeVersion = env === 1 ? 1 : await detectedTxVersion(connection);
   if (nodeVersion === 0 || !wallet) return nodeVersion;
-  if (!resolveSignerVersions(wallet).has(1)) return 0;
-  return wallet.payer ? 1 : walletSignedTxVersionCeiling;
+  // web3.js 1.x cannot serialize a v1 tx signed by a wallet adapter.
+  return wallet.payer ? 1 : 0;
 }
 
 export function resetTxVersionCache(): void {

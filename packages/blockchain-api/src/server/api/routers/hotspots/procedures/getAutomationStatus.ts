@@ -6,6 +6,7 @@ import {
   interpretCronString,
 } from "@/lib/utils/automation-helpers";
 import * as anchor from "@anchor-lang/core";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { publicProcedure } from "../../../procedures";
 import { fetchAutomationData } from "./automation-data-helpers";
 
@@ -36,7 +37,7 @@ export const getAutomationStatus =
 
       // Price the status with the same helper as getFundingEstimate, at
       // additionalDuration: 0 (current state), so its fields sum to that estimate.
-      const { rentFee, recipientFee, operationalSol } =
+      const { rentFeeLamports, recipientFeeLamports, operationalLamports } =
         estimateAutomationFunding({
           cronJobExists: !!cronJobAccount,
           baseAutomationRentLamports: cronJobAccount
@@ -117,9 +118,9 @@ export const getAutomationStatus =
           !!cronJobAccount && !cronJobAccount.removedFromQueue,
         isOutOfSol: cronJobAccount?.removedFromQueue || false,
         currentSchedule,
-        rentFee,
-        recipientFee,
-        operationalSol,
+        rentFee: rentFeeLamports / LAMPORTS_PER_SOL,
+        recipientFee: recipientFeeLamports / LAMPORTS_PER_SOL,
+        operationalSol: operationalLamports / LAMPORTS_PER_SOL,
         remainingClaims,
         fundingPeriodInfo,
         cronJobBalance: cronJobBalanceLamports.toString(),

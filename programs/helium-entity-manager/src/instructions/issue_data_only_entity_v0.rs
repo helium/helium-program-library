@@ -220,8 +220,10 @@ pub fn handler(ctx: Context<IssueDataOnlyEntityV0>, args: IssueDataOnlyEntityArg
     metadata,
   )?;
 
-  // Derived at issue time, not stored, so the fee follows rent down. Rent only falls, so each
-  // leaf's share covers the rent `update_data_only_tree_v0` reimburses at rotation.
+  // Derived at issue time, not stored, so the fee follows rent down. The fee is priced at
+  // issue-time rent. If rent rises before rotation, the escrow's surplus covers the
+  // difference; if it does not, `update_data_only_tree_v0`'s reimbursement fails and issuance
+  // stops once the tree fills until the escrow is topped up.
   let tree_fee = Rent::get()?
     .minimum_balance(ctx.accounts.data_only_config.new_tree_space as usize)
     .div_ceil(1u64 << ctx.accounts.data_only_config.new_tree_depth);

@@ -1,10 +1,10 @@
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
   estimateAutomationFunding,
   maxScheduleCronLength,
   resolveScheduleToCron,
+  scheduleChanged,
 } from "../../src/lib/utils/automation-helpers";
 
 describe("resolveScheduleToCron", () => {
@@ -28,6 +28,26 @@ describe("resolveScheduleToCron", () => {
   });
 });
 
+describe("scheduleChanged", () => {
+  const dailyCron = "0 30 14 * * *";
+
+  it("treats a stored daily crontab as the daily preset", () => {
+    expect(scheduleChanged(dailyCron, "daily")).to.equal(false);
+  });
+
+  it("sees a change from a stored daily crontab to the weekly preset", () => {
+    expect(scheduleChanged(dailyCron, "weekly")).to.equal(true);
+  });
+
+  it("compares raw crontabs as strings", () => {
+    expect(scheduleChanged(dailyCron, dailyCron)).to.equal(false);
+  });
+
+  it("sees a change from a stored every-6-hours crontab to the daily preset", () => {
+    expect(scheduleChanged("0 0 */6 * * *", "daily")).to.equal(true);
+  });
+});
+
 describe("maxScheduleCronLength", () => {
   it("bounds each preset at its longest crontab", () => {
     expect(maxScheduleCronLength("daily")).to.equal(14);
@@ -42,8 +62,6 @@ describe("maxScheduleCronLength", () => {
 });
 
 describe("estimateAutomationFunding", () => {
-  const toLamports = (sol: number) => Math.round(sol * LAMPORTS_PER_SOL);
-
   it("prices a first-time setup as the init rent and crank reward plus the setup transfers", () => {
     const baseAutomationRentLamports = 20_000_000;
     const minCrankRewardLamports = 15_000;
@@ -85,12 +103,12 @@ describe("estimateAutomationFunding", () => {
       recipientRentLamports +
       ataRentLamports +
       duration * pdaWalletCostPerClaimLamports;
-    expect(toLamports(estimate.rentFee)).to.equal(
+    expect(estimate.rentFeeLamports).to.equal(
       baseAutomationRentLamports + minCrankRewardLamports,
     );
-    expect(toLamports(estimate.cronJobFunding)).to.equal(cronJobTransfer);
-    expect(toLamports(estimate.pdaWalletFunding)).to.equal(pdaWalletTransfer);
-    expect(toLamports(estimate.totalSolNeeded)).to.equal(
+    expect(estimate.cronJobFundingLamports).to.equal(cronJobTransfer);
+    expect(estimate.pdaWalletFundingLamports).to.equal(pdaWalletTransfer);
+    expect(estimate.totalLamports).to.equal(
       baseAutomationRentLamports +
         minCrankRewardLamports +
         cronJobTransfer +
@@ -122,14 +140,15 @@ describe("estimateAutomationFunding", () => {
       taskReturnAccountFundingLamports: 0,
     });
 
-    // The new cron job holds only the rent init gives it, has no claims, and
-    // pays for its task-return accounts on its first run, so the transfer
-    // carries that funding plus one crank reward per run.
+    // The new cron job holds only the rent init gives it and pays for its
+    // task-return accounts on its first run. It is priced at the old cron
+    // job's two claims, so the transfer carries that funding plus 1 + 2 crank
+    // rewards per run.
     const taskReturnAccountFundingLamports = 10_000_000;
-    expect(toLamports(estimate.cronJobFunding)).to.equal(
-      taskReturnAccountFundingLamports + duration * minCrankRewardLamports,
+    expect(estimate.cronJobFundingLamports).to.equal(
+      taskReturnAccountFundingLamports + duration * 3 * minCrankRewardLamports,
     );
-    expect(toLamports(estimate.rentFee)).to.equal(
+    expect(estimate.rentFeeLamports).to.equal(
       baseAutomationRentLamports + minCrankRewardLamports,
     );
   });
@@ -154,10 +173,8 @@ describe("estimateAutomationFunding", () => {
     });
 
     // Target is 200 + 30 claims: 30 more for the cron job, 3 more for the PDA wallet.
-    expect(estimate.rentFee).to.equal(0);
-    expect(toLamports(estimate.totalSolNeeded)).to.equal(
-      30 * 10_000 + 3 * 40_000,
-    );
+    expect(estimate.rentFeeLamports).to.equal(0);
+    expect(estimate.totalLamports).to.equal(30 * 10_000 + 3 * 40_000);
   });
 
   it("charges the recipient rent once when the PDA balance covers part of it", () => {
@@ -196,8 +213,8 @@ describe("estimateAutomationFunding", () => {
       recipientRentLamports +
       ataRentLamports -
       pdaWalletBalanceLamports;
-    expect(estimate.recipientFee).to.equal(0);
-    expect(toLamports(estimate.totalSolNeeded)).to.equal(
+    expect(estimate.recipientFeeLamports).to.equal(0);
+    expect(estimate.totalLamports).to.equal(
       pdaWalletRentShortfall + duration * pdaWalletCostPerClaimLamports,
     );
   });
@@ -230,8 +247,43 @@ describe("estimateAutomationFunding", () => {
       taskReturnAccountFundingLamports: 0,
     });
 
-    expect(toLamports(estimate.pdaWalletFunding)).to.equal(
+    expect(estimate.pdaWalletFundingLamports).to.equal(
       duration * pdaWalletCostPerClaimLamports,
+    );
+  });
+
+  it("does not add the task-return funding twice when the balance holds it", () => {
+    const cronJobRentLamports = 3_000_000;
+    const taskReturnAccountFundingLamports = 10_000_000;
+    const cronJobCostPerClaimLamports = 10_000;
+    const pdaWalletRentLamports = 890_880;
+    const pdaWalletCostPerClaimLamports = 40_000;
+    const runs = 30;
+    const duration = 30;
+
+    const estimate = estimateAutomationFunding({
+      cronJobExists: true,
+      baseAutomationRentLamports: 0,
+      minCrankRewardLamports: cronJobCostPerClaimLamports,
+      // Rent, the task-return funding and `runs` claims.
+      cronJobBalanceLamports:
+        cronJobRentLamports +
+        taskReturnAccountFundingLamports +
+        runs * cronJobCostPerClaimLamports,
+      cronJobRentLamports,
+      cronJobCostPerClaimLamports,
+      pdaWalletBalanceLamports:
+        pdaWalletRentLamports + runs * pdaWalletCostPerClaimLamports,
+      pdaWalletCostPerClaimLamports,
+      recipientRentLamports: 0,
+      pdaWalletRentLamports,
+      additionalDuration: duration,
+      ataRentLamports: 0,
+      taskReturnAccountFundingLamports,
+    });
+
+    expect(estimate.cronJobFundingLamports).to.equal(
+      duration * cronJobCostPerClaimLamports,
     );
   });
 });

@@ -11,7 +11,7 @@ import {
 import { expect } from "chai";
 import { setLoadedAccountsDataSizeLimit } from "../src/priorityFees";
 import { toVersionedTx } from "../src/transaction";
-import { toV1TransactionConfig } from "../src/v1Transaction";
+import { exceedsV1Limits, toV1TransactionConfig } from "../src/v1Transaction";
 
 const payer = Keypair.generate();
 const transfer = SystemProgram.transfer({
@@ -133,5 +133,19 @@ describe("toVersionedTx", () => {
     const signature = new Uint8Array(64).fill(7);
     tx.addSignature(payer.publicKey, signature);
     expect(tx.serialize().slice(-64)).to.deep.equal(signature);
+  });
+});
+
+describe("exceedsV1Limits", () => {
+  it("allows 64 instructions", () => {
+    expect(exceedsV1Limits(payer.publicKey, Array(64).fill(transfer))).to.equal(
+      false
+    );
+  });
+
+  it("rejects 65 instructions", () => {
+    expect(exceedsV1Limits(payer.publicKey, Array(65).fill(transfer))).to.equal(
+      true
+    );
   });
 });

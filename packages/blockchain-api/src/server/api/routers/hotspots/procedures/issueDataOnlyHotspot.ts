@@ -172,6 +172,8 @@ export const issueDataOnlyHotspot =
           txFeeLamports: totalFee,
           entityKeyLen: entityKeyBytes.length,
           newTreeFeeLamports: dataOnlyConfig.newTreeFeeLamports.toNumber(),
+          newTreeSpace: dataOnlyConfig.newTreeSpace.toNumber(),
+          newTreeDepth: dataOnlyConfig.newTreeDepth,
         });
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({

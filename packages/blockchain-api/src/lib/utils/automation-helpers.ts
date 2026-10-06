@@ -78,6 +78,16 @@ export function resolveScheduleToCron(scheduleOrCron: string): string {
     : scheduleOrCron;
 }
 
+const PRESET_SHAPE: Record<Schedule, RegExp> = {
+  daily: /^\d+ \d+ \d+ \* \* \*$/,
+  weekly: /^\d+ \d+ \d+ \* \* \d+$/,
+  monthly: /^\d+ \d+ \d+ \d+ \* \*$/,
+};
+export const scheduleChanged = (stored: string, input: string): boolean =>
+  (SCHEDULE_PRESETS as readonly string[]).includes(input)
+    ? !PRESET_SHAPE[input as Schedule].test(stored)
+    : stored !== input;
+
 /**
  * Longest crontab a setup input can resolve to. Presets resolve from the clock
  * without padding, so createAutomation can resolve a longer one than an
@@ -428,16 +438,8 @@ export function calculateFundingForAdditionalDuration(
   const pdaWalletFundingWithShortfall =
     fundingNeeded.pdaWalletFundingLamports + pdaWalletRentShortfall;
 
-  // However, if there's no shortfall (balance already covers rent), we still need to add
-  // task return account funding if it doesn't exist yet (one-time creation cost)
-  const cronJobFundingWithTaskReturn =
-    cronJobFundingWithShortfall +
-    (cronJobRentShortfall === 0 && taskReturnAccountFundingLamports > 0
-      ? taskReturnAccountFundingLamports
-      : 0);
-
   return {
-    cronJobFundingLamports: cronJobFundingWithTaskReturn,
+    cronJobFundingLamports: cronJobFundingWithShortfall,
     pdaWalletFundingLamports: pdaWalletFundingWithShortfall,
     // The PDA wallet shortfall above already holds all of the recipient rent
     // whenever the balance does not cover it, so none is charged on top.
@@ -460,21 +462,21 @@ export interface EstimateAutomationFundingParams extends CalculateFundingForAddi
 export const estimateAutomationFunding = (
   params: EstimateAutomationFundingParams,
 ): {
-  rentFee: number;
-  cronJobFunding: number;
-  pdaWalletFunding: number;
-  recipientFee: number;
-  operationalSol: number;
-  totalSolNeeded: number;
+  rentFeeLamports: number;
+  cronJobFundingLamports: number;
+  pdaWalletFundingLamports: number;
+  recipientFeeLamports: number;
+  operationalLamports: number;
+  totalLamports: number;
 } => {
   const { cronJobExists, baseAutomationRentLamports, minCrankRewardLamports } =
     params;
 
   // The task-return funding is left out: the cron job transfer below already
   // carries it.
-  const rentFee = cronJobExists
+  const rentFeeLamports = cronJobExists
     ? 0
-    : (baseAutomationRentLamports + minCrankRewardLamports) / LAMPORTS_PER_SOL;
+    : baseAutomationRentLamports + minCrankRewardLamports;
 
   const {
     cronJobFundingLamports,
@@ -484,35 +486,30 @@ export const estimateAutomationFunding = (
     cronJobExists
       ? params
       : {
-          // A cron job init is about to create starts with only its rent, no
-          // claims and no task-return accounts, whatever an old cron job a
-          // teardown refunds held.
+          // A cron job init is about to create starts with only its rent and
+          // no task-return accounts, whatever an old cron job a teardown
+          // refunds held. It is priced at the old cron job's claim count.
           ...params,
           cronJobBalanceLamports: 0,
           cronJobRentLamports: 0,
-          cronJobCostPerClaimLamports: calculateCronJobCostPerClaim(
-            minCrankRewardLamports,
-            0,
-          ),
           taskReturnAccountFundingLamports: Math.ceil(
             TASK_RETURN_ACCOUNT_FUNDING_SOL * LAMPORTS_PER_SOL,
           ),
         },
   );
 
-  const cronJobFunding = cronJobFundingLamports / LAMPORTS_PER_SOL;
-  const pdaWalletFunding = pdaWalletFundingLamports / LAMPORTS_PER_SOL;
-  const recipientFee = recipientFeeLamports / LAMPORTS_PER_SOL;
-  const operationalSol = cronJobFunding + pdaWalletFunding;
-  // recipientFee is 0: pdaWalletFunding already carries the recipient rent.
-  const totalSolNeeded = rentFee + operationalSol + recipientFee;
+  const operationalLamports = cronJobFundingLamports + pdaWalletFundingLamports;
+  // recipientFeeLamports is 0: pdaWalletFundingLamports already carries the
+  // recipient rent.
+  const totalLamports =
+    rentFeeLamports + operationalLamports + recipientFeeLamports;
 
   return {
-    rentFee,
-    cronJobFunding,
-    pdaWalletFunding,
-    recipientFee,
-    operationalSol,
-    totalSolNeeded,
+    rentFeeLamports,
+    cronJobFundingLamports,
+    pdaWalletFundingLamports,
+    recipientFeeLamports,
+    operationalLamports,
+    totalLamports,
   };
 };

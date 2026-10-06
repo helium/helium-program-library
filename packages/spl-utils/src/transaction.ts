@@ -84,9 +84,7 @@ export const getAddressLookupTableAccounts = async (
 
 // Only a resolved 1 builds v1; resolveTxVersion holds the node and signer
 // checks, so an unresolved "auto" stays v0 here.
-export async function toVersionedTx(
-  tx: TransactionDraft
-): Promise<VersionedTransaction> {
+export function toVersionedTx(tx: TransactionDraft): VersionedTransaction {
   if (tx.version === 1) {
     return compileV1Transaction({
       feePayer: tx.feePayer,
@@ -135,6 +133,11 @@ export async function sendInstructionsWithPriorityFee(
     loadedAccountsDataSizeLimit?: number;
   } = {}
 ): Promise<string> {
+  const resolved = await resolveTxVersion(provider.connection, {
+    wallet: provider.wallet,
+  });
+  const version =
+    resolved === 1 && exceedsV1Limits(payer, instructions) ? 0 : resolved;
   return await sendInstructions(
     provider,
     await withPriorityFees({
@@ -146,11 +149,13 @@ export async function sendInstructionsWithPriorityFee(
       priorityFeeOptions,
       loadedAccountsDataSizeLimit,
       feePayer: payer,
+      version,
     }),
     signers,
     payer,
     commitment,
-    idlErrors
+    idlErrors,
+    version
   );
 }
 
@@ -160,22 +165,26 @@ export async function sendInstructions(
   signers: Signer[] = [],
   payer: PublicKey = provider.wallet.publicKey,
   commitment: Commitment = "confirmed",
-  idlErrors: Map<number, string> = new Map()
+  idlErrors: Map<number, string> = new Map(),
+  version?: 0 | 1
 ): Promise<string> {
   if (instructions.length == 0) {
     return "";
   }
 
   const feePayer = payer || provider.wallet.publicKey;
+  const resolved =
+    version ??
+    (await resolveTxVersion(provider.connection, { wallet: provider.wallet }));
+  const txVersion =
+    resolved === 1 && exceedsV1Limits(feePayer, instructions) ? 0 : resolved;
   let tx = await toVersionedTx({
     feePayer,
     recentBlockhash: (
       await provider.connection.getLatestBlockhash(commitment)
     ).blockhash,
     instructions,
-    version: await resolveTxVersion(provider.connection, {
-      wallet: provider.wallet,
-    }),
+    version: txVersion,
   });
   if (signers.length > 0) {
     tx.sign(signers);
@@ -882,7 +891,11 @@ export async function batchParallelInstructions({
     recentBlockhash: blockhash,
     instructions: chunk,
     addressLookupTableAddresses,
-    signers: extraSigners,
+    signers: extraSigners.filter((s) =>
+      chunk.some((ix) =>
+        ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
+      )
+    ),
     addressLookupTables,
     version: chunkVersion,
   });

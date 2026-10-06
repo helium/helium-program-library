@@ -213,8 +213,11 @@ export const useAutomateHotspotClaims = ({
       recipient,
       ata: ataRent,
       baseAutomation: base.reduce((sum, lamports) => sum + lamports, 0),
+      cronJob: await connection.getMinimumBalanceForRentExemption(
+        cronJobSolanaAccount?.data.length ?? 0
+      ),
     };
-  }, [provider?.connection]);
+  }, [provider?.connection, cronJobSolanaAccount?.data.length]);
   // No provider yet resolves undefined rather than pending, so missing rent
   // without an error is still loading (it clears once the provider connects).
   // The fee quotes and insufficientSol below are not final while this holds;
@@ -240,8 +243,17 @@ export const useAutomateHotspotClaims = ({
         minCrankRewardLamports: taskQueue?.minCrankReward?.toNumber() || 10000,
         existingCronJobLamports: cronJobSolanaAccount?.lamports || 0,
         baseAutomationRentLamports: rent?.baseAutomation ?? 0,
+        numCronTransactions: cronJobAccount?.nextTransactionId ?? 0,
+        existingCronJobRentLamports: rent?.cronJob ?? 0,
       }),
-    [recreatesCronJob, duration, taskQueue, cronJobSolanaAccount, rent]
+    [
+      recreatesCronJob,
+      duration,
+      taskQueue,
+      cronJobSolanaAccount,
+      cronJobAccount,
+      rent,
+    ]
   );
   const crankSolFee = cronFunding.crankSolFee;
   const pdaWalletSolFee = useMemo(() => {
@@ -451,7 +463,12 @@ export const useAutomateHotspotClaims = ({
   const userSolBalance = Number(userSol || 0) / LAMPORTS_PER_SOL;
   const minimumRequiredBalance =
     (rent?.walletMin ?? 0) / LAMPORTS_PER_SOL + EST_TX_FEE;
-  const availableUserBalance = userSolBalance - minimumRequiredBalance;
+  const availableUserBalance =
+    userSolBalance -
+    minimumRequiredBalance +
+    (recreatesCronJob && cronJobSolanaAccount
+      ? cronJobSolanaAccount.lamports / LAMPORTS_PER_SOL
+      : 0);
 
   return {
     loading: loading || removing || rentPending,

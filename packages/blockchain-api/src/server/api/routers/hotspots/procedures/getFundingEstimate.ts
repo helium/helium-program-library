@@ -5,8 +5,9 @@ import {
   getBaseAutomationRentLamports,
   estimateAutomationFunding,
   maxScheduleCronLength,
-  resolveScheduleToCron,
+  scheduleChanged,
 } from "@/lib/utils/automation-helpers";
+import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { fetchAutomationData } from "./automation-data-helpers";
 
 /**
@@ -43,7 +44,7 @@ export const getFundingEstimate =
         !cronJobAccount ||
         (schedule !== undefined &&
           !!cronJobAccount.schedule &&
-          cronJobAccount.schedule !== resolveScheduleToCron(schedule));
+          scheduleChanged(cronJobAccount.schedule, schedule));
 
       const funding = estimateAutomationFunding({
         cronJobExists: !recreatesCronJob,
@@ -69,7 +70,12 @@ export const getFundingEstimate =
       });
 
       return {
-        ...funding,
+        rentFee: funding.rentFeeLamports / LAMPORTS_PER_SOL,
+        cronJobFunding: funding.cronJobFundingLamports / LAMPORTS_PER_SOL,
+        pdaWalletFunding: funding.pdaWalletFundingLamports / LAMPORTS_PER_SOL,
+        recipientFee: funding.recipientFeeLamports / LAMPORTS_PER_SOL,
+        operationalSol: funding.operationalLamports / LAMPORTS_PER_SOL,
+        totalSolNeeded: funding.totalLamports / LAMPORTS_PER_SOL,
         currentCronJobBalance: cronJobBalanceLamports.toString(),
         currentPdaWalletBalance: pdaWalletBalanceLamports.toString(),
       };
