@@ -462,7 +462,7 @@ jobs:
           name: ${{ steps.localnet-logs.outputs.name }}
           path: |
             .anchor/program-logs/
-            .anchor/test-ledger/test-ledger-log.txt
+            .anchor/test-ledger/validator.log
             /tmp/localnet.log
           if-no-files-found: warn
           retention-days: 14
