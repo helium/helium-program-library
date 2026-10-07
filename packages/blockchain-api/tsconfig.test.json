@@ -19,7 +19,9 @@
     "strict": true,
     "target": "es6",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@helium/blockchain-api": ["../blockchain-api-client/src/index.ts"],
+      "@helium/blockchain-api/*": ["../blockchain-api-client/src/*"]
     }
   }
 }

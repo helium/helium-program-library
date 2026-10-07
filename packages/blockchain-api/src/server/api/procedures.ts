@@ -1,6 +1,7 @@
 import { implement, os, type Middleware, ORPCError } from "@orpc/server";
 import type { Meta } from "@orpc/contract";
-import { cookies, headers } from "next/headers";
+import { getCookie } from "@orpc/server/helpers";
+import type { RequestHeadersPluginContext } from "@orpc/server/plugins";
 import { privy } from "@/lib/privy";
 import { env } from "@/lib/env";
 import { summarizeProcedureInput } from "@/lib/utils/log-input";
@@ -18,6 +19,12 @@ export interface SessionContext {
   /** Full Privy user object */
   user: User;
 }
+
+/**
+ * Initial context every procedure receives. `reqHeaders` is filled by
+ * `RequestHeadersPlugin` on both handlers.
+ */
+export type AppContext = RequestHeadersPluginContext;
 
 /**
  * Context available to authenticated procedures.
@@ -74,7 +81,9 @@ const timingMiddleware = os.middleware(async ({ next, path }, input) => {
  * guarantee that a user querying is authorized, but you can still access user session data if they
  * are logged in.
  */
-export const publicProcedure = implement(fullApiContract).use(timingMiddleware);
+export const publicProcedure = implement(fullApiContract)
+  .$context<AppContext>()
+  .use(timingMiddleware);
 
 /**
  * Error constructor map that requires UNAUTHENTICATED error.
@@ -100,19 +109,18 @@ type AuthErrorConstructorMap = {
  * ```
  */
 export const withAuth: Middleware<
-  Record<never, never>,
+  AppContext,
   AuthenticatedContext,
   unknown,
   any,
   AuthErrorConstructorMap,
   Meta
 > = async ({ context, next, errors }) => {
-  const cookieStore = await cookies();
-  let idToken = cookieStore.get("privy-id-token")?.value;
+  const headerStore = context.reqHeaders;
+  let idToken = getCookie(headerStore, "privy-id-token");
 
   if (!idToken) {
-    const headerStore = await headers();
-    const authHeader = headerStore.get("authorization");
+    const authHeader = headerStore?.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
       idToken = authHeader.slice(7);
     }
@@ -135,8 +143,7 @@ export const withAuth: Middleware<
 
   // Debug: allow overriding wallet address via x-view-as header (dev only)
   if (env.NODE_ENV === "development") {
-    const headerStore = await headers();
-    const viewAs = headerStore.get("x-view-as");
+    const viewAs = headerStore?.get("x-view-as");
     if (viewAs) {
       walletAddress = viewAs;
     }

@@ -26,7 +26,7 @@ import {
   createAndFundPosition,
   setDelegatedPositionExpiration,
 } from "./helpers/governance";
-import { stopNextServer } from "./helpers/next";
+import { stopServer } from "./helpers/server";
 import {
   ensureSurfpool,
   getSurfpoolRpcUrl,
@@ -133,7 +133,7 @@ describe("delegatePositions account resolution", () => {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     rpc?.server.closeAllConnections?.();
     rpc?.server.close();
     await stopSurfpool();

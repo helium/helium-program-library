@@ -6,7 +6,7 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
-import { stopNextServer } from "./helpers/next";
+import { stopServer } from "./helpers/server";
 import { stopSurfpool } from "./helpers/surfpool";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import { setupTestCtx, TestCtx } from "./helpers/context";
@@ -28,7 +28,7 @@ describe("welcome-pack", () => {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

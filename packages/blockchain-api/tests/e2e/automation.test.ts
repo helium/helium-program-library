@@ -23,7 +23,7 @@ import {
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
-import { ensureNextServer, stopNextServer } from "./helpers/next";
+import { ensureServer, rpcUrl, stopServer } from "./helpers/server";
 import {
   ensureSurfpool,
   getSurfpoolRpcUrl,
@@ -76,17 +76,17 @@ describe("automation endpoints", () => {
     }
     applyMinimalServerEnv();
     await ensureSurfpool();
-    await ensureNextServer();
+    await ensureServer();
     payer = loadKeypairFromEnv();
     connection = new Connection(getSurfpoolRpcUrl(), "confirmed");
     await ensureFunds(payer.publicKey, 0.5 * LAMPORTS_PER_SOL);
 
-    const link = new RPCLink({ url: "http://127.0.0.1:3000/rpc" });
+    const link = new RPCLink({ url: rpcUrl() });
     client = createORPCClient(link);
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

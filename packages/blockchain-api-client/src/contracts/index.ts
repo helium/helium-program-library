@@ -6,8 +6,6 @@ import { rewardContract } from "./reward-contract";
 import { swapContract } from "./swap";
 import { transactionsContract } from "./transactions";
 import { welcomePacksContract } from "./welcome-packs";
-import { fiatContract } from "./fiat";
-import { webhooksContract } from "./webhooks";
 import { migrationContract } from "./migration";
 import { dataCreditsContract } from "./data-credits";
 import { squadsContract } from "./squads";
@@ -21,8 +19,6 @@ export * from "./reward-contract";
 export * from "./swap";
 export * from "./transactions";
 export * from "./welcome-packs";
-export * from "./fiat";
-export * from "./webhooks";
 export * from "./migration";
 export * from "./data-credits";
 export * from "./squads";
@@ -51,7 +47,5 @@ export const apiContract = oc.router({
  */
 export const fullApiContract = oc.router({
   ...apiContract,
-  fiat: fiatContract,
-  webhooks: webhooksContract,
   migration: migrationContract,
 });
