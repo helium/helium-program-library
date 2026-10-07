@@ -297,9 +297,6 @@ importers:
       fastify-plugin:
         specifier: ^4.5.1
         version: 4.5.1
-      fzstd:
-        specifier: ^0.1.1
-        version: 0.1.1
       h3-js:
         specifier: ^4.1.0
         version: 4.4.0
@@ -334,6 +331,9 @@ importers:
         specifier: ^17.7.1
         version: 17.7.2
     devDependencies:
+      '@swc-node/register':
+        specifier: ^1.11.1
+        version: 1.11.1(@swc/core@1.15.18(@swc/helpers@0.5.19))(@swc/types@0.1.25)(typescript@5.9.3)
       '@types/async-retry':
         specifier: ^1.4.8
         version: 1.4.8
@@ -343,12 +343,18 @@ importers:
       '@types/bs58':
         specifier: ^4.0.1
         version: 4.0.4
+      '@types/chai':
+        specifier: ^4.3.0
+        version: 4.3.5
       '@types/cron':
         specifier: ^2.4.0
         version: 2.4.0
       '@types/lodash':
         specifier: ^4.14.195
         version: 4.17.16
+      '@types/mocha':
+        specifier: ^9.0.0
+        version: 9.1.1
       '@types/node':
         specifier: ^18.11.11
         version: 18.17.12
@@ -361,9 +367,15 @@ importers:
       '@types/yargs':
         specifier: ^17.0.24
         version: 17.0.24
+      chai:
+        specifier: ^4.3.4
+        version: 4.3.8
       git-format-staged:
         specifier: ^2.1.3
         version: 2.1.3
+      mocha:
+        specifier: ^9.0.3
+        version: 9.2.2
       ts-loader:
         specifier: ^9.2.3
         version: 9.4.4(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.19)))
@@ -10765,9 +10777,6 @@ packages:
   fzstd@0.0.4:
     resolution: {integrity: sha512-GNZEyoB2+mGNGhBBdRiPF1WE3xRK5VTOXFNiM8YqUmo5Lo/XeyvLtSSrWLN3NS7JRnwolabqsmE970MiqI69Ug==}
 
-  fzstd@0.1.1:
-    resolution: {integrity: sha512-dkuVSOKKwh3eas5VkJy1AW1vFpet8TA/fGmVA5krThl8YcOVE/8ZIoEA1+U1vEn5ckxxhLirSdY837azmbaNHA==}
-
   gauge@3.0.2:
     resolution: {integrity: sha512-+5J6MS/5XksCuXq++uFRsnUd7Ovu1XenbeuIuNRJxYWjgQbPuFhT14lAvsWfqfAmnwluf1OwMjz39HjfLPci0Q==}
     engines: {node: '>=10'}
@@ -12925,10 +12934,12 @@ packages:
   prom-client@14.2.0:
     resolution: {integrity: sha512-sF308EhTenb/pDRPakm+WgiN+VdM/T1RaHj1x+MvAuT8UiQP8JmOEbxVqtkbfR4LrvOg5n7ic01kRBDGXjYikA==}
     engines: {node: '>=10'}
+    deprecated: prom-client has been replaced by @prometheus-io/client
 
   prom-client@15.0.0:
     resolution: {integrity: sha512-UocpgIrKyA2TKLVZDSfm8rGkL13C19YrQBAiG3xo3aDFWcHedxRxI3z+cIcucoxpSO0h5lff5iv/SXoxyeopeA==}
     engines: {node: ^16 || ^18 || >=20}
+    deprecated: prom-client has been replaced by @prometheus-io/client
 
   promise-inflight@1.0.1:
     resolution: {integrity: sha512-6zWPyEOFaQBJYcGMHBKTKJ3u6TBsnMFOIZSa6ce1e/ZrrsOlnHRHbabMjLiBYKp+n44X9eUI6VUPaukCXHuG4g==}
@@ -26077,8 +26088,6 @@ snapshots:
   functions-have-names@1.2.3: {}
 
   fzstd@0.0.4: {}
-
-  fzstd@0.1.1: {}
 
   gauge@3.0.2:
     dependencies:
