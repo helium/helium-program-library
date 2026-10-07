@@ -90,7 +90,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
     const vtxs = (
       await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
         addressLookupTableAddresses: [
-          process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
+          process.env.SOLANA_CLUSTER?.trim() === "devnet"
             ? HELIUM_COMMON_LUT_DEVNET
             : HELIUM_COMMON_LUT,
         ],

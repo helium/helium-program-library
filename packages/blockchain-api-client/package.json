@@ -21,22 +21,27 @@
   ],
   "exports": {
     ".": {
+      "module-sync": "./dist/index.js",
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
     "./contracts": {
+      "module-sync": "./dist/contracts.js",
       "import": "./dist/contracts.js",
       "types": "./dist/contracts.d.ts"
     },
     "./schemas": {
+      "module-sync": "./dist/schemas.js",
       "import": "./dist/schemas.js",
       "types": "./dist/schemas.d.ts"
     },
     "./schemas/*": {
+      "module-sync": "./dist/schemas/*.js",
       "import": "./dist/schemas/*.js",
       "types": "./dist/schemas/*.d.ts"
     },
     "./errors": {
+      "module-sync": "./dist/errors.js",
       "import": "./dist/errors.js",
       "types": "./dist/errors.d.ts"
     }

@@ -6,8 +6,7 @@
  * An allowlist rather than a list of fields to hide: a schema that gains a
  * field gains it unlisted, and an unlisted field's value is not logged. Naming
  * the fields to withhold instead would make every new secret loggable until
- * somebody remembered to add it -- and `fiat.createBankAccount` alone carries
- * an account number, a routing number, a name and a home address.
+ * somebody remembered to add it.
  */
 const LOGGABLE_INPUT_FIELDS = new Set([
   "actionType",
@@ -73,7 +72,7 @@ export function summarizeProcedureInput(input: unknown): string {
     ([key, value]) =>
       LOGGABLE_INPUT_FIELDS.has(key) && isLoggableValue(value)
         ? `${key}=${JSON.stringify(value)}`
-        : key
+        : key,
   );
   if (fields.length === 0) {
     return "";

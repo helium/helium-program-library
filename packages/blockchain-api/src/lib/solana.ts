@@ -14,7 +14,7 @@ export interface SolanaConnection {
 }
 
 export function getCluster(): string {
-  return process.env.NEXT_PUBLIC_SOLANA_CLUSTER || "mainnet";
+  return process.env.SOLANA_CLUSTER || "mainnet";
 }
 
 /** The DAS endpoint asset reads go through; the RPC when none is configured. */
