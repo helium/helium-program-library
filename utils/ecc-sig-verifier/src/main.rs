@@ -6,7 +6,7 @@ use anchor_lang::{
   prelude::{borsh, Pubkey},
   AnchorDeserialize, AnchorSerialize,
 };
-use helium_crypto::{PublicKey, Verify};
+use helium_crypto::{Network, PublicKey, Verify};
 use rocket::{
   http::Status,
   serde::{json::Json, Deserialize, Serialize},
@@ -151,29 +151,19 @@ async fn verify(verify: Json<VerifyRequest<'_>>) -> Result<Json<VerifyResult>, S
     return Err(Status::BadRequest);
   }
 
-  let pubkey: PublicKey = if discriminator == Some(&issue_sighash[..]) {
-    let issue_entity = IssueEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
-      error!("Failed to decode instruction: {:?}", e);
-      Status::BadRequest
-    })?;
-    let keystr = bs58::encode(&issue_entity.entity_key).into_string();
-    info!("key: {:?}", keystr);
-    PublicKey::from_str(&keystr).map_err(|e| {
-      error!("failed to parse pubkey: {:?}", e);
-      Status::BadRequest
-    })?
+  let entity_key = if discriminator == Some(&issue_sighash[..]) {
+    IssueEntityArgsV0::try_from_slice(&ixn.data[8..]).map(|args| args.entity_key)
   } else {
-    let issue_entity = IssueDataOnlyEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
-      error!("Failed to decode instruction: {:?}", e);
-      Status::BadRequest
-    })?;
-    let keystr = bs58::encode(&issue_entity.entity_key).into_string();
-    info!("key: {:?}", keystr);
-    PublicKey::from_str(&keystr).map_err(|e| {
-      error!("failed to parse pubkey: {:?}", e);
-      Status::BadRequest
-    })?
-  };
+    IssueDataOnlyEntityArgsV0::try_from_slice(&ixn.data[8..]).map(|args| args.entity_key)
+  }
+  .map_err(|e| {
+    error!("Failed to decode instruction: {:?}", e);
+    Status::BadRequest
+  })?;
+  let pubkey = mainnet_entity_key(&entity_key).ok_or_else(|| {
+    error!("Entity key is not a canonical mainnet key");
+    Status::BadRequest
+  })?;
   info!("pubkey: {:?}", pubkey.to_string());
 
   // Verify the ecc signature against the message
@@ -209,6 +199,16 @@ async fn verify(verify: Json<VerifyRequest<'_>>) -> Result<Json<VerifyResult>, S
   }))
 }
 
+/// The mainnet key `entity_key` encodes, when it is that key's canonical encoding. The program
+/// keys an entity by these raw bytes, so any other encoding of the same key would be a second
+/// entity.
+fn mainnet_entity_key(entity_key: &[u8]) -> Option<PublicKey> {
+  let keystr = bs58::encode(entity_key).into_string();
+  PublicKey::from_str(&keystr)
+    .ok()
+    .filter(|pubkey| pubkey.network == Network::MainNet && pubkey.to_string() == keystr)
+}
+
 /// Read-only signers follow the writable signers in the account keys, and the runtime requires
 /// the fee payer to be writable, so a read-only signer is never the fee payer and no instruction
 /// can debit it.
@@ -241,10 +241,10 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
 mod tests {
   use std::sync::Once;
 
-  use helium_crypto::{KeyTag, Keypair as EccKeypair, Sign};
+  use helium_crypto::{KeyTag, KeyType, Keypair as EccKeypair, Sign};
   use rocket::{http::ContentType, local::blocking::Client};
   use solana_sdk::{
-    hash::Hash,
+    hash::{hash, Hash},
     instruction::{AccountMeta, Instruction},
     message::{
       v0::{self, MessageAddressTableLookup},
@@ -254,6 +254,9 @@ mod tests {
   };
 
   use super::*;
+
+  // An RSA entity key issued on mainnet.
+  const RSA_ENTITY_KEY: &str = "1trSusewwjw41wwqDPiqphgiKrzqgzcyA81QLzNcpQxu17SY1yUiUQ6Muw1BvE3gYN4f5hpLafNorgX752h9md9CzrzkcVMfcY9pZKktWyXCnPRTzNerqPWhbU5NPMLdZdoQJYFi4sJncHH9eCXnLa3CasLpotEqH9ZkQ35tzyL66WmDvDNpUxvppB8jENZ3uSZWJ72x1f4WcFCm2uKX2QR849MyBFw9f6Njusk9Yatzf737X4sPoU7G6AyPkNaeLQ4yvAct5KHncmZWz6xCCTCB1Qc92CRPu7p5rG4TA3NV7hiVmn7DeRL7JDcn5WTr4wtXFfAT8ykr1UN7v7yrj8EbvwjZ2L3yvmAzyyYFJQoh19";
 
   static WRITE_VERIFIER_KEYPAIR: Once = Once::new();
 
@@ -278,10 +281,18 @@ mod tests {
     gateway(9)
   }
 
-  fn issue_data(gateway: &EccKeypair) -> Vec<u8> {
-    let entity_key = bs58::decode(gateway.public_key().to_string())
+  // The canonical entity key bytes: version byte, key, checksum.
+  fn entity_key(gateway: &EccKeypair) -> Vec<u8> {
+    bs58::decode(gateway.public_key().to_string())
       .into_vec()
-      .expect("decode gateway key");
+      .expect("decode gateway key")
+  }
+
+  fn issue_data(gateway: &EccKeypair) -> Vec<u8> {
+    issue_data_for(entity_key(gateway))
+  }
+
+  fn issue_data_for(entity_key: Vec<u8>) -> Vec<u8> {
     let mut data = sighash("global", "issue_data_only_entity_v0").to_vec();
     data.extend(
       IssueDataOnlyEntityArgsV0 { entity_key }
@@ -324,12 +335,16 @@ mod tests {
 
   // A request carrying a valid signature from `signing_gateway`.
   fn request(transaction: &VersionedTransaction) -> String {
+    request_signed_by(transaction, &signing_gateway())
+  }
+
+  fn request_signed_by(transaction: &VersionedTransaction, gateway: &EccKeypair) -> String {
     let msg = b"add gateway";
     format!(
       r#"{{"transaction":"{}","msg":"{}","signature":"{}"}}"#,
       hex::encode(bincode::serialize(transaction).expect("serialize transaction")),
       hex::encode(msg),
-      hex::encode(signing_gateway().sign(msg).expect("sign msg")),
+      hex::encode(gateway.sign(msg).expect("sign msg")),
     )
   }
 
@@ -541,6 +556,64 @@ mod tests {
     );
     unsigned.signatures.clear();
     assert_eq!(post(request(&unsigned)), Status::BadRequest);
+  }
+
+  #[test]
+  fn refuses_a_testnet_entity_key() {
+    let owner = Pubkey::new_unique();
+    let testnet_gateway = EccKeypair::generate_from_entropy(
+      KeyTag {
+        network: Network::TestNet,
+        key_type: KeyType::Ed25519,
+      },
+      &[11; 32],
+    )
+    .expect("derive testnet gateway keypair");
+    let transaction = transaction(
+      &owner,
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&owner, &testnet_gateway),
+      ],
+    );
+    assert_eq!(
+      post(request_signed_by(&transaction, &testnet_gateway)),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_non_canonical_encoding_of_the_signing_key() {
+    // The signing key's bytes with one byte appended, under a valid checksum.
+    let canonical = entity_key(&signing_gateway());
+    let mut payload = canonical[..canonical.len() - 4].to_vec();
+    payload.push(0);
+    let checksum = hash(hash(&payload).as_ref()).to_bytes();
+    payload.extend_from_slice(&checksum[..4]);
+
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        compute_limit(),
+        compute_price(),
+        hem_ix(&owner, &issue_data_for(payload)),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn accepts_mainnet_entity_keys_of_every_type_seen_on_chain() {
+    // One issued entity key per key type in recent mainnet issue transactions.
+    for key in [
+      "11vaz66ZZngjVxMw8hYVDGKdTRytXxg7rbzjPLo4YRQ7fbRziPA",
+      "13hdUHnVjzu9pc5YjUa4uqfT1ASULC6rMKWKJ33MZaTtxpgW79b",
+      RSA_ENTITY_KEY,
+    ] {
+      let bytes = bs58::decode(key).into_vec().expect("decode entity key");
+      assert!(mainnet_entity_key(&bytes).is_some(), "{key}");
+    }
   }
 
   fn message_with_read_only_account(key: &Pubkey) -> VersionedMessage {
