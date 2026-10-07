@@ -13,6 +13,7 @@ import { chunks } from "./chunks";
 import database from "./database";
 import { getBlockTimeWithRetry } from "./getBlockTimeWithRetry";
 import { getFinalizedSlot } from "./getFinalizedSlot";
+import { hasAccountChanged } from "./hasAccountChanged";
 import { getTransactionSignaturesUptoBlockTime } from "./getTransactionSignaturesUpToBlock";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { stampLastBlockBeforeCommit } from "./stampLastBlockBeforeCommit";
@@ -76,12 +77,7 @@ export const correctAccountsOfType = async ({
   const model = sequelize.models[accName];
 
   try {
-    let lastBlock: number = 0;
-    try {
-      lastBlock = await getFinalizedSlot(connection);
-    } catch (error) {
-      console.warn("Failed to fetch block after retries:", error);
-    }
+    const lastBlock = await getFinalizedSlot(connection);
 
     const pubkeys = accounts.map((c) => c.pubkey);
     const existingAccs = await model.findAll({
@@ -140,10 +136,9 @@ export const correctAccountsOfType = async ({
           }
 
           const existingData = existing?.dataValues;
-          const existingClean = _omit(existingData || {}, OMIT_KEYS);
           const sanitizedClean = _omit(sanitized, OMIT_KEYS);
           const shouldUpdate =
-            !deepEqual(sanitizedClean, existingClean) &&
+            hasAccountChanged(sanitized, existingData) &&
             (!refreshedAt || refreshedAt < snapshotTime);
 
           if (shouldUpdate) {

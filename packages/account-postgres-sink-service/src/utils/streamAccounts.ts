@@ -3,9 +3,9 @@ import { parser } from "stream-json";
 import { pick } from "stream-json/filters/Pick";
 import { streamArray } from "stream-json/streamers/StreamArray";
 
-export const streamAccounts = async (
+export const streamAccounts = (
   stream: NodeJS.ReadableStream,
-  onAccount: (account: any) => Promise<void>
+  onAccount: (account: any) => Promise<void>,
 ) => {
   return new Promise<void>((resolve, reject) => {
     let hasReceivedData = false;
@@ -22,7 +22,7 @@ export const streamAccounts = async (
           // Let a parked onAccount finish so the caller's allSettled sees its batch.
           inFlight.then(() => reject(err));
         }
-      }
+      },
     );
 
     stream.on("data", (chunk) => {

@@ -28,7 +28,7 @@ export const stampLastBlockBeforeCommit = async ({
   for (const chunk of chunks(addresses, UPDATE_CHUNK_SIZE)) {
     await model.update(
       { lastBlock },
-      // The guard keeps a newer substream write from being lowered.
+      // The guard keeps a lower second slot read from lowering the batch stamp.
       {
         where: { address: chunk, lastBlock: { [Op.lt]: lastBlock } },
         transaction,

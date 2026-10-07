@@ -18,13 +18,13 @@ const startServer = (handler: http.RequestListener) =>
 
 const streamFrom = async (
   server: http.Server,
-  onAccount?: (value: any) => Promise<void>
+  onAccount?: (value: any) => Promise<void>,
 ) => {
   const { port } = server.address() as AddressInfo;
   const res = await axios.post(
     `http://127.0.0.1:${port}`,
     {},
-    { responseType: "stream" }
+    { responseType: "stream" },
   );
   const received: string[] = [];
   const outcome = await Promise.race([
@@ -33,10 +33,10 @@ const streamFrom = async (
       onAccount ??
         (async (value) => {
           received.push(value.pubkey);
-        })
+        }),
     ).then(
       () => "resolved",
-      (err: Error) => err
+      (err: Error) => err,
     ),
     new Promise((resolve) => setTimeout(() => resolve("hung"), 2000)),
   ]);
@@ -54,7 +54,7 @@ describe("streamAccounts", () => {
     server = await startServer((_req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
-        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)}]}`
+        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)}]}`,
       );
     });
 
@@ -69,7 +69,7 @@ describe("streamAccounts", () => {
     server = await startServer((_req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       res.write(
-        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)},`
+        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)},`,
       );
       setTimeout(() => res.socket?.destroy(), 50);
     });
@@ -105,11 +105,11 @@ describe("streamAccounts", () => {
     let socketClosed!: Promise<string>;
     server = await startServer((req, res) => {
       socketClosed = new Promise((resolve) =>
-        req.socket.on("close", () => resolve("closed"))
+        req.socket.on("close", () => resolve("closed")),
       );
       res.writeHead(200, { "content-type": "application/json" });
       res.write(
-        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)},`
+        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)},`,
       );
     });
 
@@ -131,7 +131,7 @@ describe("streamAccounts", () => {
     server = await startServer((_req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
-        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)},${account(2)}]}`
+        `{"jsonrpc":"2.0","id":1,"result":[${account(0)},${account(1)},${account(2)}]}`,
       );
     });
 

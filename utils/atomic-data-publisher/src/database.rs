@@ -49,17 +49,17 @@ fn calculate_target_block(last_processed_block: u64, max_available_block: u64) -
   std::cmp::min(last_processed_block + chunk_size, max_available_block)
 }
 
-/// Sinks whose cursor bounds a job. account_sink writes every partner table.
-/// The reward destination job also emits asset_owners.owner, and in
-/// ClaimWelcomePackV0 account_sink commits the recipient before asset_ownership
-/// writes the claimer, so that job waits for asset_ownership too.
-/// On a tree update, asset_ownership writes its cursor before it commits.
-/// It also advances its cursor past a block that failed and rolled back.
-/// The asset_ownership bound does not cover these two paths.
+/// Sinks whose cursor bounds a job. account_sink writes key_to_assets,
+/// recipients, mini_fanouts, welcome_packs and the hotspot tables.
+/// asset_ownership's substream writes asset_owners and records its cursor
+/// after the block commits, so every job that reads asset_owners waits for
+/// both cursors. /refresh-owners stamps a slot read before it commits and
+/// writes no cursor; like the account_sink batch writers below, it is not
+/// covered.
 fn bounding_cursor_services(query_name: &str) -> &'static [&'static str] {
   match query_name {
-    "construct_entity_reward_destination_changes" => &["account_sink", "asset_ownership"],
-    _ => &["account_sink"],
+    "construct_atomic_hotspots" => &["account_sink"],
+    _ => &["account_sink", "asset_ownership"],
   }
 }
 
@@ -1939,6 +1939,7 @@ mod tests {
       .await
       .unwrap();
     set_account_sink_cursor(&pool, "199").await;
+    set_cursor(&pool, "asset_ownership", "200").await;
 
     let records = client.execute_job_polling(&job).await.unwrap();
     assert!(records.is_empty());
@@ -1961,11 +1962,97 @@ mod tests {
     .await
     .unwrap();
     set_account_sink_cursor(&pool, "200").await;
+    set_cursor(&pool, "asset_ownership", "200").await;
 
     let records = client.execute_job_polling(&job).await.unwrap();
     assert_eq!(records.len(), 1);
     assert_eq!(records[0].atomic_data["asset"], "asset_race");
     assert_eq!(records[0].atomic_data["pub_key"], "abcdef");
+  }
+
+  #[sqlx::test(migrations = "tests/migrations")]
+  async fn ownership_waits_for_asset_owner_behind_asset_ownership_cursor(pool: PgPool) {
+    let job = make_polling_job(
+      "entity_ownership_changes",
+      "construct_entity_ownership_changes",
+      json!({"change_type": "entity_ownership"}),
+    );
+    let client = DatabaseClient {
+      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      config: valid_test_db_config(),
+      polling_jobs: vec![job.clone()],
+      dry_run: false,
+    };
+    client.init_polling_state().await.unwrap();
+
+    sqlx::query(
+      "INSERT INTO key_to_assets (address, entity_key, asset, key_serialization) \
+       VALUES ('kta_owner', '\\xabcdef', 'asset_owner', '\"b58\"'::jsonb)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+      "INSERT INTO asset_owners (asset, owner, last_block) VALUES ('asset_owner', 'wallet_owner', 200)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // account_sink is past the row, but asset_ownership has only committed up to 199.
+    set_account_sink_cursor(&pool, "300").await;
+    set_cursor(&pool, "asset_ownership", "199").await;
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert!(records.is_empty());
+    let last_max_block: Option<i64> =
+      sqlx::query("SELECT last_max_block FROM atomic_data_polling_state WHERE job_name = $1")
+        .bind(&job.name)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .get("last_max_block");
+    assert_eq!(last_max_block, Some(199));
+
+    set_cursor(&pool, "asset_ownership", "200").await;
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].atomic_data["asset"], "asset_owner");
+  }
+
+  #[sqlx::test(migrations = "tests/migrations")]
+  async fn hotspot_job_runs_without_asset_ownership_cursor(pool: PgPool) {
+    let job = make_polling_job(
+      "atomic_mobile_hotspots",
+      "construct_atomic_hotspots",
+      json!({"change_type": "mobile_hotspot", "hotspot_type": "mobile"}),
+    );
+    let client = DatabaseClient {
+      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      config: valid_test_db_config(),
+      polling_jobs: vec![job.clone()],
+      dry_run: false,
+    };
+    client.init_polling_state().await.unwrap();
+
+    sqlx::query(
+      "INSERT INTO key_to_assets (address, entity_key, asset, key_serialization) \
+       VALUES ('kta_hs', '\\xabcdef', 'asset_hs', '\"b58\"'::jsonb)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+      "INSERT INTO mobile_hotspot_infos (address, asset, last_block) VALUES ('mhi_hs', 'asset_hs', 100)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // The hotspot job reads no asset_owners, so asset_ownership does not hold it.
+    set_account_sink_cursor(&pool, "100").await;
+    let records = client.execute_job_polling(&job).await.unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].atomic_data["asset"], "asset_hs");
   }
 
   #[sqlx::test(migrations = "tests/migrations")]
@@ -1997,6 +2084,8 @@ mod tests {
     .await
     .unwrap();
 
+    // asset_ownership is usable, so only account_sink can hold the job.
+    set_cursor(&pool, "asset_ownership", "150").await;
     let records = client.execute_job_polling(&job).await.unwrap();
     assert!(records.is_empty());
     assert!(last_processed_block(&pool, &job.name).await.is_none());

@@ -112,7 +112,40 @@ describe("makeUpsertChunk", () => {
     const [{ values, where, transaction }] = updates;
     expect(where.address).to.deep.equal(["a"]);
     expect(transaction).to.equal(t);
-    expect(values.lastBlock).to.be.greaterThan(written.records[0].lastBlock);
+    expect(written.records[0].lastBlock).to.equal(100);
+    expect(values.lastBlock).to.equal(101);
     expect(where.lastBlock[Op.lt]).to.equal(values.lastBlock);
+  });
+
+  it("returns no changed addresses when no account decodes", async () => {
+    const model: any = {
+      findAll: async () => {
+        throw new Error("findAll should not run");
+      },
+      bulkCreate: async () => {
+        throw new Error("bulkCreate should not run");
+      },
+    };
+
+    const changed = await makeUpsertChunk({
+      model,
+      decode: () => {
+        throw new Error("bad discriminator");
+      },
+      plugins: [],
+      now: "2026-09-25T00:00:00.000Z",
+      type: "TestAccountV0",
+    })(
+      [
+        {
+          pubkey: PublicKey.default,
+          account: { data: ["AAAA", "base64"], lamports: 1 } as any,
+        },
+      ],
+      {} as any,
+      100,
+    );
+
+    expect(changed).to.deep.equal([]);
   });
 });

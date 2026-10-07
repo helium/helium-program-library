@@ -79,9 +79,8 @@ describe("correctAccountsOfType", () => {
     const [{ values, where, transaction }] = updates;
     expect(where.address).to.deep.equal(["X"]);
     expect(transaction).to.equal(t);
-    expect(values.lastBlock).to.be.greaterThan(
-      bulkCreates[0].records[0].lastBlock,
-    );
+    expect(bulkCreates[0].records[0].lastBlock).to.equal(100);
+    expect(values.lastBlock).to.equal(101);
     expect(where.lastBlock[Op.lt]).to.equal(values.lastBlock);
     expect(events).to.deep.equal([
       "slot 100",
@@ -90,5 +89,118 @@ describe("correctAccountsOfType", () => {
       "update",
       "commit",
     ]);
+  });
+
+  it("rolls the batch back and does not commit when the stamp slot read fails", async function () {
+    // getFinalizedSlot retries the failed read with 1, 2 and 4 s delays.
+    this.timeout(30_000);
+    const snapshotTime = new Date();
+    const events: string[] = [];
+    let slotReads = 0;
+    const connection: any = {
+      getSlot: async () => {
+        if (++slotReads === 1) return 100;
+        throw new Error("rpc down");
+      },
+    };
+    const model: any = {
+      findAll: async () => [],
+      findOne: async () => null,
+      bulkCreate: async () => {
+        events.push("bulkCreate");
+      },
+      update: async () => {
+        events.push("update");
+      },
+    };
+    const t: any = {
+      commit: async () => events.push("commit"),
+      rollback: async () => events.push("rollback"),
+    };
+    const sequelize: any = {
+      models: { TestAccountV0: model },
+      transaction: async () => t,
+    };
+
+    let rejected: any;
+    try {
+      await correctAccountsOfType({
+        connection,
+        sequelize,
+        program: {
+          coder: { accounts: { decode: () => ({ elevation: 5 }) } },
+        } as any,
+        accName: "TestAccountV0",
+        accounts: [{ pubkey: "X", data: Buffer.alloc(0) }],
+        plugins: [],
+        refreshThreshold: new Date(snapshotTime.getTime() - 60 * 60 * 1000),
+        snapshotTime,
+        snapshotSlot: 1000,
+        txIdsByAccountId: {},
+        corrections: [],
+      });
+    } catch (err) {
+      rejected = err;
+    }
+
+    expect(rejected?.message).to.equal("rpc down");
+    expect(events).to.deep.equal(["bulkCreate", "rollback"]);
+  });
+
+  it("rolls the batch back and writes nothing when the first slot read fails", async function () {
+    // getFinalizedSlot retries the failed read with 1, 2 and 4 s delays.
+    this.timeout(30_000);
+    const snapshotTime = new Date();
+    const events: string[] = [];
+    let slotReads = 0;
+    const connection: any = {
+      getSlot: async () => {
+        // All four tries of the first read fail; a later read would succeed.
+        if (++slotReads <= 4) throw new Error("rpc down");
+        return 101;
+      },
+    };
+    const model: any = {
+      findAll: async () => [],
+      findOne: async () => null,
+      bulkCreate: async () => {
+        events.push("bulkCreate");
+      },
+      update: async () => {
+        events.push("update");
+      },
+    };
+    const t: any = {
+      commit: async () => events.push("commit"),
+      rollback: async () => events.push("rollback"),
+    };
+    const sequelize: any = {
+      models: { TestAccountV0: model },
+      transaction: async () => t,
+    };
+
+    let rejected: any;
+    try {
+      await correctAccountsOfType({
+        connection,
+        sequelize,
+        program: {
+          coder: { accounts: { decode: () => ({ elevation: 5 }) } },
+        } as any,
+        accName: "TestAccountV0",
+        accounts: [{ pubkey: "X", data: Buffer.alloc(0) }],
+        plugins: [],
+        refreshThreshold: new Date(snapshotTime.getTime() - 60 * 60 * 1000),
+        snapshotTime,
+        snapshotSlot: 1000,
+        txIdsByAccountId: {},
+        corrections: [],
+      });
+    } catch (err) {
+      rejected = err;
+    }
+
+    expect(rejected?.message).to.equal("rpc down");
+    expect(events).to.deep.equal(["rollback"]);
   });
 });

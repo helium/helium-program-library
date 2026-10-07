@@ -1,16 +1,14 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
-import deepEqual from "deep-equal";
 import { FastifyInstance } from "fastify";
-import _omit from "lodash/omit";
 import { Sequelize, Transaction } from "sequelize";
 import { IAccountConfig, IInitedPlugin } from "../types";
 import cachedIdlFetch from "./cachedIdlFetch";
 import database, { limit } from "./database";
 import { getFinalizedSlot } from "./getFinalizedSlot";
+import { hasAccountChanged } from "./hasAccountChanged";
 import { sanitizeAccount } from "./sanitizeAccount";
 import { provider } from "./solana";
-import { OMIT_KEYS } from "../constants";
 import { lowerFirstChar } from "@helium/spl-utils";
 
 interface HandleAccountWebhookArgs {
@@ -150,18 +148,11 @@ export const handleAccountWebhook = async ({
         ...sanitized,
       };
 
-      const shouldUpdate = !deepEqual(
-        _omit(sanitized, OMIT_KEYS),
-        _omit(existing?.dataValues, OMIT_KEYS)
-      );
+      const shouldUpdate = hasAccountChanged(sanitized, existing?.dataValues);
 
       if (shouldUpdate) {
         if (lastBlock === 0) {
-          try {
-            lastBlock = await getFinalizedSlot(provider.connection);
-          } catch (error) {
-            console.warn("Failed to fetch block after retries:", error);
-          }
+          lastBlock = await getFinalizedSlot(provider.connection);
         }
 
         await model.upsert({ ...sanitized, lastBlock }, { transaction: t });

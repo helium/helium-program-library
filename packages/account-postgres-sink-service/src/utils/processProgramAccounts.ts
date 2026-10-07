@@ -8,6 +8,8 @@ import { getFinalizedSlot } from "./getFinalizedSlot";
 import { stampLastBlockBeforeCommit } from "./stampLastBlockBeforeCommit";
 import { streamAccounts } from "./streamAccounts";
 
+const GPA_TIMEOUT_MS = 60000;
+
 export const processProgramAccounts = async (
   sequelize: Sequelize,
   connection: anchor.web3.Connection,
@@ -18,8 +20,8 @@ export const processProgramAccounts = async (
   processChunk: (
     chunk: anchor.web3.GetProgramAccountsResponse,
     transaction: Transaction,
-    lastBlock: number
-  ) => Promise<string[]>
+    lastBlock: number,
+  ) => Promise<string[]>,
 ) => {
   const startTime = Date.now();
   let processedCount = 0;
@@ -33,7 +35,7 @@ export const processProgramAccounts = async (
       try {
         console.log(
           `Making RPC call for ${accountType} with filters:`,
-          JSON.stringify(filters, null, 2)
+          JSON.stringify(filters, null, 2),
         );
 
         const result = await axios.post(
@@ -53,11 +55,11 @@ export const processProgramAccounts = async (
           },
           {
             responseType: "stream",
-            timeout: 60000,
-          }
+            timeout: GPA_TIMEOUT_MS,
+          },
         );
         console.log(
-          `RPC call successful for ${accountType}, processing stream...`
+          `RPC call successful for ${accountType}, processing stream...`,
         );
 
         let batch: {
@@ -83,7 +85,7 @@ export const processProgramAccounts = async (
               await t.commit();
               attemptCount += chunk.length;
               console.log(
-                `Processing ${chunk.length} ${accountType} accounts (block: ${lastBlock})`
+                `Processing ${chunk.length} ${accountType} accounts (block: ${lastBlock})`,
               );
             } catch (err) {
               await t.rollback();
@@ -106,7 +108,14 @@ export const processProgramAccounts = async (
             const currentBatch = batch;
             batch = [];
             if (activeBatches.length >= concurrentBatchLimit) {
+              // The gPA socket's idle timer would otherwise count DB
+              // backpressure as RPC idle time and destroy the stream.
+              // `result.data` is a zlib stream when the RPC compresses the body, so take the socket from the request.
+              const socket =
+                (result.request as any)?.socket ?? (result.data as any).socket;
+              socket?.setTimeout(0);
               await Promise.race(activeBatches);
+              socket?.setTimeout(GPA_TIMEOUT_MS);
             }
 
             const batchPromise = runBatch(currentBatch);
@@ -133,7 +142,7 @@ export const processProgramAccounts = async (
         await Promise.all(activeBatches);
         processedCount = attemptCount;
         console.log(
-          `Stream processing complete for ${accountType}. Accounts received: ${accountsReceived}, Accounts processed: ${processedCount}`
+          `Stream processing complete for ${accountType}. Accounts received: ${accountsReceived}, Accounts processed: ${processedCount}`,
         );
       } catch (err: any) {
         console.error(`RPC call error for ${accountType}:`, err.message);
@@ -150,15 +159,15 @@ export const processProgramAccounts = async (
       maxTimeout: 60000,
       onRetry: (err: any, attempt: any) => {
         console.warn(
-          `Retrying getProgramAccounts for ${accountType}, attempt #${attempt}: Retrying due to ${err.message}`
+          `Retrying getProgramAccounts for ${accountType}, attempt #${attempt}: Retrying due to ${err.message}`,
         );
       },
-    }
+    },
   );
 
   const duration = (Date.now() - startTime) / 1000;
   console.log(
-    `Finished processing ${processedCount} ${accountType} accounts in ${duration} seconds`
+    `Finished processing ${processedCount} ${accountType} accounts in ${duration} seconds`,
   );
 
   return processedCount;
