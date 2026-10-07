@@ -347,6 +347,18 @@ describe("dc-auto-topoff under bankrun", () => {
       executable: false,
     });
 
+    const { taskId, hntTaskId } = await scheduleBothLegs(autoTopOff);
+
+    return {
+      autoTopOff,
+      taskId,
+      hntTaskId,
+      hntTask: taskKey(taskQueue, hntTaskId)[0],
+    };
+  }
+
+  /** Queues both legs on the next free task ids with schedule_task_v0. */
+  async function scheduleBothLegs(autoTopOff: PublicKey) {
     const { taskBitmap, capacity } =
       await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
     const [taskId, hntTaskId] = nextAvailableTaskIds(
@@ -367,20 +379,17 @@ describe("dc-auto-topoff under bankrun", () => {
         hntTask: taskKey(taskQueue, hntTaskId)[0],
       })
       .rpc();
-
-    return {
-      autoTopOff,
-      taskId,
-      hntTaskId,
-      hntTask: taskKey(taskQueue, hntTaskId)[0],
-    };
+    return { taskId, hntTaskId };
   }
 
   /**
    * Frees both task addresses the top off recorded, leaving `next_task` / `next_hnt_task`
-   * naming addresses no task occupies.
+   * naming addresses no task occupies. A `schedule` is stored by the same update.
    */
-  async function dequeueBothLegs(autoTopOff: PublicKey) {
+  async function dequeueBothLegs(
+    autoTopOff: PublicKey,
+    schedule: string | null = null
+  ) {
     const state = await program.account.autoTopOffV0.fetch(autoTopOff);
     // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
     // queue_task_v0 created and the queue itself for one a run returned. A leg that was already
@@ -396,7 +405,7 @@ describe("dc-auto-topoff under bankrun", () => {
     };
     await program.methods
       .updateAutoTopOffV0({
-        schedule: null,
+        schedule,
         threshold: null,
         hntThreshold: null,
         dcaSwapAmount: null,
@@ -981,6 +990,23 @@ describe("dc-auto-topoff under bankrun", () => {
     });
   });
 
+  describe("an hourly schedule set a quarter hour before midnight UTC", () => {
+    it("schedules the next run for midnight", async () => {
+      // Two day boundaries ahead, so the warp only moves the clock forward.
+      const day = 86_400n;
+      const now = (await ctx.banksClient.getClock()).unixTimestamp;
+      const midnight = (now / day + 2n) * day;
+      await warpTo(ctx, midnight - 15n * 60n);
+
+      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
+      await dequeueBothLegs(autoTopOff, "0 0 * * * *");
+      await scheduleBothLegs(autoTopOff);
+
+      const scheduled = await program.account.autoTopOffV0.fetch(autoTopOff);
+      expect(scheduled.nextTaskTime.toString()).to.equal(midnight.toString());
+    });
+  });
+
   describe("an update that dequeues both legs", () => {
     it("leaves both legs unscheduled, so they can be scheduled again", async () => {
       const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
@@ -996,26 +1022,7 @@ describe("dc-auto-topoff under bankrun", () => {
         "the dequeued HNT task should read as nothing scheduled",
       );
 
-      const { taskBitmap, capacity } =
-        await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
-      const [taskId, hntTaskId] = nextAvailableTaskIds(
-        taskBitmap,
-        2,
-        false,
-        capacity,
-      );
-      await program.methods
-        .scheduleTaskV0({ taskId, hntTaskId })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
-        ])
-        .accounts({
-          payer: me,
-          autoTopOff,
-          task: taskKey(taskQueue, taskId)[0],
-          hntTask: taskKey(taskQueue, hntTaskId)[0],
-        })
-        .rpc();
+      const { taskId, hntTaskId } = await scheduleBothLegs(autoTopOff);
 
       const scheduled = await program.account.autoTopOffV0.fetch(autoTopOff);
       expect(scheduled.nextTask.toBase58()).to.equal(

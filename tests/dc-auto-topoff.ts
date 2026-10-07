@@ -388,18 +388,13 @@ describe("dc-auto-topoff", () => {
         taskQueueAcc.capacity
       );
 
-      const now = new Date();
-      let nextSeconds = now.getSeconds() + 2;
-      let nextMinutes = now.getMinutes();
-      if (nextSeconds > 59) {
-        nextSeconds = 0 + (nextSeconds - 59);
-        nextMinutes = now.getMinutes() + 1;
-      }
+      // Two seconds out, in UTC, which is the zone the program reads a crontab in.
+      const next = new Date(Date.now() + 2000);
       const {
         pubkeys: { autoTopOff: autoTopOffK },
       } = await program.methods
         .initializeAutoTopOffV0({
-          schedule: `${nextSeconds} ${nextMinutes} * * * *`,
+          schedule: `${next.getUTCSeconds()} ${next.getUTCMinutes()} * * * *`,
           threshold: new anchor.BN(10000000),
           routerKey,
           hntThreshold: new anchor.BN(10000000),

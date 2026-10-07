@@ -34,7 +34,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo fmt -- --check
       # or_fun_call is on because `ok_or(error!(..))` builds the error on the success path too,
@@ -86,7 +86,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - name: Require an @helium/idls changeset when the generated IDL changes
         if: steps.changed.outputs.dirs != ''
         # @helium/idls has no src/ of its own -- it compiles the generated
@@ -165,7 +165,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo test --lib
 
@@ -185,7 +185,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       # Scope: every program whose src reads TESTING, enumerated from the source rather
       # than from a list, so a new program that reads TESTING without a guard fails here, and
       # under both default features and `--features devnet`, so a devnet-exempt guard fails too.
@@ -265,7 +265,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo test --locked
         working-directory: utils/atomic-data-publisher
         env:
@@ -461,3 +461,22 @@ jobs:
         working-directory: packages/spl-utils
         env:
           RPC_URL: http://localhost:8899
+      # A transaction sent with skipPreflight fails without its program logs, so a failed suite
+      # keeps what `anchor localnet` streamed for each program, and the validator's own log.
+      - name: Name localnet logs
+        id: localnet-logs
+        if: failure() || cancelled()
+        run: echo "name=localnet-logs-$(basename "$TEST" .ts)" >> "$GITHUB_OUTPUT"
+        env:
+          TEST: ${{ matrix.test }}
+      - name: Upload localnet logs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.localnet-logs.outputs.name }}
+          path: |
+            .anchor/program-logs/
+            .anchor/test-ledger/validator.log
+            /tmp/localnet.log
+          if-no-files-found: warn
+          retention-days: 14
