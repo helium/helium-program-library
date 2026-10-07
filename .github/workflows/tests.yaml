@@ -384,7 +384,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
-      - run: cd $RUST_PATH && cargo build
+      - run: cd $RUST_PATH && cargo build && cargo test
         env:
           RUST_PATH: ${{ matrix.test }}
 
