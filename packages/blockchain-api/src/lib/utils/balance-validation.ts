@@ -36,7 +36,12 @@ const rentCache = createTtlCache<number>({ ttlMs: 60 * 60 * 1000 });
  */
 export const getRentLamports = (connection: Connection, space: number) =>
   rentCache(`${connection.rpcEndpoint}:${space}`, () =>
-    connection.getMinimumBalanceForRentExemption(space),
+    connection.getMinimumBalanceForRentExemption(space).then((lamports) => {
+      // web3.js 1.99 resolves 0 on a JSON-RPC error body; reject so the cache
+      // does not keep it.
+      if (!(lamports > 0)) throw new Error(`rent unavailable for ${space} bytes`);
+      return lamports;
+    }),
   );
 
 /**
@@ -216,8 +221,11 @@ export const getWelcomePackRentParts = async (
  * data-only escrow. The fee quoted is the larger of the stored
  * `new_tree_fee_lamports` (what the program charged before it derived the
  * fee) and `ceil(rent(new_tree_space) / 2^new_tree_depth)` (what it charges
- * after), so the quote never falls below the program in either era. Drop the
- * stored term once the derived-fee program is live.
+ * after), so the quote is never below the program's fee in either era (it
+ * over-quotes by the gap in the era with the smaller term). Both rent terms
+ * come from `getRentLamports`, which caches for an hour, so the quote can lag
+ * a Rent sysvar change by that long. Drop the stored term once the
+ * derived-fee program is live.
  */
 export const getDataOnlyIssueCostLamports = async (
   connection: Connection,

@@ -12,6 +12,7 @@ import { expect } from "chai";
 import { describe, it } from "mocha";
 import { toVersionedTx } from "../../../spl-utils/src/transaction";
 import {
+  getRentLamports,
   getTotalTransactionFees,
   getTransactionFee,
 } from "../../src/lib/utils/balance-validation";
@@ -116,5 +117,35 @@ describe("getTotalTransactionFees", () => {
   it("sums cluster fees across transactions", async () => {
     const txs = [compile([transfer]), compile([transfer])];
     expect(await getTotalTransactionFees(rpcFee(6000), txs)).to.eq(12_000);
+  });
+});
+
+describe("getRentLamports", () => {
+  // A Connection on one fixed endpoint whose RPC answers with `body(id)`.
+  const rpcConnection = (body: (id: unknown) => object) =>
+    new Connection("http://rent-test.invalid", {
+      fetch: (async (_url: unknown, init: { body: string }) => {
+        const { id } = JSON.parse(init.body);
+        return new Response(JSON.stringify(body(id)), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }) as unknown as typeof fetch,
+    });
+
+  it("rejects on a JSON-RPC error and does not cache it", async () => {
+    const busy = rpcConnection((id) => ({
+      jsonrpc: "2.0",
+      id,
+      error: { code: -32005, message: "busy" },
+    }));
+    let rejected = false;
+    await getRentLamports(busy, 165).catch(() => {
+      rejected = true;
+    });
+    expect(rejected).to.equal(true);
+
+    const healthy = rpcConnection((id) => ({ jsonrpc: "2.0", id, result: 1_488_440 }));
+    expect(await getRentLamports(healthy, 165)).to.equal(1_488_440);
   });
 });

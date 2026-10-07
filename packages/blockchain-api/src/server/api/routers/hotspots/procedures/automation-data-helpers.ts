@@ -181,7 +181,8 @@ export async function fetchAutomationData(
   const ata = getAssociatedTokenAddressSync(HNT_MINT, wallet, true);
   // Task return accounts are derived from the cron job key
   // There are two task return accounts (task_return_account_1 and task_return_account_2)
-  // We check the first one - if it doesn't exist, we need to account for rent
+  // We check the first one - if it is not yet owned by the cron program,
+  // reserve the funding
   const [taskReturnAccount1] = PublicKey.findProgramAddressSync(
     [Buffer.from("task_return_account_1"), cronJob.toBuffer()],
     PROGRAM_ID,
@@ -249,7 +250,9 @@ export async function fetchAutomationData(
   // If the ATA doesn't exist, rent will be needed and locked up
   const ataRentLamports = ataAccount ? 0 : ataRent;
 
-  const taskReturnAccountFundingLamports = taskReturnAccountInfo
+  const taskReturnAccountFundingLamports = taskReturnAccountInfo?.owner.equals(
+    PROGRAM_ID,
+  )
     ? 0
     : Math.ceil(TASK_RETURN_ACCOUNT_FUNDING_SOL * LAMPORTS_PER_SOL);
 

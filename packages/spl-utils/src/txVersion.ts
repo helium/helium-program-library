@@ -119,6 +119,7 @@ export async function resolveTxVersion(
   return wallet.payer ? 1 : 0;
 }
 
+/** Test hook: clears the cached env, node, and signer versions. Exported for tests; no stability guarantee. */
 export function resetTxVersionCache(): void {
   detectedVersions.clear();
   warnedEndpoints.clear();

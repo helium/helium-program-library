@@ -99,6 +99,12 @@ describe("toVersionedTx", () => {
     });
   }
 
+  it("builds synchronously", () => {
+    // No await: a Promise has no `version`, so an async signature fails here.
+    expect(toVersionedTx(draft(0)).version).to.equal(0);
+    expect(toVersionedTx(draft(1)).version).to.equal(1);
+  });
+
   it("builds a v1 tx that signs and round-trips through the wire bytes", async () => {
     const tx = await toVersionedTx(draft(1));
     expect(tx.version).to.equal(1);

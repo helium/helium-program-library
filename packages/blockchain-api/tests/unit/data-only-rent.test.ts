@@ -59,8 +59,10 @@ describe("getDataOnlyIssueCostLamports", () => {
       {
         entityKeyLen: 38,
         newTreeFeeLamports: 0,
-        newTreeSpace: 0,
-        newTreeDepth: 0,
+        // A 0-byte tree would price at 0 rent, which getRentLamports rejects.
+        // ceil(rent(1) / 2^20) = 1 lamport of tree fee in both eras.
+        newTreeSpace: 1,
+        newTreeDepth: 20,
       },
     );
     const high = await getDataOnlyIssueCostLamports(
@@ -68,13 +70,15 @@ describe("getDataOnlyIssueCostLamports", () => {
       {
         entityKeyLen: 38,
         newTreeFeeLamports: 0,
-        newTreeSpace: 0,
-        newTreeDepth: 0,
+        // A 0-byte tree would price at 0 rent, which getRentLamports rejects.
+        // ceil(rent(1) / 2^20) = 1 lamport of tree fee in both eras.
+        newTreeSpace: 1,
+        newTreeDepth: 20,
       },
     );
 
-    expect(low).to.equal(143 * 1000);
-    expect(high).to.equal(143 * 6960);
+    expect(low).to.equal(143 * 1000 + 1);
+    expect(high).to.equal(143 * 6960 + 1);
   });
 });
 

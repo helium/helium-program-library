@@ -125,6 +125,20 @@ const pairAt = async (
   return [dataIx(first), dataIx(base + target - size)];
 };
 
+// An extra signer, an ix that needs its signature, and one that only reads it.
+const signer = Keypair.generate();
+const signerIx = new TransactionInstruction({
+  programId: NOOP_PROGRAM,
+  keys: [{ pubkey: signer.publicKey, isSigner: true, isWritable: false }],
+  data: Buffer.alloc(800, 1),
+});
+// Same key, read-only: must not pull the signer into this chunk.
+const readIx = new TransactionInstruction({
+  programId: NOOP_PROGRAM,
+  keys: [{ pubkey: signer.publicKey, isSigner: false, isWritable: false }],
+  data: Buffer.alloc(800, 1),
+});
+
 describe("batchInstructionsToTxsWithPriorityFee", () => {
   it("packs a v0 tx of exactly 1232 bytes into one tx", async () => {
     const drafts = await batchInstructionsToTxsWithPriorityFee(
@@ -282,6 +296,15 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
     );
     expect(drafts).to.have.length(1);
   });
+
+  it("lists an extra signer only on chunks that need its signature", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      makeProvider(),
+      [signerIx, readIx],
+      { ...OPTIONS, version: 0, extraSigners: [signer] }
+    );
+    expect(drafts.map((d) => d.signers.length)).to.deep.equal([1, 0]);
+  });
 });
 
 describe("batchParallelInstructions", () => {
@@ -353,12 +376,6 @@ describe("batchParallelInstructions", () => {
   });
 
   it("signs each chunk only with the extra signers its ixs need", async () => {
-    const signer = Keypair.generate();
-    const signerIx = new TransactionInstruction({
-      programId: NOOP_PROGRAM,
-      keys: [{ pubkey: signer.publicKey, isSigner: true, isWritable: false }],
-      data: Buffer.alloc(800, 1),
-    });
     const sent: VersionedTransaction[] = [];
     const provider = {
       connection: {
@@ -382,7 +399,7 @@ describe("batchParallelInstructions", () => {
 
     await batchParallelInstructions({
       provider,
-      instructions: [signerIx, dataIx(800)],
+      instructions: [signerIx, readIx],
       extraSigners: [signer],
     });
 

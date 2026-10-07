@@ -46,6 +46,22 @@ describe("scheduleChanged", () => {
   it("sees a change from a stored every-6-hours crontab to the daily preset", () => {
     expect(scheduleChanged("0 0 */6 * * *", "daily")).to.equal(true);
   });
+
+  it("treats a stored monthly crontab as the monthly preset", () => {
+    expect(scheduleChanged("0 30 14 5 * *", "monthly")).to.equal(false);
+  });
+
+  it("sees a change from a stored daily crontab to the monthly preset", () => {
+    expect(scheduleChanged(dailyCron, "monthly")).to.equal(true);
+  });
+
+  it("treats a stored weekly crontab as the weekly preset", () => {
+    expect(scheduleChanged("0 30 14 * * 2", "weekly")).to.equal(false);
+  });
+
+  it("sees a change between different raw crontabs", () => {
+    expect(scheduleChanged(dailyCron, "0 30 15 * * *")).to.equal(true);
+  });
 });
 
 describe("maxScheduleCronLength", () => {
@@ -140,10 +156,9 @@ describe("estimateAutomationFunding", () => {
       taskReturnAccountFundingLamports: 0,
     });
 
-    // The new cron job holds only the rent init gives it and pays for its
-    // task-return accounts on its first run. It is priced at the old cron
-    // job's two claims, so the transfer carries that funding plus 1 + 2 crank
-    // rewards per run.
+    // The new cron job starts with only its rent; the 0.01 SOL task-return
+    // funding is sent again. It is priced at the old cron job's two claims,
+    // so the transfer carries that funding plus 1 + 2 crank rewards per run.
     const taskReturnAccountFundingLamports = 10_000_000;
     expect(estimate.cronJobFundingLamports).to.equal(
       taskReturnAccountFundingLamports + duration * 3 * minCrankRewardLamports,

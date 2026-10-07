@@ -486,9 +486,10 @@ export const estimateAutomationFunding = (
     cronJobExists
       ? params
       : {
-          // A cron job init is about to create starts with only its rent and
-          // no task-return accounts, whatever an old cron job a teardown
-          // refunds held. It is priced at the old cron job's claim count.
+          // A cron job init is about to create starts with only its rent; the
+          // 0.01 SOL task-return funding is sent again, whatever an old cron
+          // job a teardown refunds held. It is priced at the old cron job's
+          // claim count.
           ...params,
           cronJobBalanceLamports: 0,
           cronJobRentLamports: 0,

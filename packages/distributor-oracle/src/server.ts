@@ -152,9 +152,16 @@ export class OracleServer {
 
   private minRent(space: number): Promise<number> {
     return this.cachedHourly(`rent:${space}`, () =>
-      this.ldProgram.provider.connection.getMinimumBalanceForRentExemption(
-        space
-      )
+      // web3.js 1.99 resolves 0 on a JSON-RPC error body; reject so the cache
+      // does not keep it.
+      this.ldProgram.provider.connection
+        .getMinimumBalanceForRentExemption(space)
+        .then((lamports) => {
+          if (!(lamports > 0)) {
+            throw new Error(`rent unavailable for ${space} bytes`);
+          }
+          return lamports;
+        })
     );
   }
 
