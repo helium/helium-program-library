@@ -61,8 +61,10 @@ export function resolveSignerVersions(
   return versions;
 }
 
-// Both halves are needed: surfpool passes the gate account through from
-// mainnet (so it reads active) while its runtime cannot take v1.
+// Both halves are needed. The gate account shows the feature is active, and
+// solana-core >= 4.2 shows the node parses v1: a fork can pass an active gate
+// through from mainnet on an older node line. The check errs towards v0:
+// surfpool 1.5.0 reports 4.1.2 and resolves v0, although its runtime takes v1.
 async function detectTxVersion(connection: Connection): Promise<0 | 1> {
   const [version, gate, slot] = await Promise.all([
     connection.getVersion(),

@@ -24,7 +24,8 @@ import { expectLandedTxVersion } from "./helpers/tx";
 import { ensureFunds } from "./helpers/wallet";
 
 // solana-core of the surfpool v1.5.0 fork that blockchain-api-e2e.yml pins.
-// A 4.1 node cannot take v1, so detection resolves v0 on this fork.
+// The fork takes v1 (the forced v1 lane lands it), but it reports 4.1.2,
+// below the >= 4.2 check, so detection resolves v0 here.
 const FORK_SOLANA_CORE = "4.1.2";
 
 // Each CI lane forces HPL_TX_VERSION; the kill switch (v0) must hold on the
