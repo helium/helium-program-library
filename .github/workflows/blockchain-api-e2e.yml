@@ -26,8 +26,10 @@ permissions:
   contents: read
 
 env:
-  # The commit of the `v1.6.0` tag. A tag can move; a commit cannot.
-  SURFPOOL_REV: 050a81b9f366a813d2f3da810bf6fbc52f1047ac
+  # The commit of the `v1.5.0` tag. A tag can move; a commit cannot.
+  # 1.6.0 deadlocks on sendTransaction (solana-foundation/surfpool#849); the
+  # Agave 4.4 PR moves to the first 1.6.x commit with that fix.
+  SURFPOOL_REV: 86493c4bf716b01d4bedbc531aa9288cb14d5f36
 
 jobs:
   # Build anchor once and share the generated types/IDLs as an artifact. The
@@ -62,7 +64,7 @@ jobs:
   build-surfpool:
     runs-on: ubuntu-latest
     permissions: {}
-    # A cold build of 0.11.2 took about 10 minutes; 60 leaves room for 1.6.0.
+    # A cold build of 0.11.2 took about 10 minutes; 60 leaves room for 1.5.0.
     timeout-minutes: 60
     steps:
       - name: Setup Rust toolchain

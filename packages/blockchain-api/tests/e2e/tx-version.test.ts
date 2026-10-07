@@ -23,8 +23,9 @@ import {
 import { expectLandedTxVersion } from "./helpers/tx";
 import { ensureFunds } from "./helpers/wallet";
 
-// solana-core of the surfpool v1.6.0 fork that blockchain-api-e2e.yml pins.
-const FORK_SOLANA_CORE = "4.2.1";
+// solana-core of the surfpool v1.5.0 fork that blockchain-api-e2e.yml pins.
+// A 4.1 node cannot take v1, so detection resolves v0 on this fork.
+const FORK_SOLANA_CORE = "4.1.2";
 
 // Each CI lane forces HPL_TX_VERSION; the kill switch (v0) must hold on the
 // keypair path that the admin CLI and crons send through. A local run without
@@ -91,7 +92,7 @@ describe("transaction version on the fork", () => {
     try {
       const { "solana-core": solanaCore } = await connection.getVersion();
       expect(solanaCore).to.equal(FORK_SOLANA_CORE);
-      expect(await resolveTxVersion(connection)).to.equal(1);
+      expect(await resolveTxVersion(connection)).to.equal(0);
     } finally {
       if (lane === undefined) delete process.env.HPL_TX_VERSION;
       else process.env.HPL_TX_VERSION = lane;
