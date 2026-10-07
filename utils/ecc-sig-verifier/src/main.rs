@@ -370,10 +370,49 @@ mod tests {
       .status()
   }
 
+  // The transaction the handler returns for a request it accepts.
+  fn post_for_transaction(body: String) -> VersionedTransaction {
+    let client = Client::tracked(rocket()).expect("build client");
+    let response = client
+      .post("/verify")
+      .header(ContentType::JSON)
+      .body(body)
+      .dispatch();
+    assert_eq!(response.status(), Status::Ok);
+    let json: rocket::serde::json::Value = response.into_json().expect("read response");
+    let transaction = json["transaction"].as_str().expect("transaction field");
+    bincode::deserialize(&hex::decode(transaction).expect("decode transaction"))
+      .expect("deserialize transaction")
+  }
+
   #[test]
   fn signs_as_a_read_only_signer() {
     let owner = Pubkey::new_unique();
-    assert_eq!(post(issue_request(&owner, &owner)), Status::Ok);
+    let signed = post_for_transaction(issue_request(&owner, &owner));
+    let verifier = verifier().pubkey();
+    let slot = signed
+      .message
+      .static_account_keys()
+      .iter()
+      .position(|k| *k == verifier)
+      .expect("verifier key");
+    assert!(signed.signatures[slot].verify(verifier.as_ref(), &signed.message.serialize()));
+  }
+
+  #[test]
+  fn keeps_the_fee_payer_signature() {
+    let fee_payer = Keypair::new();
+    let mut tx = transaction(
+      &fee_payer.pubkey(),
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&fee_payer.pubkey(), &signing_gateway()),
+      ],
+    );
+    tx.signatures[0] = fee_payer.sign_message(&tx.message.serialize());
+    let signed = post_for_transaction(request(&tx));
+    assert_eq!(signed.signatures[0], tx.signatures[0]);
   }
 
   #[test]
@@ -390,6 +429,22 @@ mod tests {
     let owner = Pubkey::new_unique();
     assert_eq!(
       post(issue_request(&owner, &verifier().pubkey())),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_an_issue_sent_to_another_program() {
+    let owner = Pubkey::new_unique();
+    let issue = Instruction {
+      program_id: Pubkey::new_unique(),
+      ..issue_ix(&owner, &signing_gateway())
+    };
+    assert_eq!(
+      post(request(&transaction(
+        &owner,
+        &[compute_limit(), compute_price(), issue],
+      ))),
       Status::BadRequest
     );
   }
