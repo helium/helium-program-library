@@ -451,12 +451,12 @@ jobs:
       # keeps what `anchor localnet` streamed for each program, and the validator's own log.
       - name: Name localnet logs
         id: localnet-logs
-        if: failure()
+        if: failure() || cancelled()
         run: echo "name=localnet-logs-$(basename "$TEST" .ts)" >> "$GITHUB_OUTPUT"
         env:
           TEST: ${{ matrix.test }}
       - name: Upload localnet logs
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.localnet-logs.outputs.name }}
