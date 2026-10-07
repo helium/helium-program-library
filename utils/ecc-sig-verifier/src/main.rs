@@ -400,6 +400,22 @@ mod tests {
   }
 
   #[test]
+  fn keeps_the_fee_payer_signature() {
+    let fee_payer = Keypair::new();
+    let mut tx = transaction(
+      &fee_payer.pubkey(),
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&fee_payer.pubkey(), &signing_gateway()),
+      ],
+    );
+    tx.signatures[0] = fee_payer.sign_message(&tx.message.serialize());
+    let signed = post_for_transaction(request(&tx));
+    assert_eq!(signed.signatures[0], tx.signatures[0]);
+  }
+
+  #[test]
   fn refuses_to_be_the_fee_payer() {
     let verifier = verifier().pubkey();
     assert_eq!(
