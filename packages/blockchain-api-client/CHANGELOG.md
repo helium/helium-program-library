@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.16.1
+
+### Patch Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`d48d673`](https://github.com/helium/helium-program-library/commit/d48d673b802be2db71b2b8807edad8f98048743c) Thanks [@bryzettler](https://github.com/bryzettler)! - Charge the setup rent once on a first-time `createAutomation`. The cron job transfer no longer carries the base rent that `init_entity_claim_cron_v0` already takes from the wallet, so a first setup moves that much less SOL. `createAutomation` now prices its transfers and balance check with the same helper as `getFundingEstimate`.
+
+  Count the task queue's min crank reward that `init_entity_claim_cron_v0` pays its schedule task. `getFundingEstimate`, `getAutomationStatus` and `createAutomation` add it to `rentFee` (and so to `totalSolNeeded`, the balance check and `estimatedSolFee`) when the wallet has no automation yet; existing automations are unchanged.
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`f766451`](https://github.com/helium/helium-program-library/commit/f7664510c368e1c9f545ff11cc6715c23699bb6b) Thanks [@bryzettler](https://github.com/bryzettler)! - Add an optional `schedule` input to `getFundingEstimate`, the same preset or raw crontab `createAutomation` takes. With it, the setup rent prices the cron job at that crontab's length, as `createAutomation` does, so a raw crontab over 15 characters is no longer under-quoted. Without it, the estimate is unchanged and still assumes the longest preset (15 characters).
+
 ## 0.16.0
 
 ### Minor Changes

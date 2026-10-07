@@ -1,5 +1,48 @@
 # Change Log
 
+## 0.12.3
+
+### Patch Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`d48d673`](https://github.com/helium/helium-program-library/commit/d48d673b802be2db71b2b8807edad8f98048743c) Thanks [@bryzettler](https://github.com/bryzettler)! - Charge the setup rent once on a first-time `createAutomation`. The cron job transfer no longer carries the base rent that `init_entity_claim_cron_v0` already takes from the wallet, so a first setup moves that much less SOL. `createAutomation` now prices its transfers and balance check with the same helper as `getFundingEstimate`.
+
+  Count the task queue's min crank reward that `init_entity_claim_cron_v0` pays its schedule task. `getFundingEstimate`, `getAutomationStatus` and `createAutomation` add it to `rentFee` (and so to `totalSolNeeded`, the balance check and `estimatedSolFee`) when the wallet has no automation yet; existing automations are unchanged.
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`b5e82d0`](https://github.com/helium/helium-program-library/commit/b5e82d004a5bcf3bfb8d0719f8c153c719396211) Thanks [@bryzettler](https://github.com/bryzettler)! - Charge the recipient rent once in `getFundingEstimate` and `getAutomationStatus`. When the PDA wallet balance covered its own rent and the HNT ATA rent but only part of the recipient rent, `recipientFee` added the covered part (balance minus PDA and ATA rent) on top of the PDA wallet funding, which already carries every recipient's rent. `recipientFee` is now always 0, and `totalSolNeeded` drops by that amount for wallets in that range; other estimates are unchanged.
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`f766451`](https://github.com/helium/helium-program-library/commit/f7664510c368e1c9f545ff11cc6715c23699bb6b) Thanks [@bryzettler](https://github.com/bryzettler)! - Add an optional `schedule` input to `getFundingEstimate`, the same preset or raw crontab `createAutomation` takes. With it, the setup rent prices the cron job at that crontab's length, as `createAutomation` does, so a raw crontab over 15 characters is no longer under-quoted. Without it, the estimate is unchanged and still assumes the longest preset (15 characters).
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`0608a58`](https://github.com/helium/helium-program-library/commit/0608a582e1223a38f7192d775c7b7feae50aff06) Thanks [@bryzettler](https://github.com/bryzettler)! - Count the 0.01 SOL task-return funding once for a first-time automation: `getFundingEstimate` and `getAutomationStatus` no longer add it to `rentFee`, since the cron job funding already carries it. `totalSolNeeded` drops by 0.01 SOL for wallets without an automation. The reserve is now held back until the cron program owns `task_return_account_1`, not merely until the account exists. For an existing cron job whose task-return account is still system-owned (it has not completed a run yet), 0.01 SOL of the cron balance no longer counts as claim funding. `getAutomationStatus` reports fewer remaining claims for it. When its cron balance is below rent plus 0.01 SOL, `getFundingEstimate` and `fundAutomation` add the gap, so `totalSolNeeded` and the cron transfer rise by up to 0.01 SOL; otherwise `totalSolNeeded` does not rise. Other existing automations are unchanged.
+
+  `getAutomationStatus` now prices `recipientFee` the way `getFundingEstimate` does, instead of the full recipient rent, which the PDA wallet funding in operationalSol already carries when the wallet lacks it, so its `rentFee`, `recipientFee` and `operationalSol` sum to the estimate's `totalSolNeeded` at duration 0.
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`480ebca`](https://github.com/helium/helium-program-library/commit/480ebca0a9a8ee7591c1bb3fa4ad25833dfc51e7) Thanks [@bryzettler](https://github.com/bryzettler)! - Fund the cron job `createAutomation` re-creates on a schedule change for the whole requested duration at the claim count the old cron job had; claims added afterwards shorten it. The teardown refunds the old cron job, so the new one starts with only its rent; it was priced from the old balance and often got no funding at all, then stood down at its first run. `getFundingEstimate` with a different `schedule` now prices the same re-created cron job, and the wallet balance check counts the old cron job's refund.
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`78ac420`](https://github.com/helium/helium-program-library/commit/78ac420643be59ffad3628c85d4a06962428daa9) Thanks [@bryzettler](https://github.com/bryzettler)! - Gate data-only issue and onboard on the rent the cluster charges: issue now requires the KeyToAssetV0 rent plus the stored tree fee, onboard the IoT or mobile hotspot info rent, on top of transaction fees.
+
+  Insufficient-SOL errors on hotspot info updates, delegation, reward claims and token transfers now say the balance must cover account rent as well as transaction fees.
+
+  `getRentLamports` now rejects, and does not cache, a rent of 0 from an RPC error body; the request fails instead of pricing rent at 0 for an hour.
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`b74a18f`](https://github.com/helium/helium-program-library/commit/b74a18f01a307f1d7796b909e9f3139544cd5690) Thanks [@bryzettler](https://github.com/bryzettler)! - `issueDataOnlyHotspot` now returns an `estimatedSolFee` of the transaction fee plus the KeyToAssetV0 rent and tree fee, the same costs its funding gate charges, instead of the transaction fee alone.
+
+- Updated dependencies [[`9f99b45`](https://github.com/helium/helium-program-library/commit/9f99b458c442cd11909e7fccb4db33f373c33c8b), [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0), [`d48d673`](https://github.com/helium/helium-program-library/commit/d48d673b802be2db71b2b8807edad8f98048743c), [`f766451`](https://github.com/helium/helium-program-library/commit/f7664510c368e1c9f545ff11cc6715c23699bb6b), [`6f11300`](https://github.com/helium/helium-program-library/commit/6f11300031422e9468dc9c0ad813fad9eaa76d3c), [`7830992`](https://github.com/helium/helium-program-library/commit/78309926e86fd0de14a157d7e4c903fde04b3981), [`b26c94b`](https://github.com/helium/helium-program-library/commit/b26c94b2447cdc03eb0b997e7efcae7ed2891325), [`a9b1301`](https://github.com/helium/helium-program-library/commit/a9b13019bb52e8e9015f3fcfaabb4308c8aeddc6), [`56a2e86`](https://github.com/helium/helium-program-library/commit/56a2e86fa55c0f7eb33b0664cf368d4faf4bf1e2), [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283)]:
+  - @helium/account-fetch-cache@0.11.17
+  - @helium/circuit-breaker-sdk@0.12.0
+  - @helium/data-credits-sdk@0.13.0
+  - @helium/distributor-oracle@0.14.0
+  - @helium/helium-entity-manager-sdk@0.12.0
+  - @helium/helium-sub-daos-sdk@0.13.0
+  - @helium/hpl-crons-sdk@0.14.0
+  - @helium/idls@0.12.0
+  - @helium/lazy-distributor-sdk@0.13.0
+  - @helium/mini-fanout-sdk@0.12.0
+  - @helium/spl-utils@0.14.0
+  - @helium/sus@0.12.0
+  - @helium/voter-stake-registry-sdk@0.13.0
+  - @helium/welcome-pack-sdk@0.13.0
+  - @helium/blockchain-api@0.16.1
+
 ## 0.12.2
 
 ### Patch Changes
