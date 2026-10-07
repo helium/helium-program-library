@@ -1,4 +1,4 @@
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import BN from "bn.js";
 import { DataCredits } from "@helium/idls/lib/types/data_credits";
 import { DC_MINT } from "@helium/spl-utils";

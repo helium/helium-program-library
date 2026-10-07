@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import {
   bulkSendRawTransactions,
   populateMissingDraftInfo,
@@ -143,7 +143,7 @@ export async function runAllTasks(
       addressLookupTableAddresses: taskQueueAcc.lookupTables,
       feePayer: crankTurner.publicKey,
     });
-    const tx = toVersionedTx(
+    const tx = await toVersionedTx(
       await populateMissingDraftInfo(
         provider.connection,
         {

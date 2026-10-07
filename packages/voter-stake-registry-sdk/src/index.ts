@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Idl, Program } from "@anchor-lang/core";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { realmNames } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";

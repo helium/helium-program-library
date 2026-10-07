@@ -226,18 +226,21 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     ).instruction();
     instructions.push(setRecipientIx);
 
-    const txs = (
-      await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-        addressLookupTableAddresses: [
-          process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "devnet"
-            ? HELIUM_COMMON_LUT_DEVNET
-            : HELIUM_COMMON_LUT,
-        ],
-        commitment: "finalized",
-        // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-        deriveLoadedAccountsDataSizeLimit: false,
-      })
-    ).map((tx) => toVersionedTx(tx));
+    const txs = await Promise.all(
+      (
+        await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+          addressLookupTableAddresses: [
+            process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "devnet"
+              ? HELIUM_COMMON_LUT_DEVNET
+              : HELIUM_COMMON_LUT,
+          ],
+          commitment: "finalized",
+          version: 0,
+          // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+          deriveLoadedAccountsDataSizeLimit: false,
+        })
+      ).map((tx) => toVersionedTx(tx)),
+    );
 
     const tag = generateTransactionTag({
       type: TRANSACTION_TYPES.ADD_SPLIT,

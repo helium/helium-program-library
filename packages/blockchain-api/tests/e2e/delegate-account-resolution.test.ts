@@ -1,6 +1,6 @@
 import { createServer, Server } from "http";
 import { AddressInfo } from "net";
-import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
+import { idlAddress } from "@anchor-lang/core/dist/cjs/idl";
 import {
   delegatedPositionKey,
   EPOCH_LENGTH,

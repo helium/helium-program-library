@@ -14,7 +14,7 @@ import {
   sendInstructions,
   truthy,
 } from "@helium/spl-utils";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   getConcurrentMerkleTreeAccountSize,
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,

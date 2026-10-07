@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@clockwork-xyz/sdk": "^0.3.0",
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@fastify/cors": "^8.1.1",
     "@helium/account-fetch-cache": "workspace:^",
     "@helium/address": "^4.12.0",

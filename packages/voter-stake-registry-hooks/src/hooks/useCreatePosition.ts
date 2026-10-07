@@ -1,4 +1,4 @@
-import { BN } from "@coral-xyz/anchor";
+import { BN } from "@anchor-lang/core";
 import { TASK_QUEUE, useTaskQueue } from "@helium/automation-hooks";
 import {
   daoKey,

@@ -10,7 +10,11 @@ import {
   keyToAssetKey,
   rewardableEntityConfigKey,
 } from "@helium/helium-entity-manager-sdk";
-import { daoKey, subDaoKey } from "@helium/helium-sub-daos-sdk";
+import {
+  daoKey,
+  init as initHsd,
+  subDaoKey,
+} from "@helium/helium-sub-daos-sdk";
 import {
   HNT_MINT,
   IOT_MINT,
@@ -23,10 +27,16 @@ import {
 } from "@/lib/utils/build-transaction";
 import {
   calculateRequiredBalance,
+  getDataOnlyOnboardRentLamports,
   getTransactionFee,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { getAssetIdFromPubkey } from "@/lib/utils/hotspot-helpers";
+import {
+  assertDcCovered,
+  dataOnlyIotOnboardDcFee,
+  dcBalance,
+} from "./update-info-owner";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 
@@ -86,6 +96,24 @@ export const onboardDataOnlyHotspot =
           subDao,
           "IOT"
         )[0];
+        // The program burns DC from the owner's DC ATA without creating it, so
+        // a missing or short account would only fail on chain.
+        const [subDaoAcc, config, available] = await Promise.all([
+          initHsd(provider).then((hsd) => hsd.account.subDaoV0.fetch(subDao)),
+          program.account.rewardableEntityConfigV0.fetch(
+            rewardableEntityConfig
+          ),
+          dcBalance(connection, owner),
+        ]);
+        assertDcCovered({
+          required: dataOnlyIotOnboardDcFee({
+            onboardingFee: subDaoAcc.onboardingDataOnlyDcFee,
+            settings: config.settings,
+            assertsLocation: h3 !== null,
+          }),
+          available,
+          errors,
+        });
         onboardIx = await program.methods
           .onboardDataOnlyIotHotspotV0({
             ...args,
@@ -143,14 +171,20 @@ export const onboardDataOnlyHotspot =
         },
       });
 
-      const [totalFee, walletBalance] = await Promise.all([
+      const [totalFee, walletBalance, infoRent] = await Promise.all([
         getTransactionFee(connection, tx),
         connection.getBalance(owner),
+        getDataOnlyOnboardRentLamports(connection, network),
       ]);
-      const required = await calculateRequiredBalance(connection, totalFee, 0);
+      const required = await calculateRequiredBalance(
+        connection,
+        totalFee,
+        infoRent
+      );
       if (walletBalance < required) {
         throw errors.INSUFFICIENT_FUNDS({
-          message: "Insufficient SOL balance for transaction fees",
+          message:
+            "Insufficient SOL balance for transaction fees and account rent",
           data: { required, available: walletBalance },
         });
       }
@@ -172,7 +206,7 @@ export const onboardDataOnlyHotspot =
           actionMetadata: { type: "onboard_data_only_hotspot", network },
         },
         estimatedSolFee: await toTokenAmountOutput(
-          new BN(totalFee),
+          new BN(totalFee + infoRent),
           NATIVE_MINT.toBase58()
         ),
       };

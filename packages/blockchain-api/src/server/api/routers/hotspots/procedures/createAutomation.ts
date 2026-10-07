@@ -1,11 +1,12 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
-  calculateFundingForAdditionalDuration,
+  estimateAutomationFunding,
   getBaseAutomationRentLamports,
   ENTITY_CLAIM_CRON_NAME,
   resolveScheduleToCron,
+  scheduleChanged,
 } from "@/lib/utils/automation-helpers";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   cronJobKey,
   cronJobNameMappingKey,
@@ -79,10 +80,11 @@ export const createAutomation =
       const instructions: TransactionInstruction[] = [];
 
       // If cronJob doesn't exist or schedule changed, create/recreate it
-      if (
+      const recreatesCronJob =
         !cronJobAccount ||
-        (cronJobAccount.schedule && cronJobAccount.schedule !== cronSchedule)
-      ) {
+        (!!cronJobAccount.schedule &&
+          scheduleChanged(cronJobAccount.schedule, schedule));
+      if (recreatesCronJob) {
         // If it exists but schedule changed, remove it first. Skip holes left
         // by individually-removed claims (nextTransactionId is monotonic).
         if (cronJobAccount) {
@@ -140,7 +142,6 @@ export const createAutomation =
 
       // fetchAutomationData always returns a valid object, even if cron job doesn't exist
       const {
-        cronJobAccount: existingCronJobAccount,
         cronJobBalanceLamports,
         cronJobRentLamports,
         pdaWalletBalanceLamports,
@@ -149,41 +150,47 @@ export const createAutomation =
         recipientRentLamports,
         pdaWalletRentLamports,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
+        minCrankReward,
         pdaWallet,
       } = await fetchAutomationData(walletAddress, provider);
 
-      // If cron job doesn't exist, estimate the rent that will be needed
-      // This is important because the funding calculation needs to account for
-      // rent that will be locked up when the account is created
-      const effectiveCronJobRentLamports = existingCronJobAccount
-        ? cronJobRentLamports
-        : await getBaseAutomationRentLamports(
-            provider.connection,
-            cronSchedule.length,
-          );
-
-      // ATA rent and task return account rent are included from automationData
-      const { cronJobFundingLamports, pdaWalletFundingLamports } =
-        calculateFundingForAdditionalDuration({
-          cronJobBalanceLamports,
-          cronJobCostPerClaimLamports,
-          pdaWalletBalanceLamports,
-          pdaWalletCostPerClaimLamports,
-          recipientRentLamports,
-          cronJobRentLamports: effectiveCronJobRentLamports,
-          pdaWalletRentLamports,
-          additionalDuration: duration,
-          ataRentLamports,
-          taskReturnAccountRentLamports,
-        });
+      // Price with the same helper as getFundingEstimate. When init runs (first
+      // setup or a schedule change) init_entity_claim_cron_v0 pays the base
+      // rent and the schedule task's crank reward from the wallet, so the cron
+      // job transfer below carries neither and the total counts them once. The
+      // new cron job starts empty, so it is funded for the whole duration.
+      const {
+        cronJobFundingLamports,
+        pdaWalletFundingLamports,
+        totalLamports,
+      } = estimateAutomationFunding({
+        cronJobExists: !recreatesCronJob,
+        baseAutomationRentLamports: recreatesCronJob
+          ? await getBaseAutomationRentLamports(
+              provider.connection,
+              cronSchedule.length,
+            )
+          : 0,
+        minCrankRewardLamports: minCrankReward,
+        cronJobBalanceLamports,
+        cronJobCostPerClaimLamports,
+        pdaWalletBalanceLamports,
+        pdaWalletCostPerClaimLamports,
+        recipientRentLamports,
+        cronJobRentLamports,
+        pdaWalletRentLamports,
+        additionalDuration: duration,
+        ataRentLamports,
+        taskReturnAccountFundingLamports,
+      });
 
       // Always add at least minimal funding to ensure transaction is created
       const minCrankSolFee = Math.max(0, cronJobFundingLamports);
       const minPdaWalletSolFee = Math.max(0, pdaWalletFundingLamports);
 
       // Check wallet has sufficient balance (same pattern as fundAutomation)
-      const totalFundingNeeded = minCrankSolFee + minPdaWalletSolFee;
+      const totalFundingNeeded = totalLamports;
       const walletBalance = await provider.connection.getBalance(wallet);
       const estimatedTxFees = BASE_TX_FEE_LAMPORTS * 2; // Estimate for multiple potential txs
       const cluster = getCluster();
@@ -194,7 +201,13 @@ export const createAutomation =
       const totalNeededWithFees =
         totalFundingNeeded + estimatedTxFees + estimatedJitoTipCost;
 
-      if (walletBalance < totalNeededWithFees) {
+      // The teardown runs before init and the transfers, so the old cron job's
+      // lamports are back in the wallet by the time they spend. Lamports donated
+      // to a cron job PDA with no data get no teardown, so they never come back.
+      const teardownRefundLamports =
+        cronJobAccount && recreatesCronJob ? cronJobBalanceLamports : 0;
+
+      if (walletBalance + teardownRefundLamports < totalNeededWithFees) {
         throw errors.INSUFFICIENT_FUNDS({
           message: "Insufficient SOL balance to set up automation",
           data: {
@@ -229,18 +242,21 @@ export const createAutomation =
       }
 
       // Build and serialize transactions
-      const vtxs = (
-        await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-          addressLookupTableAddresses: [
-            process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
-              ? HELIUM_COMMON_LUT_DEVNET
-              : HELIUM_COMMON_LUT,
-          ],
-          commitment: "finalized",
-          // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-          deriveLoadedAccountsDataSizeLimit: false,
-        })
-      ).map((tx) => toVersionedTx(tx));
+      const vtxs = await Promise.all(
+        (
+          await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+            addressLookupTableAddresses: [
+              process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
+                ? HELIUM_COMMON_LUT_DEVNET
+                : HELIUM_COMMON_LUT,
+            ],
+            commitment: "finalized",
+            version: 0,
+            // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+            deriveLoadedAccountsDataSizeLimit: false,
+          })
+        ).map((tx) => toVersionedTx(tx)),
+      );
 
       // Add Jito tip if needed for mainnet bundles
       const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
@@ -248,9 +264,12 @@ export const createAutomation =
         vtxs.push(await getJitoTipTransaction(wallet));
       }
 
-      // Estimated fee includes tx fees + operational funding (cronJob + pdaWallet)
+      // Estimated fee includes tx fees + setup rent and crank reward + operational funding (cronJob + pdaWallet)
       const txFees = await getTotalTransactionFees(provider.connection, vtxs);
       const estimatedSolFeeLamports = txFees + totalFundingNeeded;
+      const effectiveSchedule = recreatesCronJob
+        ? cronSchedule
+        : cronJobAccount!.schedule;
 
       return {
         transactionData: {
@@ -259,14 +278,18 @@ export const createAutomation =
             {
               type: "setup_automation",
               description: "Set up hotspot claim automation",
-              cronSchedule,
+              cronSchedule: effectiveSchedule,
               duration,
             },
             useJito,
           ),
           parallel: false,
           tag: `setup_automation:${walletAddress}`,
-          actionMetadata: { type: "setup_automation", cronSchedule, duration },
+          actionMetadata: {
+            type: "setup_automation",
+            cronSchedule: effectiveSchedule,
+            duration,
+          },
         },
         estimatedSolFee: await toTokenAmountOutput(
           new BN(estimatedSolFeeLamports),

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { chunks, truthy, withPriorityFees } from "@helium/spl-utils";
 import { AddressLookupTableProgram, PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";

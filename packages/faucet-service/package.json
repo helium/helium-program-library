@@ -33,7 +33,7 @@
     "seed-db": "npx ts-node --project tsconfig.cjs.json src/seed-db.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@fastify/cors": "^8.1.1",
     "@helium/idls": "workspace:^",
     "@helium/spl-utils": "workspace:^",

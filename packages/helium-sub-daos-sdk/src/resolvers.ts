@@ -11,7 +11,7 @@ import {
   PROGRAM_ID as VSR_PROGRAM_ID,
   vsrResolvers,
 } from "@helium/voter-stake-registry-sdk";
-import { AnchorProvider, BN, Provider } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Provider } from "@anchor-lang/core";
 import { PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import { EPOCH_LENGTH, PROGRAM_ID } from "./constants";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";

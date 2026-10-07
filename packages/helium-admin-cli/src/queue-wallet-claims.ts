@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { batchParallelInstructionsWithPriorityFee } from "@helium/spl-utils";
 import {
   customSignerKey,

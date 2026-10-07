@@ -171,6 +171,28 @@ jobs:
       - run: cargo build --locked
       - run: cargo test --lib
 
+  # These suites fake every RPC, so they need no chain and no anchor build.
+  # setup-ts would build @helium/idls, which needs target/types; the filtered
+  # turbo run builds only the four packages the suites import. automation-hooks
+  # runs its suite directly: its dependency graph needs an anchor build, and
+  # its tests load only source through swc.
+  test-ts-unit:
+    name: spl-utils, sus, account-fetch-cache and automation-hooks Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run test --filter=@helium/spl-utils --filter=@helium/sus --filter=@helium/account-fetch-cache
+      - run: pnpm --filter @helium/automation-hooks test
+
   test-testing-guard:
     name: TESTING Build Guard
     runs-on: ubuntu-latest
@@ -313,6 +335,19 @@ jobs:
       - uses: ./.github/actions/setup-ts/
       - run: pnpm --filter @helium/helium-vote-service test
 
+  test-blockchain-api-unit:
+    needs: build
+    name: Test Blockchain API Unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+      - uses: ./.github/actions/setup-ts/
+      - run: pnpm --filter @helium/blockchain-api-service test:unit
+
   test-migration-service:
     needs: build
     name: Test Migration Service
@@ -414,6 +449,11 @@ jobs:
         with:
           testing: true
       - run: cd $RUST_PATH && cargo build && cargo test
+        env:
+          RUST_PATH: ${{ matrix.test }}
+      # hpl-utils carries unit tests that no other job runs.
+      - if: matrix.test == 'utils/hpl-utils'
+        run: cd $RUST_PATH && cargo test
         env:
           RUST_PATH: ${{ matrix.test }}
 

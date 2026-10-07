@@ -1,6 +1,6 @@
-import { Idl } from "@coral-xyz/anchor";
-import { decodeIdlAccount } from "@coral-xyz/anchor/dist/cjs/idl";
-import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+import { Idl } from "@anchor-lang/core";
+import { decodeIdlAccount } from "@anchor-lang/core/dist/cjs/idl";
+import { utf8 } from "@anchor-lang/core/dist/cjs/utils/bytes";
 import { TypedAccountParser } from "@helium/account-fetch-cache";
 import {
   UseAccountState,

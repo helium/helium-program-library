@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { BN, Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { BN, Program } from "@anchor-lang/core";
 import {
   customSignerKey,
   init as initTuktuk,
@@ -402,7 +402,7 @@ describe("tuktuk-dca", () => {
     /** The deepest `Program … invoke [n]` any program reached in this transaction. */
     async function maxCpiDepth(signature: string): Promise<number> {
       const tx = await provider.connection.getTransaction(signature, {
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
         commitment: "confirmed",
       });
       const logs = tx?.meta?.logMessages ?? [];

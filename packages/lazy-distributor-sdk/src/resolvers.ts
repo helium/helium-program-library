@@ -1,4 +1,4 @@
-import { Accounts } from "@coral-xyz/anchor";
+import { Accounts } from "@anchor-lang/core";
 import {
   ataResolver,
   combineResolvers,

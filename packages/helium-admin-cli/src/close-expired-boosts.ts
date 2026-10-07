@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init as initHex, boostConfigKey } from "@helium/hexboosting-sdk";
 import {
   batchInstructionsToTxsWithPriorityFee,

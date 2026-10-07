@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program } from "@anchor-lang/core";
 import {
   PROGRAM_ID as CIRCUIT_BREAKER_PROGRAM_ID,
   accountWindowedBreakerKey,

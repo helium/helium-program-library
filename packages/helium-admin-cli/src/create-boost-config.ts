@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { init } from "@helium/hexboosting-sdk";
 import { HNT_MINT, MOBILE_MINT, toBN } from "@helium/spl-utils";

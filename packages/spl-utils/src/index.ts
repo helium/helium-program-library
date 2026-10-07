@@ -1,11 +1,12 @@
 export * from "./extendBorsh";
 export * from "./transaction";
 export * from "./anchorError";
-export * from "./executeRemoteTxn";
 export * from "./utils";
 export * from "./token";
 export * from "./constants";
 export * from "./draft";
+export { resolveTxVersion, resetTxVersionCache } from "./txVersion";
+export type { TxVersionOption } from "./txVersion";
 export {
   fetchBackwardsCompatibleIdl,
   useBackwardsCompatibleIdl,
@@ -46,6 +47,8 @@ export {
   MAX_COMPUTE_UNITS,
   tableComputeUnitsForInstructions,
 } from "./computeUnitTable";
+
+export { getTransactionSizeLimit } from "./v1Transaction";
 
 export { proofArgsAndAccounts } from "./proofArgsAndAccounts";
 export type { ProofArgsAndAccountsArgs } from "./proofArgsAndAccounts";
