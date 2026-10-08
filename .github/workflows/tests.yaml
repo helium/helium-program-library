@@ -8,6 +8,8 @@ on:
     branches:
       - master
       - develop
+permissions:
+  contents: read
 env:
   SOLANA_CLI_VERSION: 2.1.6
 
@@ -34,13 +36,27 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo fmt -- --check
       # or_fun_call is on because `ok_or(error!(..))` builds the error on the success path too,
       # and an AnchorError owns two Strings. The heap a program gets is a bump allocator that
       # never frees, so errors that are never returned still consume it.
       - run: cargo clippy --all-targets -- -D warnings -D clippy::or_fun_call -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs
+
+  check-release-bumps:
+    name: Check Version Bumps and Changesets
+    # A develop-to-master release PR carries every change since the last release, after
+    # `changeset version` has consumed the changesets, so the job runs only on PRs into develop.
+    # A Version Packages PR into develop passes because it changes no src/.
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: scripts/check-release-bumps.sh ${{ github.event.pull_request.base.sha }}
 
   check-idls-changeset:
     name: Check @helium/idls Changeset
@@ -72,7 +88,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - name: Require an @helium/idls changeset when the generated IDL changes
         if: steps.changed.outputs.dirs != ''
         # @helium/idls has no src/ of its own -- it compiles the generated
@@ -151,9 +167,31 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo test --lib
+
+  # These suites fake every RPC, so they need no chain and no anchor build.
+  # setup-ts would build @helium/idls, which needs target/types; the filtered
+  # turbo run builds only the four packages the suites import. automation-hooks
+  # runs its suite directly: its dependency graph needs an anchor build, and
+  # its tests load only source through swc.
+  test-ts-unit:
+    name: spl-utils, sus, account-fetch-cache and automation-hooks Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run test --filter=@helium/spl-utils --filter=@helium/sus --filter=@helium/account-fetch-cache
+      - run: pnpm --filter @helium/automation-hooks test
 
   test-testing-guard:
     name: TESTING Build Guard
@@ -171,7 +209,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       # Scope: every program whose src reads TESTING, enumerated from the source rather
       # than from a list, so a new program that reads TESTING without a guard fails here, and
       # under both default features and `--features devnet`, so a devnet-exempt guard fails too.
@@ -251,7 +289,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo test --locked
         working-directory: utils/atomic-data-publisher
         env:
@@ -297,6 +335,19 @@ jobs:
       - uses: ./.github/actions/setup-ts/
       - run: pnpm --filter @helium/helium-vote-service test
 
+  test-blockchain-api-unit:
+    needs: build
+    name: Test Blockchain API Unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+      - uses: ./.github/actions/setup-ts/
+      - run: pnpm --filter @helium/blockchain-api-service test:unit
+
   test-migration-service:
     needs: build
     name: Test Migration Service
@@ -309,6 +360,19 @@ jobs:
           testing: true
       - uses: ./.github/actions/setup-ts/
       - run: pnpm --filter @helium/migration-service test
+
+  test-account-postgres-sink-service:
+    needs: build
+    name: Test Account Postgres Sink Service
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+      - uses: ./.github/actions/setup-ts/
+      - run: pnpm --filter @helium/account-postgres-sink-service test
 
   test-docker-builds:
     needs: build
@@ -384,7 +448,12 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
-      - run: cd $RUST_PATH && cargo build
+      - run: cd $RUST_PATH && cargo build && cargo test
+        env:
+          RUST_PATH: ${{ matrix.test }}
+      # hpl-utils carries unit tests that no other job runs.
+      - if: matrix.test == 'utils/hpl-utils'
+        run: cd $RUST_PATH && cargo test
         env:
           RUST_PATH: ${{ matrix.test }}
 
@@ -447,3 +516,22 @@ jobs:
         working-directory: packages/spl-utils
         env:
           RPC_URL: http://localhost:8899
+      # A transaction sent with skipPreflight fails without its program logs, so a failed suite
+      # keeps what `anchor localnet` streamed for each program, and the validator's own log.
+      - name: Name localnet logs
+        id: localnet-logs
+        if: failure() || cancelled()
+        run: echo "name=localnet-logs-$(basename "$TEST" .ts)" >> "$GITHUB_OUTPUT"
+        env:
+          TEST: ${{ matrix.test }}
+      - name: Upload localnet logs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.localnet-logs.outputs.name }}
+          path: |
+            .anchor/program-logs/
+            .anchor/test-ledger/validator.log
+            /tmp/localnet.log
+          if-no-files-found: warn
+          retention-days: 14

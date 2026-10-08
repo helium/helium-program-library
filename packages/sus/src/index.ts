@@ -3,12 +3,12 @@ import {
   BorshAccountsCoder,
   BorshInstructionCoder,
   Idl,
-} from "@coral-xyz/anchor";
+} from "@anchor-lang/core";
 import {
   convertIdlToCamelCase,
   decodeIdlAccount,
-} from "@coral-xyz/anchor/dist/cjs/idl";
-import { utf8 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+} from "@anchor-lang/core/dist/cjs/idl";
+import { utf8 } from "@anchor-lang/core/dist/cjs/utils/bytes";
 import { getLeafAssetId } from "@metaplex-foundation/mpl-bubblegum";
 import {
   PROGRAM_ID as MPL_PID,
@@ -29,9 +29,12 @@ import {
   AccountMeta,
   AddressLookupTableAccount,
   Connection,
+  Ed25519Program,
   MessageAccountKeys,
+  MessageV1,
   PublicKey,
   RpcResponseAndContext,
+  Secp256k1Program,
   SimulatedTransactionResponse,
   SystemProgram,
   TransactionError,
@@ -48,6 +51,11 @@ const BUBBLEGUM_PROGRAM_ID = new PublicKey(
 
 const ACCOUNT_COMPRESSION_PROGRAM_ID = new PublicKey(
   "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
+);
+
+// web3.js ships no class for this precompile.
+const SECP256R1_PROGRAM_ID = new PublicKey(
+  "Secp256r1SigVerify1111111111111111111111111"
 );
 
 export type BalanceChange = {
@@ -279,6 +287,29 @@ export async function sus({
     [];
   // Linearly simulate txs so as not to hit rate limits
   for (const [index, transaction] of transactions.entries()) {
+    const accounts = {
+      encoding: "base64" as const,
+      addresses:
+        simulationAccountsByTx[index]?.map((account) => account.toBase58()) ||
+        [],
+    };
+    // web3.js 1.x reads v1 but cannot serialize it, so simulate the bytes as
+    // given and let the node swap in a fresh blockhash.
+    if (transaction.version === 1) {
+      simulatedTxs.push(
+        await rpcRequest(connection, "simulateTransaction", [
+          serializedTransactions[index].toString("base64"),
+          {
+            encoding: "base64",
+            commitment: connection.commitment,
+            sigVerify: false,
+            replaceRecentBlockhash: true,
+            accounts,
+          },
+        ])
+      );
+      continue;
+    }
     let simulatedTxn: RpcResponseAndContext<SimulatedTransactionResponse> | null =
       null;
     let tries = 0;
@@ -286,13 +317,7 @@ export async function sus({
     blockhashLoop: while (true) {
       transaction.message.recentBlockhash = blockhash;
       simulatedTxn = await connection.simulateTransaction(transaction, {
-        accounts: {
-          encoding: "base64",
-          addresses:
-            simulationAccountsByTx[index]?.map((account) =>
-              account.toBase58()
-            ) || [],
-        },
+        accounts,
       });
       if (isBlockhashNotFound(simulatedTxn)) {
         ({ blockhash } = await connection?.getLatestBlockhash("finalized"));
@@ -519,9 +544,11 @@ export async function sus({
     const writableAccounts = writableAccountsByTx[index];
     const transaction = transactions[index];
 
-    const message = Buffer.from(transaction.message.serialize()).toString(
-      "base64"
-    );
+    const message = Buffer.from(
+      transaction.version === 1
+        ? v1MessageBytes(serializedTransactions[index], transaction)
+        : transaction.message.serialize()
+    ).toString("base64");
     const explorerLink = `https://explorer.solana.com/tx/inspector?cluster=${cluster}&message=${encodeURIComponent(
       message
     )}`;
@@ -552,10 +579,29 @@ export async function sus({
       let solFee = (transaction?.signatures.length || 1) * 5000;
       let priorityFee = 0;
 
-      const fee =
-        (await connection?.getFeeForMessage(transaction.message, "confirmed"))
-          .value || solFee;
-      priorityFee = fee - solFee;
+      if (transaction.version === 1) {
+        const v1Message = transaction.message as MessageV1;
+        // Read the header, not the node's price: getFeeForMessage returns
+        // null once the blockhash expires.
+        priorityFee = Number(v1Message.transactionConfig.priorityFee ?? 0);
+        const nodeFee = await rpcRequest(connection, "getFeeForMessage", [
+          message,
+          { commitment: "confirmed" },
+        ])
+          .then((res) => res.value as number | null)
+          .catch(() => null);
+        solFee =
+          nodeFee !== null
+            ? nodeFee - priorityFee
+            : (transaction.signatures.length +
+                precompileSignatureCount(v1Message)) *
+              5000;
+      } else {
+        const fee =
+          (await connection?.getFeeForMessage(transaction.message, "confirmed"))
+            .value || solFee;
+        priorityFee = fee - solFee;
+      }
       const balanceChanges = writableAccounts
         .map((acc) => {
           const type =
@@ -663,6 +709,45 @@ export async function sus({
   }
 
   return results;
+}
+
+// The runtime charges the base fee for each precompile signature too. A
+// precompile instruction's first data byte is its signature count.
+function precompileSignatureCount(message: MessageV1): number {
+  return message.compiledInstructions
+    .filter((ix) => {
+      const programId = message.staticAccountKeys[ix.programIdIndex];
+      return (
+        programId.equals(Ed25519Program.programId) ||
+        programId.equals(Secp256k1Program.programId) ||
+        programId.equals(SECP256R1_PROGRAM_ID)
+      );
+    })
+    .reduce((count, ix) => count + (ix.data[0] ?? 0), 0);
+}
+
+// v1 wire layout: the message, then the signatures with no length prefix.
+function v1MessageBytes(
+  serialized: Buffer,
+  transaction: VersionedTransaction
+): Buffer {
+  return serialized.subarray(
+    0,
+    serialized.length - 64 * transaction.signatures.length
+  );
+}
+
+async function rpcRequest(
+  connection: Connection,
+  method: string,
+  args: unknown[]
+) {
+  // @ts-ignore
+  const res = await connection._rpcRequest(method, args);
+  if (res.error) {
+    throw new Error(`failed to ${method}: ${res.error.message}`);
+  }
+  return res.result;
 }
 
 function isBlockhashNotFound(

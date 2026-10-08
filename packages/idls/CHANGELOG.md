@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0) Thanks [@bryzettler](https://github.com/bryzettler)! - Move from `@coral-xyz/anchor` to `@anchor-lang/core` 0.31.2, the package Anchor now publishes its TypeScript client under. When a transaction lands and then fails, `sendAndConfirm` and `sendAll` now throw a `SendTransactionError` that holds the program logs and the original error message. Errors from `simulate` now also hold the program logs. With `@solana/web3.js` 1.92 or later, 0.31.1 lost them. Preflight failures are unchanged. `sendAndConfirm` and `sendAll` now fetch the blockhash at `commitment` when `preflightCommitment` is not set. SDK functions typed on `Program` reject a `Program` built from `@coral-xyz/anchor`, so consumers must import `Program` from `@anchor-lang/core`. A provider or IDL from either package is accepted. A pnpm or npm override can alias `@coral-xyz/anchor@^0.31` to `npm:@anchor-lang/core@0.31.2`. This override puts third-party SDKs on the same 0.31.2 code. Under npm, or pnpm with `node-linker=hoisted`, the override installs a second copy of the module, and `setProvider` state and `instanceof` checks do not cross between the two package names. Under the default pnpm linker, both names load one copy.
+
+### Patch Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`b26c94b`](https://github.com/helium/helium-program-library/commit/b26c94b2447cdc03eb0b997e7efcae7ed2891325) Thanks [@bryzettler](https://github.com/bryzettler)! - Derive the data-only tree fee in helium-entity-manager's `issue_data_only_entity_v0` from the Rent sysvar at issue time: `ceil(Rent::get().minimum_balance(new_tree_space) / 2^new_tree_depth)`. The fee was `DataOnlyConfigV0.new_tree_fee_lamports`, fixed at DAO bootstrap under the old rent and changeable by no instruction, so as SIMD-0437 lowers rent it over-collects from onboarding wallets (69,215 stored vs 50,520 derived at mainnet rent in September 2026, about 10x at the last step) and strands the surplus in the tree escrow, whose only outflow is the exact rent reimbursement at tree rotation. The fee is priced at issue-time rent. If rent rises before rotation, the escrow's surplus covers the difference; if it does not, `update_data_only_tree_v0`'s reimbursement fails and issuance stops once the tree fills until the escrow is topped up. `new_tree_fee_lamports` and the `new_tree_fee_lamports` init argument keep their layout and are no longer read.
+
 ## 0.11.33
 
 ### Patch Changes

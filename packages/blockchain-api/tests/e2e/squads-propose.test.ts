@@ -9,7 +9,10 @@ import {
   ensureTokenBalance,
   loadKeypair2FromEnv,
 } from "./helpers/wallet";
-import { signAndSubmitTransactionData } from "./helpers/tx";
+import {
+  expectLandedTxVersion,
+  signAndSubmitTransactionData,
+} from "./helpers/tx";
 import { createTestMultisig } from "./helpers/squads";
 import { TEST_HOTSPOT_ENTITY_KEY } from "./helpers/constants";
 import { stopNextServer } from "./helpers/next";
@@ -128,11 +131,13 @@ describe("squads v4 propose-mode (token transfer)", function () {
       unknown
     >;
     assert.equal(meta.type, "token_transfer_proposal");
-    await signAndSubmitTransactionData(
+    const proposeSigs = await signAndSubmitTransactionData(
       ctx.connection,
       propose.transactionData,
       ctx.payer
     );
+    // blockchain-api pins version 0 per call, whatever the lane forces
+    await expectLandedTxVersion(ctx.connection, proposeSigs[0], 0);
     const index = String(meta.transactionIndex);
 
     const approve = await ctx.client.squads.approveProposal({

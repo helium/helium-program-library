@@ -5,7 +5,7 @@ import {
   LAMPORTS_PER_SOL,
   TransactionInstruction,
 } from "@solana/web3.js";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   entityCronAuthorityKey,
   init as initHplCrons,
@@ -29,7 +29,7 @@ import {
   calculateCronJobCostPerClaim,
   calculatePdaWalletCostPerClaim,
   ENTITY_CLAIM_CRON_NAME,
-  TASK_RETURN_ACCOUNT_SIZE,
+  TASK_RETURN_ACCOUNT_FUNDING_SOL,
 } from "@/lib/utils/automation-helpers";
 import {
   ATA_SPACE,
@@ -148,7 +148,7 @@ export interface AutomationData {
   recipientRentLamports: number;
   pdaWalletRentLamports: number; // Minimum rent for the 0-data PDA wallet
   ataRentLamports: number; // ATA rent if ATA doesn't exist (will be locked up)
-  taskReturnAccountRentLamports: number; // Task return account rent if it doesn't exist (will be locked up)
+  taskReturnAccountFundingLamports: number; // Fixed 0.01 SOL the cron job is topped up with for its task return accounts on first funding; not rent
   cronJob: PublicKey;
   pdaWallet: PublicKey;
 }
@@ -181,7 +181,8 @@ export async function fetchAutomationData(
   const ata = getAssociatedTokenAddressSync(HNT_MINT, wallet, true);
   // Task return accounts are derived from the cron job key
   // There are two task return accounts (task_return_account_1 and task_return_account_2)
-  // We check the first one - if it doesn't exist, we need to account for rent
+  // We check the first one - if it is not yet owned by the cron program,
+  // reserve the funding
   const [taskReturnAccount1] = PublicKey.findProgramAddressSync(
     [Buffer.from("task_return_account_1"), cronJob.toBuffer()],
     PROGRAM_ID,
@@ -249,9 +250,11 @@ export async function fetchAutomationData(
   // If the ATA doesn't exist, rent will be needed and locked up
   const ataRentLamports = ataAccount ? 0 : ataRent;
 
-  const taskReturnAccountRentLamports = taskReturnAccountInfo
+  const taskReturnAccountFundingLamports = taskReturnAccountInfo?.owner.equals(
+    PROGRAM_ID,
+  )
     ? 0
-    : Math.ceil(TASK_RETURN_ACCOUNT_SIZE * LAMPORTS_PER_SOL);
+    : Math.ceil(TASK_RETURN_ACCOUNT_FUNDING_SOL * LAMPORTS_PER_SOL);
 
   return {
     cronJobAccount,
@@ -265,7 +268,7 @@ export async function fetchAutomationData(
     recipientRentLamports,
     pdaWalletRentLamports,
     ataRentLamports,
-    taskReturnAccountRentLamports,
+    taskReturnAccountFundingLamports,
     cronJob,
     pdaWallet,
   };

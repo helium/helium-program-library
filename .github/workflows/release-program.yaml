@@ -22,12 +22,12 @@ jobs:
         with:
           path: |
             ~/.cargo/bin/toml
-          key: toml-cli-${{ runner.os }}-v0002
+          key: toml-cli-${{ runner.os }}-v0003-0.2.3
       # `--locked` builds against the crate's own lockfile, so a dependency that later requires a
       # newer rustc than this runner has cannot break the install. A failure here is fatal: the
       # next step reads the program id with this binary, and an empty id reaches `anchor idl
       # write-buffer` several steps later as a missing argument.
-      - run: cargo install toml-cli --locked
+      - run: cargo install toml-cli --version 0.2.3 --locked
         if: steps.cache-toml-cli.outputs.cache-hit != 'true'
         shell: bash
 

@@ -3,6 +3,11 @@ import {
   VersionedTransaction,
   ComputeBudgetProgram,
 } from "@solana/web3.js";
+import {
+  IOT_HOTSPOT_INFO_SPACE,
+  keyToAssetSpace,
+  MOBILE_HOTSPOT_INFO_SPACE,
+} from "@helium/helium-entity-manager-sdk";
 import { recipientSpace } from "@helium/lazy-distributor-sdk";
 import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
@@ -31,7 +36,12 @@ const rentCache = createTtlCache<number>({ ttlMs: 60 * 60 * 1000 });
  */
 export const getRentLamports = (connection: Connection, space: number) =>
   rentCache(`${connection.rpcEndpoint}:${space}`, () =>
-    connection.getMinimumBalanceForRentExemption(space),
+    connection.getMinimumBalanceForRentExemption(space).then((lamports) => {
+      // web3.js 1.99 resolves 0 on a JSON-RPC error body; reject so the cache
+      // does not keep it.
+      if (!(lamports > 0)) throw new Error(`rent unavailable for ${space} bytes`);
+      return lamports;
+    }),
   );
 
 /**
@@ -206,6 +216,50 @@ export const getWelcomePackRentParts = async (
 };
 
 /**
+ * Lamports issue_data_only_entity_v0 takes from the payer: rent for the
+ * KeyToAssetV0 it creates plus the per-leaf tree fee it moves to the
+ * data-only escrow. The fee quoted is the larger of the stored
+ * `new_tree_fee_lamports` (what the program charged before it derived the
+ * fee) and `ceil(rent(new_tree_space) / 2^new_tree_depth)` (what it charges
+ * after), so the quote is never below the program's fee in either era (it
+ * over-quotes by the gap in the era with the smaller term). Both rent terms
+ * come from `getRentLamports`, which caches for an hour, so the quote can lag
+ * a Rent sysvar change by that long. Drop the stored term once the
+ * derived-fee program is live.
+ */
+export const getDataOnlyIssueCostLamports = async (
+  connection: Connection,
+  {
+    entityKeyLen,
+    newTreeFeeLamports,
+    newTreeSpace,
+    newTreeDepth,
+  }: {
+    entityKeyLen: number;
+    newTreeFeeLamports: number;
+    newTreeSpace: number;
+    newTreeDepth: number;
+  },
+) =>
+  (await getRentLamports(connection, keyToAssetSpace(entityKeyLen))) +
+  Math.max(
+    newTreeFeeLamports,
+    Math.ceil(
+      (await getRentLamports(connection, newTreeSpace)) / 2 ** newTreeDepth,
+    ),
+  );
+
+/** Rent for the hotspot info account onboard_data_only_{iot,mobile}_hotspot_v0 creates. */
+export const getDataOnlyOnboardRentLamports = (
+  connection: Connection,
+  network: "iot" | "mobile",
+) =>
+  getRentLamports(
+    connection,
+    network === "iot" ? IOT_HOTSPOT_INFO_SPACE : MOBILE_HOTSPOT_INFO_SPACE,
+  );
+
+/**
  * Lamports the payer spends on the pack account itself. The escrow (gift +
  * fanout cost) is transferred into the pack account on top of whatever its
  * init rent already left there, so the pack costs the larger of the two
@@ -250,6 +304,44 @@ export async function calculateRequiredBalance(
 }
 
 /**
+ * Funding for issue_data_only_entity_v0: the estimate a client tops up to
+ * (tx fee + issue cost) and the gate's threshold, which adds the wallet-rent
+ * floor. Deriving both here keeps the estimate from drifting below the gate.
+ */
+export const getDataOnlyIssueFunding = async (
+  connection: Connection,
+  {
+    txFeeLamports,
+    entityKeyLen,
+    newTreeFeeLamports,
+    newTreeSpace,
+    newTreeDepth,
+  }: {
+    txFeeLamports: number;
+    entityKeyLen: number;
+    newTreeFeeLamports: number;
+    newTreeSpace: number;
+    newTreeDepth: number;
+  },
+) => {
+  const estimatedLamports =
+    txFeeLamports +
+    (await getDataOnlyIssueCostLamports(connection, {
+      entityKeyLen,
+      newTreeFeeLamports,
+      newTreeSpace,
+      newTreeDepth,
+    }));
+  return {
+    estimatedLamports,
+    requiredLamports: await calculateRequiredBalance(
+      connection,
+      estimatedLamports,
+    ),
+  };
+};
+
+/**
  * Fee the cluster would charge for this transaction, via getFeeForMessage —
  * the validator's own fee calculation, so it tracks base, priority, and any
  * future fee components without local modeling. Falls back to a local
@@ -263,14 +355,16 @@ export async function getTransactionFee(
     const { value } = await connection.getFeeForMessage(tx.message);
     if (value != null) return value;
   } catch {
-    // RPC unavailable — use the local estimate below.
+    // RPC unavailable, or a V1Transaction (web3.js cannot serialize a
+    // MessageV1, so getFeeForMessage always throws) — both use the local
+    // estimate below.
   }
   return estimateTransactionFeeLocally(tx);
 }
 
 /**
  * Local fallback: (base_signature_fee * num_signatures) + priority fee parsed
- * from the transaction's compute-budget instructions.
+ * from the transaction's compute-budget instructions, or from the v1 header.
  *
  * Models only today's fee components — it does NOT model the SIMD-0553
  * resource fee (burned, priced on requested CU + loaded-data size), whose
@@ -281,6 +375,11 @@ export async function getTransactionFee(
 function estimateTransactionFeeLocally(tx: VersionedTransaction): number {
   const numSignatures = tx.message.header.numRequiredSignatures;
   const baseFee = BASE_SIGNATURE_FEE_LAMPORTS * numSignatures;
+
+  // v1 carries the total priority fee, in lamports, in the message header.
+  if (tx.message.version === 1) {
+    return baseFee + (tx.message.transactionConfig.priorityFee ?? 0);
+  }
 
   let computeUnitLimit: number | undefined;
   let computeUnitPrice = 0; // Default no priority fee

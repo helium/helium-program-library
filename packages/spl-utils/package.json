@@ -1,6 +1,6 @@
 {
   "name": "@helium/spl-utils",
-  "version": "0.13.5",
+  "version": "0.14.0",
   "description": "Utils shared across spl suite",
   "publishConfig": {
     "access": "public",
@@ -30,15 +30,19 @@
     "package": "npx shx mkdir -p lib/cjs lib/esm",
     "prebuild": "npm run clean && npm run package",
     "build": "tsc -b tsconfig.json",
+    "test": "mocha -r @swc-node/register \"tests/**/*.test.ts\" --timeout 10000",
     "sample-cu": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/sample-cu.ts",
-    "check-cu-table": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/check-cu-table.ts"
+    "check-cu-table": "ts-node -T -O '{\"module\":\"commonjs\"}' scripts/check-cu-table.ts",
+    "update-hem-idl": "cd ../.. && anchor idl build -p helium_entity_manager -o packages/spl-utils/src/idl/helium_entity_manager.json"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@helium/account-fetch-cache": "workspace:^",
     "@helium/address": "^4.12.0",
     "@helium/anchor-resolvers": "workspace:^",
     "@metaplex-foundation/mpl-token-metadata": "^2.10.0",
+    "@noble/curves": "^1.9.7",
+    "@solana/kit": "8.3.0",
     "@solana/spl-account-compression": "^0.1.7",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.99.0",
@@ -48,7 +52,13 @@
     "bs58": "^4.0.1"
   },
   "devDependencies": {
+    "@swc-node/register": "^1.11.1",
+    "@swc/core": "^1.13.5",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "chai": "^6.2.0",
     "git-format-staged": "^2.1.3",
+    "mocha": "^11.7.5",
     "ts-loader": "^9.2.3",
     "typescript": "^5.2.2"
   },

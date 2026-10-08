@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, IdlAccounts, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, IdlAccounts, Program } from "@anchor-lang/core";
 import { getSingleton } from "@helium/account-fetch-cache";
 import {
   decodeEntityKey,
@@ -555,9 +555,12 @@ export async function formBulkTransactions({
       ],
       // Wallet-signed: guard ixs may be appended (see withPriorityFees).
       deriveLoadedAccountsDataSizeLimit: false,
+      // The oracle's /bulk-sign co-signs with web3.js 1.x, which cannot
+      // sign v1.
+      version: 0,
     }
   );
-  const initialTxs = initialTxDrafts.map(toVersionedTx);
+  const initialTxs = await Promise.all(initialTxDrafts.map(toVersionedTx));
 
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);
@@ -775,9 +778,11 @@ export async function formTransaction({
     // Wallet-signed: guard ixs may be appended (see withPriorityFees).
     deriveLoadedAccountsDataSizeLimit: false,
   });
-  const tx = toVersionedTx({
+  const tx = await toVersionedTx({
     ...fullDraft,
     instructions,
+    // The oracle co-signs with web3.js 1.x, which cannot sign v1.
+    version: 0,
   });
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);

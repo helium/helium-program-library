@@ -1,4 +1,4 @@
-import { BorshInstructionCoder } from "@coral-xyz/anchor";
+import { BorshInstructionCoder } from "@anchor-lang/core";
 import {
   delegatedPositionKey,
   EPOCH_LENGTH,
@@ -32,7 +32,11 @@ import { stopNextServer } from "./helpers/next";
 import { stopSurfpool } from "./helpers/surfpool";
 import { setupTestCtx, TestCtx } from "./helpers/context";
 import { confineTaskQueueFreeIds } from "./helpers/tuktuk";
-import { signAndSubmitTransactionData } from "./helpers/tx";
+import {
+  expectLandedTxVersion,
+  priorityFeeLamports,
+  signAndSubmitTransactionData,
+} from "./helpers/tx";
 import {
   ensureFunds,
   ensureTokenBalance,
@@ -131,6 +135,8 @@ describe("governance", () => {
         ctx.payer
       );
       expect(sigs).to.have.length(1);
+      // blockchain-api pins version 0 per call, whatever the lane forces
+      await expectLandedTxVersion(ctx.connection, sigs[0], 0);
 
       // Verify position exists on-chain
       const positionMint = data.transactionData.transactions[0].metadata
@@ -2329,6 +2335,22 @@ describe("governance", () => {
       }
       expect(Number(data.estimatedSolFee!.amount)).to.equal(required);
 
+      // The quote priced each transaction with getFeeForMessage, which
+      // surfpool answers without the compute-unit price the runtime then
+      // charges (mainnet's includes it). Surfpool 1.5+ also keeps the fee payer
+      // above its rent floor mid-bundle, so add that price back before submit.
+      const priorityFees = data.transactionData.transactions
+        .map((t) =>
+          priorityFeeLamports(
+            VersionedTransaction.deserialize(
+              Buffer.from(t.serializedTransaction, "base64"),
+            ),
+            wallet.publicKey,
+          ),
+        )
+        .reduce((a, b) => a + b, 0);
+      await setBalanceExactly(wallet, required + priorityFees, ctx.payer);
+
       // #then the whole bundle lands on exactly that balance, leaving the
       // wallet its rent floor and nothing else: every lamport the quote asked
       // for was spent, so it priced exactly what the bundle costs
@@ -2337,11 +2359,9 @@ describe("governance", () => {
         data.transactionData,
         wallet,
       );
-      // The quote priced each transaction with getFeeForMessage, which
-      // surfpool answers without the compute-unit price the runtime then
-      // charges (mainnet's includes it). Surfpool's meta.fee leaves it out
-      // too, so read what was really charged off the ledger: lamports are
-      // conserved across a transaction except for its fee.
+      // Surfpool's meta.fee leaves the compute-unit price out too, so read
+      // what was really charged off the ledger: lamports are conserved across
+      // a transaction except for its fee.
       const { blockhash } = await ctx.connection.getLatestBlockhash();
       let unquotedFees = 0;
       for (const [i, signature] of signatures.entries()) {
@@ -2365,9 +2385,12 @@ describe("governance", () => {
           .value!;
         unquotedFees += charged - quoted;
       }
+      expect(unquotedFees).to.equal(priorityFees);
       expect(
         (await ctx.connection.getBalance(wallet.publicKey)) + unquotedFees,
-      ).to.equal(await getMinWalletRentLamports(ctx.connection));
+      ).to.equal(
+        (await getMinWalletRentLamports(ctx.connection)) + priorityFees,
+      );
 
       // #then the rent-bearing accounts are the sizes the quote priced
       const positionMint = data.transactionData.transactions[0].metadata

@@ -1,7 +1,7 @@
 {
   "name": "@helium/blockchain-api-service",
   "private": true,
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "Helium Blockchain API - Web application for Helium blockchain",
   "license": "Apache-2.0",
   "repository": {
@@ -19,13 +19,13 @@
     "lint:check": "eslint src tests",
     "typecheck": "tsc --noEmit",
     "background-service": "node scripts/start-background-service.js",
-    "test:e2e": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register \"tests/e2e/**/*.test.ts\" --timeout 100000",
-    "test:e2e:file": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register --timeout 100000",
+    "test:e2e": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register \"tests/e2e/**/*.test.ts\" --timeout 100000 --exit",
+    "test:e2e:file": "NODE_OPTIONS='--max-old-space-size=8192' DOTENV_CONFIG_PATH=.env.test mocha -r dotenv/config -r @swc-node/register --timeout 100000 --exit",
     "test:unit": "mocha -r @swc-node/register \"tests/unit/**/*.test.ts\" --timeout 10000",
     "sequelize-cli": "sequelize-cli"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.1",
+    "@anchor-lang/core": "^0.31.2",
     "@helium/account-fetch-cache": "workspace:^",
     "@helium/blockchain-api": "workspace:^",
     "@helium/circuit-breaker-sdk": "workspace:^",

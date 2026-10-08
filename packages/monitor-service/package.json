@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.21",
+  "version": "0.11.22",
   "description": "Prometheus monitoring of important accounts on Solana",
   "repository": {
     "type": "git",
@@ -27,7 +27,7 @@
     "dev": "npx ts-node --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@helium/account-fetch-cache": "workspace:^",
     "@helium/circuit-breaker-sdk": "workspace:^",
     "@helium/data-credits-sdk": "workspace:^",

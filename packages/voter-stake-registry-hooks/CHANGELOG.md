@@ -1,5 +1,26 @@
 # Change Log
 
+## 0.14.0
+
+### Minor Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0) Thanks [@bryzettler](https://github.com/bryzettler)! - Move from `@coral-xyz/anchor` to `@anchor-lang/core` 0.31.2, the package Anchor now publishes its TypeScript client under. When a transaction lands and then fails, `sendAndConfirm` and `sendAll` now throw a `SendTransactionError` that holds the program logs and the original error message. Errors from `simulate` now also hold the program logs. With `@solana/web3.js` 1.92 or later, 0.31.1 lost them. Preflight failures are unchanged. `sendAndConfirm` and `sendAll` now fetch the blockhash at `commitment` when `preflightCommitment` is not set. SDK functions typed on `Program` reject a `Program` built from `@coral-xyz/anchor`, so consumers must import `Program` from `@anchor-lang/core`. A provider or IDL from either package is accepted. A pnpm or npm override can alias `@coral-xyz/anchor@^0.31` to `npm:@anchor-lang/core@0.31.2`. This override puts third-party SDKs on the same 0.31.2 code. Under npm, or pnpm with `node-linker=hoisted`, the override installs a second copy of the module, and `setProvider` state and `instanceof` checks do not cross between the two package names. Under the default pnpm linker, both names load one copy.
+
+### Patch Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283) Thanks [@bryzettler](https://github.com/bryzettler)! - `@helium/spl-utils` now builds v1 transactions when the node and a keypair-backed signer support them. Wallet adapters stay on v0 unless a per-call `version` forces a version. `HPL_TX_VERSION=v0` forces v0. `HPL_TX_VERSION=v1` skips node detection, but a signer without v1 support still gets v0. Any `HPL_TX_VERSION` value other than `v0`, `v1` or `auto` throws. `sendInstructions` falls back to v0 when the instructions exceed the v1 limits, and takes an optional `version`. The batchers pick v1 or v0 for each transaction. Both batchers now throw when a single instruction group fits in no transaction version, instead of sending an oversize transaction. The `executeRemoteTxn` family, `executeBig`, `BigInstructionResult`, `sendMultipleInstructions` and `createNft` are no longer exported; `createNft` moved to the tests. `stringToTransaction` and `bufferToTransaction` are deprecated. `createAtaAndMint` and `createAtaAndTransfer` now honour only `commitment` from their `ConfirmOptions`. `mintTo`, `createMint` and `createAtaAndMint` now send through `sendInstructions` with preflight skipped. `@helium/sus` now simulates and prices v1 transactions. `TransactionCompletionQueue` now removes its websocket signature subscription when a confirmation wait resolves, fails or times out, instead of leaving it open on the shared connection. `bulkSendTransactions` and `bulkSendRawTransactions` no longer resend a transaction with an unsigned required signer until expiry. They send the signed ones, then throw "Missing signature for public key …". When an on-chain failure or blockhash expiry ends the call first, its error also names the missing signers found so far. `@helium/distributor-oracle` `minRent` now rejects, and does not cache, a rent of 0 from an RPC error body.
+
+- Updated dependencies [[`9f99b45`](https://github.com/helium/helium-program-library/commit/9f99b458c442cd11909e7fccb4db33f373c33c8b), [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0), [`d308316`](https://github.com/helium/helium-program-library/commit/d308316cdbfe442dab0490dd535630d97a7540b8), [`6f11300`](https://github.com/helium/helium-program-library/commit/6f11300031422e9468dc9c0ad813fad9eaa76d3c), [`b26c94b`](https://github.com/helium/helium-program-library/commit/b26c94b2447cdc03eb0b997e7efcae7ed2891325), [`a9b1301`](https://github.com/helium/helium-program-library/commit/a9b13019bb52e8e9015f3fcfaabb4308c8aeddc6), [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283)]:
+  - @helium/account-fetch-cache@0.11.17
+  - @helium/automation-hooks@0.14.0
+  - @helium/circuit-breaker-sdk@0.12.0
+  - @helium/helium-react-hooks@0.12.0
+  - @helium/helium-sub-daos-sdk@0.13.0
+  - @helium/hpl-crons-sdk@0.14.0
+  - @helium/idls@0.12.0
+  - @helium/spl-utils@0.14.0
+  - @helium/voter-stake-registry-sdk@0.13.0
+
 ## 0.13.0
 
 ### Minor Changes

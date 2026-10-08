@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "React hooks for helium voter stake registry",
   "repository": {
     "type": "git",
@@ -32,7 +32,7 @@
     "build": "tsc -b tsconfig.json"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@helium/account-fetch-cache": "workspace:^",
     "@helium/account-fetch-cache-hooks": "workspace:^",
     "@helium/automation-hooks": "workspace:^",

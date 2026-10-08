@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program, Wallet } from "@anchor-lang/core";
 import cors from "@fastify/cors";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
 import {

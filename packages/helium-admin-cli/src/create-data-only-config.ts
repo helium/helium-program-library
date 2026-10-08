@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   init as initHem,
   dataOnlyConfigKey,
@@ -140,7 +140,7 @@ export async function run(args: any = process.argv) {
           newTreeSpace: new BN(
             getConcurrentMerkleTreeAccountSize(size, buffer, canopy)
           ),
-          newTreeFeeLamports: new BN(cost / 2 ** size),
+          newTreeFeeLamports: new BN(Math.ceil(cost / 2 ** size)),
           name: "DATAONLY",
           metadataUrl:
             "https://shdw-drive.genesysgo.net/H8b1gZmA2aBqDYxicxawGpznCaNbFSEJ3YnJuawGQ2EQ/data-only.json",

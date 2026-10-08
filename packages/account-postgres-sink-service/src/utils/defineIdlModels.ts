@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { camelize, underscore } from "inflection";
 import { DataTypes, QueryTypes, Sequelize } from "sequelize";
 import { initPlugins } from "../plugins";
@@ -9,7 +9,7 @@ import {
   IdlField,
   IdlTypeDef,
   IdlTypeDefTyStruct,
-} from "@coral-xyz/anchor/dist/cjs/idl";
+} from "@anchor-lang/core/dist/cjs/idl";
 import { omit, pick } from "lodash";
 import { syncTableWithViews } from "./syncTableWithViews";
 
