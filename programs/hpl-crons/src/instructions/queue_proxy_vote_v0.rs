@@ -1,3 +1,4 @@
+use crate::task_rent::{queue_authority_can_pay, task_space};
 use anchor_lang::{
   prelude::*,
   system_program::{transfer, Transfer},
@@ -8,7 +9,7 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
+  TaskQueueAuthorityV0, TaskQueueV0, TransactionSourceV0, TriggerV0,
 };
 use voter_stake_registry::state::ProxyMarkerV0;
 
@@ -84,13 +85,23 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
     )?;
   }
 
-  // Queue authority pays for the task rent if it can, since we know it'll come back
-  // This makes voting cheaper for users.
+  // The queue authority pays the task's rent when it can do so and stay rent exempt;
+  // otherwise the payer does. This makes voting cheaper for users.
   let mut payer = ctx.accounts.payer.to_account_info();
   let description = "proxy vote".to_string();
-  let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
-  let rent_needed = Rent::get()?.minimum_balance(len);
-  if ctx.accounts.queue_authority.lamports() > rent_needed {
+  let transaction = TransactionSourceV0::RemoteV0 {
+    url: format!(
+      "{}/v1/proposals/{}/proxy-vote/{}",
+      VOTE_SERVICE_URL, ctx.accounts.marker.proposal, ctx.accounts.marker.voter
+    ),
+    signer: VOTE_SERVICE_SIGNER,
+  };
+  let space = task_space(&transaction, &description);
+  if queue_authority_can_pay(
+    ctx.accounts.queue_authority.lamports(),
+    space,
+    &Rent::get()?,
+  ) {
     payer = ctx.accounts.queue_authority.to_account_info();
     transfer(
       CpiContext::new_with_signer(
@@ -120,13 +131,7 @@ pub fn handler(ctx: Context<QueueProxyVoteV0>, args: QueueProxyVoteArgsV0) -> Re
     ),
     QueueTaskArgsV0 {
       trigger: TriggerV0::Now,
-      transaction: TransactionSourceV0::RemoteV0 {
-        url: format!(
-          "{}/v1/proposals/{}/proxy-vote/{}",
-          VOTE_SERVICE_URL, ctx.accounts.marker.proposal, ctx.accounts.marker.voter
-        ),
-        signer: VOTE_SERVICE_SIGNER,
-      },
+      transaction,
       crank_reward: None,
       free_tasks: 2,
       id: args.free_task_id,

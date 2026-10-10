@@ -1,5 +1,6 @@
 use std::cmp::max;
 
+use crate::task_rent::{queue_authority_can_pay, task_space};
 use anchor_lang::{
   prelude::*,
   system_program::{self, transfer, Transfer},
@@ -13,7 +14,7 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
+  TaskQueueAuthorityV0, TaskQueueV0, TransactionSourceV0, TriggerV0,
 };
 use voter_stake_registry::state::{PositionV0, VoteMarkerV0};
 
@@ -80,13 +81,17 @@ pub fn handler(
   )
   .unwrap();
 
-  // Queue authority pays for the task rent if it can, since we know it'll come back
-  // This makes voting cheaper for users.
+  // The queue authority pays the task's rent when it can do so and stay rent exempt;
+  // otherwise the payer does. This makes voting cheaper for users.
   let mut payer = ctx.accounts.payer.to_account_info();
   let description = "relinquish expired vote marker".to_string();
-  let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
-  let rent_needed = Rent::get()?.minimum_balance(len);
-  if ctx.accounts.queue_authority.lamports() > rent_needed {
+  let transaction = TransactionSourceV0::CompiledV0(compiled_tx);
+  let space = task_space(&transaction, &description);
+  if queue_authority_can_pay(
+    ctx.accounts.queue_authority.lamports(),
+    space,
+    &Rent::get()?,
+  ) {
     payer = ctx.accounts.queue_authority.to_account_info();
     transfer(
       CpiContext::new_with_signer(
@@ -115,7 +120,7 @@ pub fn handler(
     ),
     QueueTaskArgsV0 {
       trigger: TriggerV0::Timestamp(max(Clock::get()?.unix_timestamp, args.trigger_ts)),
-      transaction: TransactionSourceV0::CompiledV0(compiled_tx),
+      transaction,
       crank_reward: None,
       free_tasks: 0,
       id: args.free_task_id,

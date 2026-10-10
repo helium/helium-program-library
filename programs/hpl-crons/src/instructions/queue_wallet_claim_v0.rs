@@ -1,3 +1,4 @@
+use crate::task_rent::{queue_authority_can_pay, task_space};
 use anchor_lang::{
   prelude::*,
   system_program::{transfer, Transfer},
@@ -9,7 +10,7 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
+  TaskQueueAuthorityV0, TaskQueueV0, TransactionSourceV0, TriggerV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -72,16 +73,27 @@ pub fn handler(ctx: Context<QueueWalletClaimV0>, args: QueueWalletClaimArgsV0) -
     )?;
   }
 
-  // Queue authority pays for the task rent if it can, since we know it'll come back
-  // This makes claim tasks cheaper for users.
+  // The queue authority pays the task's rent when it can do so and stay rent exempt;
+  // otherwise the payer does. This makes claim tasks cheaper for users.
   let mut payer = ctx.accounts.payer.to_account_info();
   let description = format!("ld wallet {}", ctx.accounts.wallet.key())
     .chars()
     .take(40)
     .collect::<String>();
-  let len = 8 + std::mem::size_of::<TaskV0>() + 60 + description.len();
-  let rent_needed = Rent::get()?.minimum_balance(len);
-  if ctx.accounts.queue_authority.lamports() > rent_needed {
+  let transaction = TransactionSourceV0::RemoteV0 {
+    url: format!(
+      "{}/v1/tuktuk/wallet/{}",
+      ORACLE_URL,
+      ctx.accounts.wallet.key()
+    ),
+    signer: ORACLE_SIGNER,
+  };
+  let space = task_space(&transaction, &description);
+  if queue_authority_can_pay(
+    ctx.accounts.queue_authority.lamports(),
+    space,
+    &Rent::get()?,
+  ) {
     payer = ctx.accounts.queue_authority.to_account_info();
     transfer(
       CpiContext::new_with_signer(
@@ -111,14 +123,7 @@ pub fn handler(ctx: Context<QueueWalletClaimV0>, args: QueueWalletClaimArgsV0) -
     ),
     QueueTaskArgsV0 {
       trigger: TriggerV0::Now,
-      transaction: TransactionSourceV0::RemoteV0 {
-        url: format!(
-          "{}/v1/tuktuk/wallet/{}",
-          ORACLE_URL,
-          ctx.accounts.wallet.key()
-        ),
-        signer: ORACLE_SIGNER,
-      },
+      transaction,
       crank_reward: None,
       free_tasks: NUM_QUEUED_PER_BATCH + 1,
       id: args.free_task_id,
