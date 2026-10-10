@@ -14,6 +14,7 @@ import {
 } from "@helium/tuktuk-sdk";
 import {
   ComputeBudgetProgram,
+  Keypair,
   PublicKey,
   SystemProgram,
   TransactionMessage,
@@ -24,6 +25,7 @@ import { init as initHsd } from "../packages/helium-sub-daos-sdk/src";
 import {
   epochTrackerKey,
   init as initHplCrons,
+  queueAuthorityKey,
   taskReturnAccountKey,
 } from "../packages/hpl-crons-sdk/src";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
@@ -366,6 +368,74 @@ describe("hpl-crons", () => {
     expect(epochAfter.toString()).to.equal(
       epochBefore.add(new anchor.BN(1)).toString()
     );
+  });
+
+  describe("queue_wallet_claim_v0", () => {
+    let queueAuthority: PublicKey;
+    let nextTaskId = 50;
+
+    // Every wallet has a 44-character address, so every claim task has the same size.
+    const nextWallet = () => {
+      let wallet = Keypair.generate().publicKey;
+      while (wallet.toBase58().length !== 44)
+        wallet = Keypair.generate().publicKey;
+      return wallet;
+    };
+
+    const queueClaim = async () => {
+      const id = nextTaskId++;
+      const task = taskKey(taskQueue, id)[0];
+      await program.methods
+        .queueWalletClaimV0({ freeTaskId: id })
+        .accounts({ payer: me, wallet: nextWallet(), taskQueue, task })
+        .rpc({ skipPreflight: true });
+      const info = await provider.connection.getAccountInfo(task);
+      const { rentRefund } = await tuktukProgram.account.taskV0.fetch(task);
+      return { space: info!.data.length, rentRefund };
+    };
+
+    const balance = (key: PublicKey) => provider.connection.getBalance(key);
+    const rent = (space: number) =>
+      provider.connection.getMinimumBalanceForRentExemption(space);
+    const fund = (to: PublicKey, lamports: number) =>
+      sendInstructions(provider, [
+        SystemProgram.transfer({ fromPubkey: me, toPubkey: to, lamports }),
+      ]);
+
+    before(async () => {
+      [queueAuthority] = queueAuthorityKey(anchor.workspace.HplCrons.programId);
+      await tuktukProgram.methods
+        .addQueueAuthorityV0()
+        .accounts({ payer: me, queueAuthority, taskQueue })
+        .rpc();
+    });
+
+    it("has the queue authority pay a claim task's rent only when it stays rent exempt", async () => {
+      expect(await balance(queueAuthority)).to.eq(0);
+
+      // Unfunded, the queue authority pays nothing: the payer pays the rent and is the task's
+      // rent_refund.
+      const first = await queueClaim();
+      expect(first.rentRefund.toBase58()).to.eq(me.toBase58());
+      expect(await balance(queueAuthority)).to.eq(0);
+
+      const taskRent = await rent(first.space);
+      const threshold = taskRent + (await rent(0));
+
+      // One lamport short of covering the task and its own rent-exempt minimum.
+      await fund(queueAuthority, threshold - 1);
+      const short = await queueClaim();
+      expect(short.space).to.eq(first.space);
+      expect(short.rentRefund.toBase58()).to.eq(me.toBase58());
+      expect(await balance(queueAuthority)).to.eq(threshold - 1);
+
+      // Exactly enough: the queue authority pays the rent and keeps its minimum.
+      await fund(queueAuthority, 1);
+      const covered = await queueClaim();
+      expect(covered.space).to.eq(first.space);
+      expect(covered.rentRefund.toBase58()).to.eq(queueAuthority.toBase58());
+      expect(await balance(queueAuthority)).to.eq(await rent(0));
+    });
   });
 
   // A pyth verification chain advances one step at a time, so the task it hands back carries a
