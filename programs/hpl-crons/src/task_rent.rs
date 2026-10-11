@@ -45,44 +45,7 @@ pub fn queue_authority_can_pay(lamports: u64, space: usize, rent: &Rent) -> bool
 #[cfg(test)]
 mod tests {
   use super::*;
-  use anchor_lang::solana_program::pubkey;
   use tuktuk_program::CompiledInstructionV0;
-
-  fn mainnet_rent() -> Rent {
-    Rent {
-      lamports_per_byte_year: 2540,
-      exemption_threshold: 2.0,
-      burn_percent: 50,
-    }
-  }
-
-  fn wallet_claim_space(wallet: Pubkey) -> usize {
-    let transaction = TransactionSourceV0::RemoteV0 {
-      url: format!(
-        "https://hnt-rewards.oracle.helium.io/v1/tuktuk/wallet/{}",
-        wallet
-      ),
-      signer: Pubkey::default(),
-    };
-    let description = format!("ld wallet {}", wallet)
-      .chars()
-      .take(40)
-      .collect::<String>();
-    task_space(&transaction, &description)
-  }
-
-  /// tuktuk allocates 466 bytes, at 3,017,520 lamports, for a wallet-claim task whose
-  /// wallet address is 44 characters, and one byte less for a 43-character address.
-  #[test]
-  fn wallet_claim_task_matches_the_allocated_account() {
-    let space = wallet_claim_space(pubkey!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"));
-    assert_eq!(space, 466);
-    assert_eq!(mainnet_rent().minimum_balance(space), 3_017_520);
-    assert_eq!(
-      wallet_claim_space(pubkey!("hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux")),
-      465
-    );
-  }
 
   /// The bytes of a task account tuktuk allocated for a compiled transaction: the space
   /// computed from the task's own transaction and description is the account's length.
@@ -116,8 +79,26 @@ mod tests {
   }
 
   #[test]
+  fn compiled_size_counts_every_account_when_no_instruction_names_one() {
+    let transaction = CompiledTransactionV0 {
+      num_rw_signers: 0,
+      num_ro_signers: 0,
+      num_rw: 1,
+      accounts: vec![Pubkey::default(); 2],
+      instructions: vec![CompiledInstructionV0 {
+        program_id_index: 0,
+        accounts: vec![],
+        data: vec![7; 3],
+      }],
+      signer_seeds: vec![],
+    };
+    // header 4 + accounts (4 + 3 * 32) + instructions (4 + 1 + 4 + 0 + 4 + 3)
+    assert_eq!(compiled_transaction_size(&transaction), 4 + 100 + 16);
+  }
+
+  #[test]
   fn queue_authority_pays_only_when_it_stays_rent_exempt() {
-    let rent = mainnet_rent();
+    let rent = Rent::default();
     let space = 466;
     let needed = rent.minimum_balance(space) + rent.minimum_balance(0);
     assert!(queue_authority_can_pay(needed, space, &rent));

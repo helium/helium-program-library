@@ -374,7 +374,7 @@ describe("hpl-crons", () => {
     let queueAuthority: PublicKey;
     let nextTaskId = 50;
 
-    // Every wallet has a 44-character address, so every claim task has the same size.
+    // Use only 44-character addresses, so every claim task has the same size.
     const nextWallet = () => {
       let wallet = Keypair.generate().publicKey;
       while (wallet.toBase58().length !== 44)
@@ -383,6 +383,12 @@ describe("hpl-crons", () => {
     };
 
     const queueClaim = async () => {
+      while (
+        await provider.connection.getAccountInfo(
+          taskKey(taskQueue, nextTaskId)[0]
+        )
+      )
+        nextTaskId++;
       const id = nextTaskId++;
       const task = taskKey(taskQueue, id)[0];
       await program.methods
