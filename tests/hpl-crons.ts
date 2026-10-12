@@ -1,6 +1,14 @@
 import * as anchor from "@anchor-lang/core";
 import { Program } from "@anchor-lang/core";
-import { sendInstructions } from "@helium/spl-utils";
+import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { init as initNftProxy } from "@helium/nft-proxy-sdk";
+import { init as initProposal } from "@helium/proposal-sdk";
+import {
+  createAtaAndMint,
+  createMint,
+  sendInstructions,
+  toBN,
+} from "@helium/spl-utils";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
 import {
   compileTransaction,
@@ -14,6 +22,7 @@ import {
 } from "@helium/tuktuk-sdk";
 import {
   ComputeBudgetProgram,
+  Keypair,
   PublicKey,
   SystemProgram,
   TransactionMessage,
@@ -24,11 +33,14 @@ import { init as initHsd } from "../packages/helium-sub-daos-sdk/src";
 import {
   epochTrackerKey,
   init as initHplCrons,
+  queueAuthorityKey,
   taskReturnAccountKey,
 } from "../packages/hpl-crons-sdk/src";
 import { HeliumSubDaos } from "../target/types/helium_sub_daos";
+import { init as initVsrProgram } from "../packages/voter-stake-registry-sdk/src";
 import { HplCrons } from "../target/types/hpl_crons";
 import { initTestDao, initTestSubdao } from "./utils/daos";
+import { createPosition, initVotingProposal, initVsr } from "./utils/vsr";
 
 describe("hpl-crons", () => {
   anchor.setProvider(anchor.AnchorProvider.local("http://127.0.0.1:8899"));
@@ -366,6 +378,200 @@ describe("hpl-crons", () => {
     expect(epochAfter.toString()).to.equal(
       epochBefore.add(new anchor.BN(1)).toString()
     );
+  });
+
+  describe("queue authority task rent", () => {
+    let queueAuthority: PublicKey;
+    let nextTaskId = 50;
+
+    const balance = (key: PublicKey) => provider.connection.getBalance(key);
+    const rent = (space: number) =>
+      provider.connection.getMinimumBalanceForRentExemption(space);
+    const fund = (to: PublicKey, lamports: number) =>
+      sendInstructions(provider, [
+        SystemProgram.transfer({ fromPubkey: me, toPubkey: to, lamports }),
+      ]);
+
+    // Queues a task on the first free task id through `queue`, and returns the task account's
+    // size and rent_refund.
+    const queueTask = async (
+      queue: (taskId: number, task: PublicKey) => Promise<unknown>,
+    ) => {
+      while (
+        await provider.connection.getAccountInfo(
+          taskKey(taskQueue, nextTaskId)[0],
+        )
+      )
+        nextTaskId++;
+      const id = nextTaskId++;
+      const task = taskKey(taskQueue, id)[0];
+      await queue(id, task);
+      const info = await provider.connection.getAccountInfo(task);
+      const { rentRefund } = await tuktukProgram.account.taskV0.fetch(task);
+      return { space: info!.data.length, rentRefund };
+    };
+
+    // Queues three tasks through `queue`, all the same size. The queue authority pays a task's
+    // rent exactly when its balance covers that rent plus its own rent-exempt minimum;
+    // otherwise the payer pays and the queue authority's balance does not change.
+    const expectQueueAuthorityPaysOnlyWhenRentExempt = async (
+      queue: (taskId: number, task: PublicKey) => Promise<unknown>,
+    ) => {
+      const start = await balance(queueAuthority);
+
+      // Below the threshold, the payer pays the rent and is the task's rent_refund.
+      const first = await queueTask(queue);
+      expect(first.rentRefund.toBase58()).to.eq(me.toBase58());
+      expect(await balance(queueAuthority)).to.eq(start);
+
+      const taskRent = await rent(first.space);
+      const threshold = taskRent + (await rent(0));
+
+      // One lamport short of covering the task and its own rent-exempt minimum.
+      await fund(queueAuthority, threshold - 1 - start);
+      const short = await queueTask(queue);
+      expect(short.space).to.eq(first.space);
+      expect(short.rentRefund.toBase58()).to.eq(me.toBase58());
+      expect(await balance(queueAuthority)).to.eq(threshold - 1);
+
+      // Exactly enough: the queue authority pays the rent and keeps its minimum.
+      await fund(queueAuthority, 1);
+      const covered = await queueTask(queue);
+      expect(covered.space).to.eq(first.space);
+      expect(covered.rentRefund.toBase58()).to.eq(queueAuthority.toBase58());
+      expect(await balance(queueAuthority)).to.eq(await rent(0));
+    };
+
+    before(async () => {
+      [queueAuthority] = queueAuthorityKey(anchor.workspace.HplCrons.programId);
+      await tuktukProgram.methods
+        .addQueueAuthorityV0()
+        .accounts({ payer: me, queueAuthority, taskQueue })
+        .rpc();
+    });
+
+    describe("queue_wallet_claim_v0", () => {
+      // Use only 44-character addresses, so every claim task has the same size.
+      const nextWallet = () => {
+        let wallet = Keypair.generate().publicKey;
+        while (wallet.toBase58().length !== 44)
+          wallet = Keypair.generate().publicKey;
+        return wallet;
+      };
+
+      it("has the queue authority pay a claim task's rent only when it stays rent exempt", async () => {
+        expect(await balance(queueAuthority)).to.eq(0);
+        await expectQueueAuthorityPaysOnlyWhenRentExempt((freeTaskId, task) =>
+          program.methods
+            .queueWalletClaimV0({ freeTaskId })
+            .accounts({ payer: me, wallet: nextWallet(), taskQueue, task })
+            .rpc({ skipPreflight: true }),
+        );
+      });
+    });
+
+    // The vote tasks read a proxy marker, and a vote marker with the position that voted.
+    describe("vote tasks", () => {
+      let vsrProgram: Program<VoterStakeRegistry>;
+      let proxyMarker: PublicKey;
+      let voteMarker: PublicKey;
+      let position: PublicKey;
+
+      before(async () => {
+        vsrProgram = await initVsrProgram(
+          provider,
+          anchor.workspace.VoterStakeRegistry.programId,
+          anchor.workspace.VoterStakeRegistry.idl,
+        );
+        const proxyProgram = await initNftProxy(provider);
+        const proposalProgram = await initProposal(provider);
+        const hntMint = await createMint(provider, 8, me, me);
+        await createAtaAndMint(provider, hntMint, toBN(1000, 8));
+        const { registrar } = await initVsr(
+          vsrProgram,
+          proxyProgram,
+          provider,
+          me,
+          hntMint,
+          me,
+        );
+        const { proposalConfig, proposal } = await initVotingProposal(
+          proposalProgram,
+          registrar,
+          me,
+        );
+        ({ position } = await createPosition(
+          vsrProgram,
+          provider,
+          registrar,
+          hntMint,
+          { lockupPeriods: 200, lockupAmount: 100 },
+        ));
+        const vote = await vsrProgram.methods
+          .voteV0({ choice: 0 })
+          .accountsPartial({
+            registrar,
+            proposal,
+            position,
+            proposalConfig,
+            stateController: me,
+            onVoteHook: PublicKey.default,
+          })
+          .rpcAndKeys({ skipPreflight: true });
+        voteMarker = vote.pubkeys.marker!;
+        const proxiedVote = await vsrProgram.methods
+          .proxiedVoteV1({ choice: 0 })
+          .accountsPartial({ proposal, voter: me })
+          .rpcAndKeys({ skipPreflight: true });
+        proxyMarker = proxiedVote.pubkeys.marker!;
+      });
+
+      it("has the queue authority pay a proxy vote task's rent only when it stays rent exempt", async () => {
+        await expectQueueAuthorityPaysOnlyWhenRentExempt((freeTaskId, task) =>
+          program.methods
+            .queueProxyVoteV0({ freeTaskId })
+            // The client cannot resolve `voter` from the marker, so it is passed.
+            .accountsPartial({
+              payer: me,
+              voter: me,
+              marker: proxyMarker,
+              taskQueue,
+              task,
+            })
+            .rpc({ skipPreflight: true }),
+        );
+      });
+
+      it("has the queue authority pay a relinquish expired vote marker task's rent only when it stays rent exempt", async () => {
+        await expectQueueAuthorityPaysOnlyWhenRentExempt((freeTaskId, task) =>
+          program.methods
+            .queueRelinquishExpiredVoteMarkerV0({
+              freeTaskId,
+              triggerTs: new anchor.BN(0),
+            })
+            .accounts({
+              payer: me,
+              marker: voteMarker,
+              position,
+              taskQueue,
+              task,
+            })
+            .rpc({ skipPreflight: true }),
+        );
+      });
+
+      it("has the queue authority pay a relinquish expired proxy vote marker task's rent only when it stays rent exempt", async () => {
+        await expectQueueAuthorityPaysOnlyWhenRentExempt((freeTaskId, task) =>
+          program.methods
+            .queueRelinquishExpiredProxyVoteMarkerV0({
+              freeTaskId,
+              triggerTs: new anchor.BN(0),
+            })
+            .accounts({ payer: me, marker: proxyMarker, taskQueue, task })
+            .rpc({ skipPreflight: true }),
+        );
+      });
+    });
   });
 
   // A pyth verification chain advances one step at a time, so the task it hands back carries a
