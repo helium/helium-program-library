@@ -1,5 +1,6 @@
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
+import { Proposal } from "@helium/modular-governance-idls/lib/types/proposal";
 import {
   createMintInstructions,
   sendInstructions,
@@ -179,5 +180,56 @@ export async function createPosition(
   return {
     position,
     vault: await getAssociatedTokenAddress(hntMint, position, true),
+  };
+}
+
+// Creates a proposal config whose votes `voteController` counts and `stateController` moves
+// through states, then a two-choice proposal under it in the voting state.
+export async function initVotingProposal(
+  proposalProgram: Program<Proposal>,
+  voteController: PublicKey,
+  stateController: PublicKey,
+) {
+  const {
+    pubkeys: { proposalConfig },
+  } = await proposalProgram.methods
+    .initializeProposalConfigV0({
+      name: random(10),
+      voteController,
+      stateController,
+      onVoteHook: PublicKey.default,
+      authority: stateController,
+    })
+    .rpcAndKeys({ skipPreflight: true });
+  const name = `Proposal ${random(10)}`;
+  const {
+    pubkeys: { proposal },
+  } = await proposalProgram.methods
+    .initializeProposalV0({
+      seed: Buffer.from(name, "utf-8"),
+      maxChoicesPerVoter: 1,
+      name,
+      uri: "https://example.com",
+      choices: [
+        { name: "Yes", uri: null },
+        { name: "No", uri: null },
+      ],
+      tags: ["test"],
+    })
+    .accountsPartial({ proposalConfig })
+    .rpcAndKeys({ skipPreflight: true });
+  await proposalProgram.methods
+    .updateStateV0({
+      newState: {
+        voting: {
+          startTs: new BN(new Date().valueOf() / 1000),
+        } as any,
+      },
+    })
+    .accountsPartial({ proposal })
+    .rpc({ skipPreflight: true });
+  return {
+    proposalConfig: proposalConfig as PublicKey,
+    proposal: proposal as PublicKey,
   };
 }

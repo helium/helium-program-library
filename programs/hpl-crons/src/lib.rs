@@ -5,6 +5,7 @@ use tuktuk_program::{TaskV0, TransactionSourceV0};
 mod error;
 mod instructions;
 mod state;
+mod task_rent;
 
 pub use instructions::*;
 pub use state::*;
