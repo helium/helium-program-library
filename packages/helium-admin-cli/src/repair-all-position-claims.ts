@@ -100,6 +100,7 @@ export async function run(args: any = process.argv) {
                 task,
                 mint: bot.position.mint,
                 subDao: bot.delegatedPosition!.subDao,
+                positionAuthority: ata.owner,
                 positionTokenAccount: ataAddr,
                 taskQueue,
                 hntMint: HNT_MINT,
@@ -107,7 +108,8 @@ export async function run(args: any = process.argv) {
                 delegatedPosition: bot.account.delegatedPosition,
                 delegatorAta: getAssociatedTokenAddressSync(
                   HNT_MINT,
-                  ata.owner
+                  ata.owner,
+                  true
                 ),
                 nextTask: task,
                 rentRefund: bot.account.rentRefund,

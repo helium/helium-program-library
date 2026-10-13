@@ -15,6 +15,7 @@ import {
 import {
   delegationClaimBotKey,
   init as initHplCrons,
+  taskRentRefund,
 } from "@helium/hpl-crons-sdk";
 import {
   batchParallelInstructionsWithPriorityFee,
@@ -23,7 +24,11 @@ import {
   HNT_MINT,
   sleep,
 } from "@helium/spl-utils";
-import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
+import {
+  init as initTuktuk,
+  nextAvailableTaskIds,
+  taskKey,
+} from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   LAMPORTS_PER_SOL,
@@ -139,6 +144,7 @@ export const useDelegatePositions = ({
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
       const hplCronsProgram = await initHplCrons(provider as any);
+      const tuktukProgram = await initTuktuk(provider as any);
 
       if (loading) return;
 
@@ -387,6 +393,12 @@ export const useDelegatePositions = ({
                       true
                     ),
                   })
+                  .remainingAccounts(
+                    await taskRentRefund(
+                      tuktukProgram,
+                      delegationClaimBot.info.nextTask
+                    )
+                  )
                   .instruction()
               );
             }
@@ -441,6 +453,14 @@ export const useDelegatePositions = ({
                       delegationClaimBot.info?.rentRefund ||
                       provider.wallet.publicKey,
                   })
+                  .remainingAccounts(
+                    delegationClaimBot.info
+                      ? await taskRentRefund(
+                          tuktukProgram,
+                          delegationClaimBot.info.nextTask
+                        )
+                      : []
+                  )
                   .instruction()
               );
             }

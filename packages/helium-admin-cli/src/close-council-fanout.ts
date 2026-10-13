@@ -68,12 +68,20 @@ export async function run(args: any = process.argv) {
   const miniFanout = new PublicKey(argv.miniFanout);
   const miniFanoutAcc = await program.account.miniFanoutV0.fetch(miniFanout);
 
-  const taskRentRefund = await resolveTaskRentRefund(
+  const taskRentRefund =
+    (
+      await resolveTaskRentRefund(
+        tuktukProgram,
+        [miniFanoutAcc.nextTask],
+        miniFanout,
+        program.programId
+      )
+    )[0]?.pubkey ?? wallet.publicKey;
+  const preTaskRentRefund = await resolveTaskRentRefund(
     tuktukProgram,
-    miniFanoutAcc.nextTask,
+    [miniFanoutAcc.nextPreTask],
     miniFanout,
-    program.programId,
-    wallet.publicKey
+    program.programId
   );
 
   const ownerTokenAccount = getAssociatedTokenAddressSync(
@@ -94,6 +102,7 @@ export async function run(args: any = process.argv) {
       ownerTokenAccount,
       taskRentRefund,
     })
+    .remainingAccounts(preTaskRentRefund)
     .instruction();
 
   await sendInstructionsOrSquadsV4({

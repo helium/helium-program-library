@@ -1,7 +1,7 @@
 import { Program } from "@anchor-lang/core";
 import { MiniFanout } from "@helium/idls/lib/types/mini_fanout";
 import { taskKey, nextAvailableTaskIds } from "@helium/tuktuk-sdk";
-import { PublicKey } from "@solana/web3.js";
+import { AccountMeta, PublicKey } from "@solana/web3.js";
 
 // Shared helpers for admin scripts that create, update, reschedule, or close a
 // mini-fanout (see create-council-fanout.ts, update-council-fanout.ts,
@@ -37,30 +37,36 @@ export async function allocateNextTasks(
 }
 
 /**
- * The tuktuk program's dequeue_task_v0 requires the passed-in rent_refund
- * account to match the task's own `rent_refund` field exactly (it's a
- * `has_one` constraint), which is set at queue time to whoever paid to queue
- * it — not necessarily the wallet running this script. Resolve it from the
- * on-chain task rather than assuming it's the current payer.
+ * The rent refund of each task in `taskPubkeys` that exists on chain, as writable
+ * accounts with no duplicate key. The tuktuk program's dequeue_task_v0 closes a
+ * task only to the task's own `rent_refund` field, which is set at queue time to
+ * whoever paid to queue it, not necessarily the wallet running this script. So
+ * resolve it from the on-chain task rather than assuming it's the current payer.
  *
- * A mini-fanout with nothing currently scheduled points `next_task` /
- * `next_pre_task` back at itself (or at the program id, legacy); in that case
- * there's nothing to dequeue, so the returned value is unused by the caller
- * and any pubkey is safe to pass through.
+ * An account with nothing currently scheduled points its task field back at
+ * itself (or at the program id, legacy); in that case there's nothing to
+ * dequeue, and that task adds no account.
  */
 export async function resolveTaskRentRefund(
   tuktukProgram: any,
-  taskPubkey: PublicKey,
-  miniFanoutPubkey: PublicKey,
-  miniFanoutProgramId: PublicKey,
-  fallback: PublicKey
-): Promise<PublicKey> {
-  if (
-    taskPubkey.equals(miniFanoutPubkey) ||
-    taskPubkey.equals(miniFanoutProgramId)
-  ) {
-    return fallback;
+  taskPubkeys: PublicKey[],
+  ownerPubkey: PublicKey,
+  ownerProgramId: PublicKey
+): Promise<AccountMeta[]> {
+  const rentRefunds = new Map<string, AccountMeta>();
+  for (const taskPubkey of taskPubkeys) {
+    if (taskPubkey.equals(ownerPubkey) || taskPubkey.equals(ownerProgramId)) {
+      continue;
+    }
+    const task = await tuktukProgram.account.taskV0.fetchNullable(taskPubkey);
+    if (task) {
+      const pubkey = task.rentRefund as PublicKey;
+      rentRefunds.set(pubkey.toBase58(), {
+        pubkey,
+        isWritable: true,
+        isSigner: false,
+      });
+    }
   }
-  const task = await tuktukProgram.account.taskV0.fetchNullable(taskPubkey);
-  return task ? (task.rentRefund as PublicKey) : fallback;
+  return [...rentRefunds.values()];
 }
