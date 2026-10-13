@@ -113,6 +113,12 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
     const task = miniFanout.nextTask.equals(miniFanoutK)
       ? null
       : await tuktukProgram.account.taskV0.fetchNullable(miniFanout.nextTask);
+    const preTask =
+      miniFanout.preTask && !miniFanout.nextPreTask.equals(miniFanoutK)
+        ? await tuktukProgram.account.taskV0.fetchNullable(
+            miniFanout.nextPreTask,
+          )
+        : null;
 
     const closeIx = await program.methods
       .closeMiniFanoutV0()
@@ -120,6 +126,11 @@ export const deleteSplit = publicProcedure.hotspots.deleteSplit.handler(
         miniFanout: miniFanoutK,
         taskRentRefund: task?.rentRefund || walletAddress,
       })
+      .remainingAccounts(
+        preTask
+          ? [{ pubkey: preTask.rentRefund, isWritable: true, isSigner: false }]
+          : [],
+      )
       .instruction();
 
     const ldProgram = await initLd(provider);

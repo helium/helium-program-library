@@ -28,16 +28,16 @@ import {
 export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   // dc_auto_top.schedule_task_v0 (n=5, med=225550, max=230071) [localnet]
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:eaccb3f1f9b4986e": 230071,
-  // dc_auto_top.update_auto_top_off_v0 (n=2, med=52423, max=52423) [localnet]
-  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:d973e6aa442fafc7": 52423,
+  // dc_auto_top.update_auto_top_off_v0 (n=2, med=52423, max=99355) [localnet]
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:d973e6aa442fafc7": 99355,
   // dc_auto_top.initialize_auto_top_off_v0 (n=4, med=149418, max=152410) [localnet]
   "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:1b878c374c515333": 152410,
   // hpl_crons.queue_end_epoch (n=1, med=380865, max=380865) [localnet]
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:3f865a9ff98338b5": 380865,
   // hpl_crons.init_epoch_tracker (n=1, med=8607, max=8607) [localnet]
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:2c2149f2ca9ca298": 8607,
-  // tuktuk_dca.close_dca_v0 (n=1, med=69738, max=69738) [localnet]
-  "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:34871f9c70464b03": 69738,
+  // tuktuk_dca.close_dca_v0 (n=1, med=69738, max=73775) [localnet]
+  "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:34871f9c70464b03": 73775,
   // tuktuk_dca.lend_v0 (n=4, med=17431, max=17431) [localnet]
   "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:e10f950c9015525e": 17431,
   // tuktuk_dca.check_repay_v0 (n=4, med=44115, max=44115) [localnet]
@@ -233,10 +233,10 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:0cd0601ffbf3b6f7": 65877,
   // mini_fanout.schedule_task_v0 (n=29, med=160736, max=175973)
   "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:eaccb3f1f9b4986e": 171480,
-  // mini_fanout.update_mini_fanout_v0 (n=1, med=193465, max=193465) [localnet]
-  "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:75d8d18303804134": 193465,
-  // mini_fanout.update_wallet_delegate_v0 (n=1, med=187662, max=187662) [localnet]
-  "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:744028b39e3d0c80": 187662,
+  // mini_fanout.update_mini_fanout_v0 (n=2, med=196707, max=205592) [localnet]
+  "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:75d8d18303804134": 205592,
+  // mini_fanout.update_wallet_delegate_v0 (n=1, med=212534, max=224661) [localnet]
+  "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn:744028b39e3d0c80": 224661,
   // mobile_entity_manager.approve_carrier_v0 (n=5, med=3701, max=3701) [localnet]
   "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:85bc12fb6ed37c3e": 3701,
   // mobile_entity_manager.initialize_carrier_v0 (n=4, med=226636, max=253636) [localnet]
@@ -335,8 +335,8 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "memMa1HG4odAFmUbGWfPwS1WWfK95k99F2YTkGvyxZr:df262bb30be50e09": 18642,
   // hexboosting.close_boost_v1 (n=1, med=3130, max=3130) [localnet]
   "hexbnKYoA2GercNNhHUCCfrTRWrHjT6ujKPXTa5NPqJ:dc96b2aac596d965": 3130,
-  // dc_auto_top.close_auto_top_off_v0 (n=1, med=106264, max=106264)
-  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:c2d0b1ae6462c4d9": 106264,
+  // dc_auto_top.close_auto_top_off_v0 (n=1, med=106264, max=138509)
+  "topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU:c2d0b1ae6462c4d9": 138509,
   // tuktuk_dca.initialize_dca_nested_v0 (n=1, med=88794, max=88794) [localnet]
   "tdcam4m5U74pEZQrsQ7fVAav4AUXXc6z8fkhvExfRVN:50afa90952dcb70a": 88794,
   // circuit_breaker.update_account_windowed_breaker_v0 (n=1, med=2115, max=2115) [localnet]
@@ -361,16 +361,16 @@ export const INSTRUCTION_CU_TABLE: Record<string, number> = {
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:71b78362d83a323b": 1805,
   // hpl_crons.init_delegation_claim_bot_v0 (n=32, med=13292, max=19505)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:59d043dd74967d7c": 19434,
-  // hpl_crons.start_delegation_claim_bot_v1 (n=33, med=167535, max=182621)
-  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:881bfbc9a9530fce": 181986,
+  // hpl_crons.start_delegation_claim_bot_v1 (n=16, med=172342, max=207669) [localnet]
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:881bfbc9a9530fce": 207669,
   // hpl_crons.init_entity_claim_cron_v0 (n=20, med=238335, max=263828)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:25bbf0e2c259d539": 263828,
   // hpl_crons.remove_entity_from_cron_v0 (n=8, med=17357, max=18875)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:bf5d02ac7f030110": 18875,
   // hpl_crons.queue_wallet_claim_v0 (n=80, med=59826, max=68012)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:6d694121031f838f": 65598,
-  // hpl_crons.close_delegation_claim_bot_v0 (n=29, med=28997, max=29281)
-  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:b3fd74f09eb38f77": 29279,
+  // hpl_crons.close_delegation_claim_bot_v0 (n=29, med=28997, max=31213)
+  "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:b3fd74f09eb38f77": 31213,
   // hpl_crons.queue_delegation_claim_v0 (n=1264, med=311318, max=346130)
   "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:7a169de76dc89b02": 327897,
   // nft_proxy.initialize_proxy_config_v0 (n=1, med=11734, max=11734)

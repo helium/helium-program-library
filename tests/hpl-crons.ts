@@ -1,6 +1,7 @@
 import * as anchor from "@anchor-lang/core";
 import { Program } from "@anchor-lang/core";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
+import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
 import {
@@ -14,32 +15,45 @@ import {
   compileTransaction,
   customSignerKey,
   init as initTuktuk,
+  nextAvailableTaskIds,
   runTask,
   taskKey,
+  taskQueueAuthorityKey,
   taskQueueKey,
   taskQueueNameMappingKey,
   tuktukConfigKey,
 } from "@helium/tuktuk-sdk";
+import { createMemoInstruction } from "@solana/spl-memo";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
+  AccountMeta,
   ComputeBudgetProgram,
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SystemProgram,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { expect } from "chai";
-import { init as initHsd } from "../packages/helium-sub-daos-sdk/src";
 import {
+  daoKey,
+  delegatedPositionKey,
+  init as initHsd,
+} from "../packages/helium-sub-daos-sdk/src";
+import {
+  delegationClaimBotKey,
   epochTrackerKey,
   init as initHplCrons,
   queueAuthorityKey,
+  taskRentRefund,
   taskReturnAccountKey,
 } from "../packages/hpl-crons-sdk/src";
-import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { init as initVsrProgram } from "../packages/voter-stake-registry-sdk/src";
+import { HeliumSubDaos } from "../target/types/helium_sub_daos";
 import { HplCrons } from "../target/types/hpl_crons";
 import { initTestDao, initTestSubdao } from "./utils/daos";
+import { ensureVSRIdl } from "./utils/fixtures";
 import { createPosition, initVotingProposal, initVsr } from "./utils/vsr";
 
 describe("hpl-crons", () => {
@@ -624,6 +638,624 @@ describe("hpl-crons", () => {
     // bound so an off-by-one in MAX_FREE_TASKS can't slip past CI.
     it("accepts a free task count at the bound", async () => {
       expect(await returnPythTask(1)).to.be.undefined;
+    });
+  });
+
+  // Start and close dequeue the bot's next task, and tuktuk closes a task only to the rent
+  // refund the task itself names. A task that start queued names start's payer; a task that a
+  // run returned names the task queue. A rent refund that is no account of the instruction is
+  // passed as a writable remaining account.
+  describe("delegation claim bot", () => {
+    const [queueAuthority] = queueAuthorityKey();
+
+    let vsrProgram: Program<VoterStakeRegistry>;
+    let proxyProgram: Program<NftProxy>;
+    let hntMint: PublicKey;
+    let registrar: PublicKey;
+    let subDao: PublicKey;
+    let botDao: PublicKey;
+
+    before(async () => {
+      vsrProgram = await initVsrProgram(
+        provider,
+        anchor.workspace.VoterStakeRegistry.programId,
+        anchor.workspace.VoterStakeRegistry.idl
+      );
+      ensureVSRIdl();
+      proxyProgram = await initNftProxy(provider);
+
+      hntMint = await createMint(provider, 8, me, me);
+      await createAtaAndMint(provider, hntMint, toBN(2000, 8));
+      ({ registrar } = await initVsr(
+        vsrProgram,
+        proxyProgram,
+        provider,
+        me,
+        hntMint,
+        daoKey(hntMint)[0]
+      ));
+      // A delegation records the registrar's current epoch as its last claimed epoch, and the
+      // bot's first task is due once the epoch after that one has ended. Three days back makes
+      // that task due at once, so a test can run it.
+      await vsrProgram.methods
+        .setTimeOffsetV0(new anchor.BN(-3 * 60 * 60 * 24))
+        .accountsPartial({ registrar })
+        .rpc({ skipPreflight: true });
+      ({ dao: botDao } = await initTestDao(
+        hsdProgram,
+        provider,
+        100,
+        me,
+        undefined,
+        hntMint,
+        registrar
+      ));
+      ({ subDao } = await initTestSubdao({
+        hsdProgram,
+        provider,
+        authority: me,
+        dao: botDao,
+        registrar,
+      }));
+
+      // An earlier suite of this file may have added the queue authority already.
+      const taskQueueAuthority = taskQueueAuthorityKey(
+        taskQueue,
+        queueAuthority
+      )[0];
+      if (!(await provider.connection.getAccountInfo(taskQueueAuthority))) {
+        await tuktukProgram.methods
+          .addQueueAuthorityV0()
+          .accounts({ payer: me, queueAuthority, taskQueue })
+          .rpc();
+      }
+      // A run pays the task return account from the queue's "helium" signer, and the rent of
+      // the tasks it returns from the task queue.
+      await sendInstructions(provider, [
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: customSignerKey(taskQueue, [
+            Buffer.from("helium", "utf-8"),
+          ])[0],
+          lamports: LAMPORTS_PER_SOL,
+        }),
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: taskQueue,
+          lamports: LAMPORTS_PER_SOL,
+        }),
+      ]);
+    });
+
+    const lamportsOf = (account: PublicKey) =>
+      provider.connection.getBalance(account, "confirmed");
+
+    // What tuktuk leaves in a task: the rent exemption for its data, and its crank reward.
+    const lamportsHeldBy = async (task: PublicKey) => {
+      const { data } = (await provider.connection.getAccountInfo(
+        task,
+        "confirmed"
+      ))!;
+      const { crankReward } = tuktukProgram.coder.accounts.decode(
+        "taskV0",
+        data
+      );
+      return (
+        (await provider.connection.getMinimumBalanceForRentExemption(
+          data.length
+        )) + Number(crankReward.toString())
+      );
+    };
+
+    const fundedKeypair = async () => {
+      const keypair = Keypair.generate();
+      await sendInstructions(provider, [
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: keypair.publicKey,
+          lamports: LAMPORTS_PER_SOL,
+        }),
+      ]);
+      return keypair;
+    };
+
+    type Bot = {
+      delegationClaimBot: PublicKey;
+      delegatedPosition: PublicKey;
+      position: PublicKey;
+      mint: PublicKey;
+    };
+
+    const rentRefundMeta = (
+      pubkey: PublicKey,
+      isWritable = true
+    ): AccountMeta => ({ pubkey, isWritable, isSigner: false });
+
+    /** The anchor error name and number of a failed run. */
+    const errorOf = async (run: Promise<unknown>) => {
+      try {
+        await run;
+      } catch (e: any) {
+        const errorCode = e?.error?.errorCode;
+        // Anything without an anchor error code is an infra failure, not a program verdict.
+        if (!errorCode) throw e;
+        return `${errorCode.code} ${errorCode.number}`;
+      }
+    };
+
+    /**
+     * start_delegation_claim_bot_v1 on the next free task id, with `payer` paying for the new
+     * task, or the wallet without one.
+     */
+    const start = async (
+      { delegationClaimBot, delegatedPosition, mint }: Bot,
+      payer: Keypair | null,
+      remainingAccounts: AccountMeta[] = [],
+      overrides: Partial<
+        Record<
+          "subDao" | "positionAuthority" | "mint" | "positionTokenAccount",
+          PublicKey
+        >
+      > = {}
+    ) => {
+      const { taskBitmap, capacity } =
+        await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+      const [taskId] = nextAvailableTaskIds(taskBitmap, 1, false, capacity);
+      const task = taskKey(taskQueue, taskId)[0];
+      const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+        delegationClaimBot
+      );
+      await program.methods
+        .startDelegationClaimBotV1({ taskId })
+        .accountsPartial({
+          payer: payer?.publicKey ?? me,
+          queueAuthority,
+          delegationClaimBot,
+          taskQueue,
+          taskQueueAuthority: taskQueueAuthorityKey(
+            taskQueue,
+            queueAuthority
+          )[0],
+          task,
+          delegatedPosition,
+          subDao,
+          dao: botDao,
+          hntMint,
+          positionAuthority: me,
+          mint,
+          positionTokenAccount: getAssociatedTokenAddressSync(mint, me),
+          delegatorAta: getAssociatedTokenAddressSync(hntMint, me),
+          nextTask: nextTask.equals(PublicKey.default) ? task : nextTask,
+          rentRefund: me,
+          ...overrides,
+        })
+        .remainingAccounts(remainingAccounts)
+        // The instruction derives four addresses, so its compute cost moves with their bumps.
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+        ])
+        .signers(payer ? [payer] : [])
+        .rpc({ skipPreflight: true, commitment: "confirmed" });
+      return task;
+    };
+
+    const close = (
+      { delegationClaimBot, delegatedPosition, position, mint }: Bot,
+      nextTask: PublicKey,
+      remainingAccounts: AccountMeta[] = []
+    ) =>
+      program.methods
+        .closeDelegationClaimBotV0()
+        .accountsPartial({
+          rentRefund: me,
+          delegationClaimBot,
+          taskQueue,
+          delegatedPosition,
+          position,
+          positionAuthority: me,
+          mint,
+          positionTokenAccount: getAssociatedTokenAddressSync(mint, me),
+          nextTask,
+          taskQueueAuthority: taskQueueAuthorityKey(
+            taskQueue,
+            queueAuthority
+          )[0],
+          queueAuthority,
+        })
+        .remainingAccounts(remainingAccounts)
+        .rpc({ skipPreflight: true, commitment: "confirmed" });
+
+    /** A delegated position with a claim bot that `payer` started, so its task refunds to `payer`. */
+    const startedBot = async () => {
+      const { position } = await createPosition(
+        vsrProgram,
+        provider,
+        registrar,
+        hntMint,
+        { lockupPeriods: 183, lockupAmount: 100 }
+      );
+      const { mint } = await vsrProgram.account.positionV0.fetch(position);
+      await hsdProgram.methods
+        .delegateV0()
+        .accountsPartial({ position, subDao, positionAuthority: me })
+        .rpc({ skipPreflight: true });
+      const delegatedPosition = delegatedPositionKey(position)[0];
+      const delegationClaimBot = delegationClaimBotKey(
+        taskQueue,
+        delegatedPosition
+      )[0];
+      await program.methods
+        .initDelegationClaimBotV0()
+        .accountsPartial({
+          payer: me,
+          delegationClaimBot,
+          taskQueue,
+          delegatedPosition,
+          position,
+          positionAuthority: me,
+          mint,
+          positionTokenAccount: getAssociatedTokenAddressSync(mint, me),
+        })
+        .rpc({ skipPreflight: true });
+
+      const bot: Bot = { delegationClaimBot, delegatedPosition, position, mint };
+      const payer = await fundedKeypair();
+      const task = await start(bot, payer);
+      const taskAcc = await tuktukProgram.account.taskV0.fetch(task);
+      expect(taskAcc.rentRefund.toBase58()).to.equal(
+        payer.publicKey.toBase58()
+      );
+      return { bot, payer, task };
+    };
+
+    /** Runs the bot's task, which leaves the bot on a task that the run returned. */
+    const returnedTask = async ({ delegationClaimBot }: Bot, task: PublicKey) => {
+      await sendInstructions(provider, [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ...(await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: me,
+        })),
+      ]);
+      const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+        delegationClaimBot
+      );
+      expect(nextTask.toBase58()).to.not.equal(task.toBase58());
+      const nextTaskAcc = await tuktukProgram.account.taskV0.fetch(nextTask);
+      expect(nextTaskAcc.rentRefund.toBase58()).to.equal(taskQueue.toBase58());
+      // A task that a run queues names the bot.
+      expect(
+        nextTaskAcc.transaction.compiledV0![0].accounts.map((a) => a.toBase58())
+      ).to.include(delegationClaimBot.toBase58());
+      return nextTask;
+    };
+
+    /**
+     * Queues a memo task at the address the bot records. The transaction of that task does not name
+     * the bot. Returns the task's lamports.
+     */
+    const memoTaskAt = async ({ delegationClaimBot }: Bot, task: PublicKey) => {
+      const own = await tuktukProgram.account.taskV0.fetch(task);
+      // The task that start queued names the bot.
+      expect(
+        own.transaction.compiledV0![0].accounts.map((a) => a.toBase58())
+      ).to.include(delegationClaimBot.toBase58());
+      await tuktukProgram.methods
+        .dequeueTaskV0()
+        .accountsPartial({ task, taskQueue, rentRefund: own.rentRefund })
+        .rpc({ skipPreflight: true, commitment: "confirmed" });
+      const { transaction, remainingAccounts } = compileTransaction(
+        [createMemoInstruction("memo", [])],
+        []
+      );
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id: own.id,
+          trigger: { now: {} },
+          crankReward: null,
+          freeTasks: 0,
+          transaction: { compiledV0: [transaction] },
+          description: "memo",
+        })
+        .accountsPartial({ task, taskQueue })
+        .remainingAccounts(remainingAccounts)
+        .rpc({ skipPreflight: true, commitment: "confirmed" });
+      return lamportsHeldBy(task);
+    };
+
+    // The clients find the remaining account with this helper.
+    it("gives the rent refund a task names as a writable remaining account, and none with no task", async () => {
+      const { bot, payer, task } = await startedBot();
+      const resolve = async (key: PublicKey) =>
+        (await taskRentRefund(tuktukProgram, key)).map((meta) => ({
+          ...meta,
+          pubkey: meta.pubkey.toBase58(),
+        }));
+      const writable = (pubkey: PublicKey) => [
+        { pubkey: pubkey.toBase58(), isWritable: true, isSigner: false },
+      ];
+
+      expect(await resolve(task)).to.deep.equal(writable(payer.publicKey));
+      expect(await resolve(await returnedTask(bot, task))).to.deep.equal(
+        writable(taskQueue)
+      );
+      // The run closed the task. A bot that never started stores the default key.
+      expect(await resolve(task)).to.deep.equal([]);
+      expect(await resolve(PublicKey.default)).to.deep.equal([]);
+    });
+
+    describe("start_delegation_claim_bot_v1", () => {
+      it("refunds the replaced task to the payer with no remaining account", async () => {
+        const { bot, payer, task } = await startedBot();
+
+        const newTask = await start(bot, payer);
+
+        expect(
+          await provider.connection.getAccountInfo(task, "confirmed")
+        ).to.equal(null);
+        const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+          bot.delegationClaimBot
+        );
+        expect(nextTask.toBase58()).to.equal(newTask.toBase58());
+      });
+
+      it("fails when the rent refund of the replaced task is not passed", async () => {
+        const { bot, task } = await startedBot();
+
+        expect(await errorOf(start(bot, await fundedKeypair()))).to.eq(
+          "RentRefundAccountMissing 6008"
+        );
+        const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+          bot.delegationClaimBot
+        );
+        expect(nextTask.toBase58()).to.equal(task.toBase58());
+      });
+
+      it("fails when the rent refund of the replaced task is a read-only remaining account", async () => {
+        const { bot, payer, task } = await startedBot();
+
+        expect(
+          await errorOf(
+            start(bot, await fundedKeypair(), [
+              rentRefundMeta(payer.publicKey, false),
+            ])
+          )
+        ).to.eq("RentRefundAccountNotWritable 6009");
+        const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+          bot.delegationClaimBot
+        );
+        expect(nextTask.toBase58()).to.equal(task.toBase58());
+      });
+
+      it("refunds the replaced task to a writable remaining account", async () => {
+        const { bot, payer, task } = await startedBot();
+        const newPayer = await fundedKeypair();
+        const taskLamports = await lamportsHeldBy(task);
+        expect(await lamportsOf(task)).to.equal(taskLamports);
+        const before = await lamportsOf(payer.publicKey);
+
+        const newTask = await start(bot, newPayer, [rentRefundMeta(payer.publicKey)]);
+
+        expect(
+          await provider.connection.getAccountInfo(task, "confirmed")
+        ).to.equal(null);
+        expect(await lamportsOf(payer.publicKey)).to.equal(
+          before + taskLamports
+        );
+        const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+          bot.delegationClaimBot
+        );
+        expect(nextTask.toBase58()).to.equal(newTask.toBase58());
+      });
+
+      it("refunds a task that a run returned to the task queue", async () => {
+        const { bot, task } = await startedBot();
+        const returned = await returnedTask(bot, task);
+        const newPayer = await fundedKeypair();
+        const taskLamports = await lamportsHeldBy(returned);
+        expect(await lamportsOf(returned)).to.equal(taskLamports);
+        const before = await lamportsOf(taskQueue);
+
+        const newTask = await start(bot, newPayer);
+
+        expect(
+          await provider.connection.getAccountInfo(returned, "confirmed")
+        ).to.equal(null);
+        expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
+        const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+          bot.delegationClaimBot
+        );
+        expect(nextTask.toBase58()).to.equal(newTask.toBase58());
+      });
+
+      it("leaves a task whose transaction does not name the bot queued", async () => {
+        const { bot, task } = await startedBot();
+        const taskLamports = await memoTaskAt(bot, task);
+
+        const newTask = await start(bot, await fundedKeypair());
+
+        expect(await lamportsOf(task)).to.equal(taskLamports);
+        const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+          bot.delegationClaimBot
+        );
+        expect(nextTask.toBase58()).to.equal(newTask.toBase58());
+      });
+
+      // start accepts the mint and the sub-DAO that the delegated position stores, and the holder
+      // of the position token.
+      describe("account constraints", () => {
+        /** The anchor error code of a start with `overrides`. */
+        const startRejection = async (
+          overrides: Parameters<typeof start>[3]
+        ) => {
+          const { bot, payer, task } = await startedBot();
+          let code: string | undefined;
+          try {
+            await start(
+              bot,
+              await fundedKeypair(),
+              [rentRefundMeta(payer.publicKey)],
+              overrides
+            );
+          } catch (e: any) {
+            code = e?.error?.errorCode?.code;
+            // Anything without an anchor error code is an infra failure, not a program verdict.
+            if (!code) throw e;
+          }
+          const { nextTask } = await program.account.delegationClaimBotV0.fetch(
+            bot.delegationClaimBot
+          );
+          expect(nextTask.toBase58()).to.equal(task.toBase58());
+          return code;
+        };
+
+        it("requires the mint the delegated position stores", async () => {
+          const { mint } = (await startedBot()).bot;
+
+          expect(
+            await startRejection({
+              mint,
+              positionTokenAccount: getAssociatedTokenAddressSync(mint, me),
+            })
+          ).to.eq("ConstraintHasOne");
+        });
+
+        it("requires a position token account of the position's mint", async () => {
+          const { mint } = (await startedBot()).bot;
+
+          expect(
+            await startRejection({
+              positionTokenAccount: getAssociatedTokenAddressSync(mint, me),
+            })
+          ).to.eq("ConstraintTokenMint");
+        });
+
+        it("requires the position authority to hold the position token", async () => {
+          expect(
+            await startRejection({
+              positionAuthority: Keypair.generate().publicKey,
+            })
+          ).to.eq("ConstraintTokenOwner");
+        });
+
+        it("requires the sub-DAO the delegated position stores", async () => {
+          const { subDao: otherSubDao } = await initTestSubdao({
+            hsdProgram,
+            provider,
+            authority: me,
+            dao: botDao,
+            registrar,
+          });
+
+          expect(await startRejection({ subDao: otherSubDao })).to.eq(
+            "ConstraintHasOne"
+          );
+        });
+      });
+    });
+
+    describe("close_delegation_claim_bot_v0", () => {
+      it("refunds a task the rent refund queued with no remaining account", async () => {
+        const { bot, payer } = await startedBot();
+        const task = await start(bot, null, [rentRefundMeta(payer.publicKey)]);
+        const { rentRefund } = await tuktukProgram.account.taskV0.fetch(task);
+        expect(rentRefund.toBase58()).to.equal(me.toBase58());
+
+        await close(bot, task);
+
+        expect(
+          await provider.connection.getAccountInfo(task, "confirmed")
+        ).to.equal(null);
+        expect(
+          await program.account.delegationClaimBotV0.fetchNullable(
+            bot.delegationClaimBot
+          )
+        ).to.equal(null);
+      });
+
+      it("fails when the rent refund of the bot's task is not passed", async () => {
+        const { bot, task } = await startedBot();
+
+        expect(await errorOf(close(bot, task))).to.eq(
+          "RentRefundAccountMissing 6008"
+        );
+        expect(
+          await program.account.delegationClaimBotV0.fetchNullable(
+            bot.delegationClaimBot
+          )
+        ).to.not.equal(null);
+      });
+
+      it("fails when the rent refund of the bot's task is a read-only remaining account", async () => {
+        const { bot, payer, task } = await startedBot();
+
+        expect(
+          await errorOf(
+            close(bot, task, [rentRefundMeta(payer.publicKey, false)])
+          )
+        ).to.eq("RentRefundAccountNotWritable 6009");
+        expect(
+          await program.account.delegationClaimBotV0.fetchNullable(
+            bot.delegationClaimBot
+          )
+        ).to.not.equal(null);
+      });
+
+      it("refunds the bot's task to a writable remaining account", async () => {
+        const { bot, payer, task } = await startedBot();
+        const taskLamports = await lamportsHeldBy(task);
+        expect(await lamportsOf(task)).to.equal(taskLamports);
+        const before = await lamportsOf(payer.publicKey);
+
+        await close(bot, task, [rentRefundMeta(payer.publicKey)]);
+
+        expect(
+          await provider.connection.getAccountInfo(task, "confirmed")
+        ).to.equal(null);
+        expect(await lamportsOf(payer.publicKey)).to.equal(
+          before + taskLamports
+        );
+        expect(
+          await program.account.delegationClaimBotV0.fetchNullable(
+            bot.delegationClaimBot
+          )
+        ).to.equal(null);
+      });
+
+      it("refunds a task that a run returned to the task queue", async () => {
+        const { bot, task } = await startedBot();
+        const returned = await returnedTask(bot, task);
+        const taskLamports = await lamportsHeldBy(returned);
+        expect(await lamportsOf(returned)).to.equal(taskLamports);
+        const before = await lamportsOf(taskQueue);
+
+        await close(bot, returned);
+
+        expect(
+          await provider.connection.getAccountInfo(returned, "confirmed")
+        ).to.equal(null);
+        expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
+        expect(
+          await program.account.delegationClaimBotV0.fetchNullable(
+            bot.delegationClaimBot
+          )
+        ).to.equal(null);
+      });
+
+      it("leaves a task whose transaction does not name the bot queued", async () => {
+        const { bot, task } = await startedBot();
+        const taskLamports = await memoTaskAt(bot, task);
+
+        await close(bot, task);
+
+        expect(await lamportsOf(task)).to.equal(taskLamports);
+        expect(
+          await program.account.delegationClaimBotV0.fetchNullable(
+            bot.delegationClaimBot
+          )
+        ).to.equal(null);
+      });
     });
   });
 });

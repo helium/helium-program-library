@@ -3,7 +3,6 @@ use std::cmp::max;
 use anchor_lang::{prelude::*, InstructionData};
 use anchor_spl::token::{Mint, TokenAccount};
 use helium_sub_daos::{DaoV0, DelegatedPositionV0, SubDaoV0};
-use shared_utils::try_from;
 use spl_token::solana_program::instruction::Instruction;
 use tuktuk_program::{
   compile_transaction,
@@ -15,11 +14,14 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::QueueTaskArgsV0,
-  TaskQueueAuthorityV0, TaskQueueV0, TaskV0, TransactionSourceV0, TriggerV0,
+  TaskQueueAuthorityV0, TaskQueueV0, TransactionSourceV0, TriggerV0,
 };
 
 use super::FIFTEEN_MINUTES;
-use crate::{error::ErrorCode, DelegationClaimBotV0, StartDelegationClaimBotArgsV0, EPOCH_LENGTH};
+use crate::{
+  error::ErrorCode, rent_refund_account, task_names, DelegationClaimBotV0,
+  StartDelegationClaimBotArgsV0, EPOCH_LENGTH,
+};
 
 const HNT_EPOCH: u64 = 20117;
 
@@ -52,6 +54,8 @@ pub struct StartDelegationClaimBotV1<'info> {
   #[account(mut)]
   pub task: AccountInfo<'info>,
   #[account(
+    has_one = mint,
+    has_one = sub_dao,
     constraint = delegated_position.last_claimed_epoch >= HNT_EPOCH @ ErrorCode::UnclaimedIotMobileRewards
   )]
   pub delegated_position: Account<'info, DelegatedPositionV0>,
@@ -87,20 +91,26 @@ pub struct StartDelegationClaimBotV1<'info> {
   pub rent_refund: AccountInfo<'info>,
 }
 
-pub fn handler(
-  ctx: Context<StartDelegationClaimBotV1>,
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, StartDelegationClaimBotV1<'info>>,
   args: StartDelegationClaimBotArgsV0,
 ) -> Result<()> {
   if !ctx.accounts.next_task.data_is_empty()
     && ctx.accounts.next_task.key() != ctx.accounts.task.key()
+    && task_names(
+      &ctx.accounts.next_task,
+      &ctx.accounts.delegation_claim_bot.key(),
+    )?
   {
-    let next_task = ctx.accounts.next_task.to_account_info();
-    let task = try_from!(Account<TaskV0>, next_task)?;
-    let rent_refund_acc = if task.rent_refund == ctx.accounts.task_queue.key() {
-      ctx.accounts.task_queue.to_account_info()
-    } else {
-      ctx.accounts.rent_refund.to_account_info()
-    };
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_task,
+      &[
+        ctx.accounts.payer.to_account_info(),
+        ctx.accounts.rent_refund.to_account_info(),
+        ctx.accounts.task_queue.to_account_info(),
+      ],
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
@@ -108,7 +118,7 @@ pub fn handler(
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: rent_refund_acc,
+        rent_refund,
       },
       &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
     ))?;
