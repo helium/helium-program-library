@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init as initMfan } from "@helium/mini-fanout-sdk";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import { PublicKey } from "@solana/web3.js";
@@ -100,12 +100,20 @@ export async function run(args: any = process.argv) {
     tuktukProgram,
     miniFanoutAcc.taskQueue
   );
-  const taskRentRefund = await resolveTaskRentRefund(
+  const taskRentRefund =
+    (
+      await resolveTaskRentRefund(
+        tuktukProgram,
+        [miniFanoutAcc.nextTask],
+        miniFanout,
+        program.programId
+      )
+    )[0]?.pubkey ?? wallet.publicKey;
+  const preTaskRentRefund = await resolveTaskRentRefund(
     tuktukProgram,
-    miniFanoutAcc.nextTask,
+    [miniFanoutAcc.nextPreTask],
     miniFanout,
-    program.programId,
-    wallet.publicKey
+    program.programId
   );
 
   const updateIx = await program.methods
@@ -124,6 +132,7 @@ export async function run(args: any = process.argv) {
       newPreTask: preTask,
       taskRentRefund,
     })
+    .remainingAccounts(preTaskRentRefund)
     .instruction();
 
   await sendInstructionsOrSquadsV4({

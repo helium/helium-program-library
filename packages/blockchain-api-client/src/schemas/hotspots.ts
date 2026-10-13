@@ -126,6 +126,9 @@ export const FundAutomationInputSchema = z.object({
 export const GetFundingEstimateInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   duration: z.coerce.number().int().min(1), // Number of claims to estimate funding for
+  // The schedule createAutomation will be given. Prices the cron job at its
+  // crontab length; without it the estimate assumes the longest preset.
+  schedule: SetupAutomationInputSchema.shape.schedule.optional(),
 });
 
 export const CloseAutomationInputSchema = z.object({
@@ -301,8 +304,8 @@ export const AutomationStatusOutputSchema = z.object({
       nextRun: z.string(), // ISO date string
     })
     .optional(),
-  rentFee: z.number(), // Initial setup rent (cron accounts priced from the cluster Rent sysvar + TASK_RETURN_ACCOUNT_SIZE) if automation doesn't exist, 0 otherwise
-  recipientFee: z.number(), // SOL needed for recipient accounts (if any)
+  rentFee: z.number(), // Initial setup cost in SOL if automation doesn't exist, 0 otherwise: rent (cluster Rent sysvar) for the accounts init_entity_claim_cron_v0 creates, including the task return account, plus the task queue's min crank reward its schedule task takes; the 0.01 SOL cron-job task-return top-up is in operationalSol
+  recipientFee: z.number(), // Always 0: pdaWalletFunding (in operationalSol) already carries all recipient rent; kept for schema compatibility
   operationalSol: z.number(), // Total operational SOL needed for automation claims (cronJobFunding + pdaWalletFunding)
   remainingClaims: z.number().optional(),
   fundingPeriodInfo: z
@@ -318,12 +321,12 @@ export const AutomationStatusOutputSchema = z.object({
 });
 
 export const FundingEstimateOutputSchema = z.object({
-  rentFee: z.number(), // Initial setup rent (cron accounts priced from the cluster Rent sysvar + TASK_RETURN_ACCOUNT_SIZE) if automation doesn't exist, 0 otherwise
+  rentFee: z.number(), // Initial setup cost in SOL if automation doesn't exist, 0 otherwise: rent (cluster Rent sysvar) for the accounts init_entity_claim_cron_v0 creates, including the task return account, plus the task queue's min crank reward its schedule task takes; the 0.01 SOL cron-job task-return top-up is in operationalSol
   cronJobFunding: z.number(), // SOL needed for cron job account operations
   pdaWalletFunding: z.number(), // SOL needed for PDA wallet operations
-  recipientFee: z.number(), // SOL needed for recipient accounts (if any)
+  recipientFee: z.number(), // Always 0: pdaWalletFunding (in operationalSol) already carries all recipient rent; kept for schema compatibility
   operationalSol: z.number(), // Total operational SOL needed for automation claims (cronJobFunding + pdaWalletFunding)
-  totalSolNeeded: z.number(), // Total SOL needed including all fees (rentFee + operationalSol + recipientFee)
+  totalSolNeeded: z.number(), // Total SOL needed including all fees (rentFee + operationalSol; recipientFee is always 0)
   currentCronJobBalance: z.string(), // Current balance in cronJob (lamports as string)
   currentPdaWalletBalance: z.string(), // Current balance in pdaWallet (lamports as string)
 });

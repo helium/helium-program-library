@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { makerKey, init as initHem } from "@helium/helium-entity-manager-sdk";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";
 import os from "os";

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { delegatedDataCreditsKey, init } from "@helium/data-credits-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { DC_MINT } from "@helium/spl-utils";

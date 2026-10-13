@@ -13,15 +13,21 @@ runs:
           --provider.wallet ~/.config/solana/id.json > /tmp/localnet.log 2>&1 &
         echo $! > /tmp/localnet.pid
     - name: Wait for localnet to start
-      # A healthy validator answers within a poll or two (~5s), so this bound only ever
-      # applies to a broken one. A vanished pid is reported with the log but is not itself fatal:
-      # `anchor localnet` is a wrapper around solana-test-validator, so treating its exit
-      # as terminal would fail a build whose validator is merely slow to come up.
+      # Waits for /health and for slot >= 1. A healthy validator gets there within a poll or
+      # two (~5s), so this bound only ever applies to a broken one. A vanished pid is
+      # reported with the log but is not itself fatal: `anchor localnet` is a wrapper around
+      # solana-test-validator, so treating its exit as terminal would fail a build whose
+      # validator is merely slow to come up.
       shell: bash
       run: |
         reported=0
         for i in $(seq 1 60); do
-          if [[ "$(curl -s http://localhost:8899/health)" == "ok" ]]; then
+          # /health is ok before slot 1 (the test validator disables the health check); the
+          # slot-0 bank has no SlotHashes sysvar, so v0 messages fail sanitize there.
+          if [[ "$(curl -s http://localhost:8899/health)" == "ok" ]] && \
+             curl -s -X POST -H 'Content-Type: application/json' \
+               -d '{"jsonrpc":"2.0","id":1,"method":"getSlot","params":[{"commitment":"processed"}]}' \
+               http://localhost:8899 | grep -qE '"result":[1-9]'; then
             echo "localnet healthy after $i poll(s)"
             exit 0
           fi

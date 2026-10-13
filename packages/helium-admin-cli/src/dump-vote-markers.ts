@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { organizationKey } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";

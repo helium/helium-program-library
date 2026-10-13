@@ -1,4 +1,4 @@
-import { BN } from "@coral-xyz/anchor";
+import { BN } from "@anchor-lang/core";
 import { calcMultiplier } from "./calcLockupMultiplier";
 import {
   Position,

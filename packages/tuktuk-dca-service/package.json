@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.20",
+  "version": "0.11.21",
   "description": "Jupiter Lite API DCA swap service for Helium",
   "repository": {
     "type": "git",
@@ -32,7 +32,7 @@
     "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.0",
+    "@anchor-lang/core": "^0.31.2",
     "@fastify/cors": "^8.1.1",
     "@fastify/static": "^6",
     "@helium/spl-utils": "workspace:^",

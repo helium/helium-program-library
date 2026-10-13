@@ -1,4 +1,4 @@
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@anchor-lang/core";
 import { init as initLd } from "@helium/lazy-distributor-sdk";
 import { TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
 import { init as initTuktuk, nextAvailableTaskIds } from "@helium/tuktuk-sdk";

@@ -36,6 +36,7 @@ urlencoding = "2.1"
 
 [dev-dependencies]
 sqlx = { version = "0.8.6", features = ["migrate"] }
+metrics-util = { version = "0.17", features = ["debugging"] }
 
 #[patch.'https://github.com/helium/proto']
 #helium-proto = { git = "https://www.github.com/helium/proto", branch = "mj/chain-rewardable-entities" }

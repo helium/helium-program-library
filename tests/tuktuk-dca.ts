@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { BN, Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { BN, Program } from "@anchor-lang/core";
 import {
   customSignerKey,
   init as initTuktuk,
@@ -304,6 +304,8 @@ describe("tuktuk-dca", () => {
     // A fresh authority per test, so each one gets its own DCA at `dcaIndex` whether or not the
     // test before it left its DCA open.
     let dcaAuthority: Keypair;
+    // Pays the DCA's rent and queues its task. The wallet does unless a suite below sets one.
+    let rentPayer: Keypair | undefined;
 
     beforeEach(async () => {
       dcaAuthority = Keypair.generate();
@@ -369,7 +371,7 @@ describe("tuktuk-dca", () => {
         })
         .accountsPartial({
           core: {
-            rentPayer: me,
+            rentPayer: rentPayer?.publicKey ?? me,
             dcaPayer: me,
             authority: dcaAuthority.publicKey,
             inputMint: usdcMint,
@@ -386,7 +388,7 @@ describe("tuktuk-dca", () => {
             queueAuthorityKey()[0],
           )[0],
         })
-        .signers([dcaAuthority])
+        .signers(rentPayer ? [dcaAuthority, rentPayer] : [dcaAuthority])
         .rpc({ skipPreflight: true });
 
       console.log("DCA initialized", dca.toBase58());
@@ -402,7 +404,7 @@ describe("tuktuk-dca", () => {
     /** The deepest `Program … invoke [n]` any program reached in this transaction. */
     async function maxCpiDepth(signature: string): Promise<number> {
       const tx = await provider.connection.getTransaction(signature, {
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 1,
         commitment: "confirmed",
       });
       const logs = tx?.meta?.logMessages ?? [];
@@ -588,6 +590,100 @@ describe("tuktuk-dca", () => {
       // Verify DCA is closed
       const dcaAccount = await program.account.dcaV0.fetchNullable(dca);
       expect(dcaAccount).to.be.null;
+    });
+
+    const lamportsOf = (account: PublicKey) =>
+      provider.connection.getBalance(account);
+
+    // What tuktuk leaves in a task: the rent exemption for its data, and its crank reward.
+    const lamportsHeldBy = async (taskAddress: PublicKey) => {
+      const { data } = (await provider.connection.getAccountInfo(taskAddress))!;
+      const { crankReward } = tuktukProgram.coder.accounts.decode(
+        "taskV0",
+        data,
+      );
+      return (
+        (await provider.connection.getMinimumBalanceForRentExemption(
+          data.length,
+        )) + Number(crankReward.toString())
+      );
+    };
+
+    // The wallet holds more lamports than a number carries exactly, so the payer here is a
+    // keypair whose balance can be compared to the lamport.
+    describe("with a rent payer other than the wallet", () => {
+      before(async () => {
+        rentPayer = Keypair.generate();
+        await sendInstructions(provider, [
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: rentPayer.publicKey,
+            lamports: LAMPORTS_PER_SOL,
+          }),
+        ]);
+      });
+
+      after(() => {
+        rentPayer = undefined;
+      });
+
+      it("refunds the task to the payer that queued it", async () => {
+        const payer = rentPayer!.publicKey;
+        const { rentRefund } = await tuktukProgram.account.taskV0.fetch(task);
+        expect(rentRefund.toBase58()).to.equal(payer.toBase58());
+        const taskLamports = await lamportsHeldBy(task);
+        expect(await lamportsOf(task)).to.equal(taskLamports);
+        // That payer is also the DCA's rent refund, so the close pays it the rent of the DCA
+        // and of its input account as well.
+        const closed =
+          taskLamports +
+          (await lamportsOf(dca)) +
+          (await lamportsOf(inputAccount));
+        const before = await lamportsOf(payer);
+        const queueBefore = await lamportsOf(taskQueue);
+
+        await program.methods
+          .closeDcaV0()
+          .accountsPartial({
+            dca,
+            authority: dcaAuthority.publicKey,
+          })
+          .signers([dcaAuthority])
+          .rpc({ skipPreflight: true });
+
+        expect(await provider.connection.getAccountInfo(task)).to.equal(null);
+        expect(await program.account.dcaV0.fetchNullable(dca)).to.equal(null);
+        expect(await lamportsOf(payer)).to.equal(before + closed);
+        expect(await lamportsOf(taskQueue)).to.equal(queueBefore);
+      });
+    });
+
+    it("refunds a task that a run returned to the task queue", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await runAllTasks();
+      const { nextTask } = await program.account.dcaV0.fetch(dca);
+      expect(nextTask.toBase58()).to.not.equal(task.toBase58());
+      const { rentRefund } = await tuktukProgram.account.taskV0.fetch(nextTask);
+      expect(rentRefund.toBase58()).to.equal(
+        taskQueue.toBase58(),
+        "the run should have returned a task that refunds to the task queue",
+      );
+      const taskLamports = await lamportsHeldBy(nextTask);
+      expect(await lamportsOf(nextTask)).to.equal(taskLamports);
+      const before = await lamportsOf(taskQueue);
+
+      await program.methods
+        .closeDcaV0()
+        .accountsPartial({
+          dca,
+          authority: dcaAuthority.publicKey,
+        })
+        .signers([dcaAuthority])
+        .rpc({ skipPreflight: true });
+
+      expect(await provider.connection.getAccountInfo(nextTask)).to.equal(null);
+      expect(await program.account.dcaV0.fetchNullable(dca)).to.equal(null);
+      expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
     });
 
     it("refuses a close that sends the input somewhere other than the authority's account", async () => {

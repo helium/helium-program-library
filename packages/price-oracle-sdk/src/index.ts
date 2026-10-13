@@ -1,5 +1,5 @@
 import { PriceOracle } from "@helium/idls/lib/types/price_oracle";
-import { AnchorProvider, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Idl, Program } from "@anchor-lang/core";
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID } from "./constants";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";

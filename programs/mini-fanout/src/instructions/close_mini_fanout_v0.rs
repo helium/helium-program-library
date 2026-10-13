@@ -12,7 +12,9 @@ use tuktuk_program::{
   TaskQueueAuthorityV0,
 };
 
-use crate::{fanout_seeds, queue_authority_seeds, state::*};
+use crate::{
+  fanout_seeds, queue_authority_seeds, rent_refund_account, state::*, task_names, task_runs,
+};
 
 #[derive(Accounts)]
 pub struct CloseMiniFanoutV0<'info> {
@@ -73,7 +75,7 @@ pub struct CloseMiniFanoutV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
+pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, CloseMiniFanoutV0<'info>>) -> Result<()> {
   transfer(
     CpiContext::new_with_signer(
       ctx.accounts.token_program.to_account_info(),
@@ -95,34 +97,55 @@ pub fn handler(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
     },
     &[fanout_seeds!(ctx.accounts.mini_fanout)],
   ))?;
+  let rent_refund_candidates = [
+    ctx.accounts.task_rent_refund.to_account_info(),
+    ctx.accounts.owner.to_account_info(),
+    ctx.accounts.rent_refund.to_account_info(),
+    ctx.accounts.task_queue.to_account_info(),
+  ];
   if ctx.accounts.next_task.key() != ctx.accounts.mini_fanout.key()
     && !ctx.accounts.next_task.data_is_empty()
+    && task_names(&ctx.accounts.next_task, &ctx.accounts.mini_fanout.key())?
   {
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_task,
+      &rent_refund_candidates,
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
+        rent_refund,
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(ctx.accounts.mini_fanout)],
     ))?;
   }
-  // Only a fanout that queues a pre task ever owned the account in that slot, so only it
-  // may close one. Anything else there belongs to whoever queued it.
+  // Only a fanout that stores a pre task dequeues one, and only a task whose transaction equals
+  // that pre task.
   if ctx.accounts.mini_fanout.pre_task.is_some()
     && ctx.accounts.next_pre_task.key() != ctx.accounts.mini_fanout.key()
     && !ctx.accounts.next_pre_task.data_is_empty()
+    && task_runs(
+      &ctx.accounts.next_pre_task,
+      &ctx.accounts.mini_fanout.pre_task,
+    )?
   {
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_pre_task,
+      &rent_refund_candidates,
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_pre_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
+        rent_refund,
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(ctx.accounts.mini_fanout)],

@@ -9,3 +9,4 @@ export * from "./build-batched-transactions";
 export * from "./rent";
 export * from "./delegation-accounts";
 export * from "./claim-bot-accounts";
+export * from "./delegation-submission";

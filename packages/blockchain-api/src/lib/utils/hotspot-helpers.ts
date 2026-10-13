@@ -11,7 +11,7 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { env } from "../env";
 import { connectToDb } from "./db";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 
 const DAO_KEY = daoKey(HNT_MINT)[0];
 const HELIUM_ENTITY_CREATOR = entityCreatorKey(DAO_KEY)[0].toBase58();

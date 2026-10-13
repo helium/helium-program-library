@@ -1,11 +1,11 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import {
   createAtaAndMint,
   createAtaAndTransfer,
   createMint,
   HNT_PYTH_PRICE_FEED,
-  sendMultipleInstructions,
+  sendInstructions,
   toBN,
 } from "@helium/spl-utils";
 import {
@@ -212,14 +212,8 @@ export const initTestMaker = async (
     maker
   );
 
-  await sendMultipleInstructions(
-    provider,
-    [
-      [createMerkle, initialize],
-      [setTree, approve],
-    ],
-    [[merkle], [makerKeypair]]
-  );
+  await sendInstructions(provider, [createMerkle, initialize], [merkle]);
+  await sendInstructions(provider, [setTree, approve], [makerKeypair]);
 
   return {
     maker: maker!,

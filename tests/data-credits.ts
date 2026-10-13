@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { createAtaAndMint, createMint } from "@helium/spl-utils";

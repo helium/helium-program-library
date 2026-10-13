@@ -1,4 +1,4 @@
-import { BN, IdlTypes, Program } from "@coral-xyz/anchor";
+import { BN, IdlTypes, Program } from "@anchor-lang/core";
 import { WelcomePack } from "@helium/idls/lib/types/welcome_pack";
 import {
   PROGRAM_ID as LAZY_DISTRIBUTOR_PROGRAM_ID,

@@ -6,7 +6,7 @@ import {
   AnchorProvider,
   Wallet,
   BorshAccountsCoder,
-} from "@coral-xyz/anchor";
+} from "@anchor-lang/core";
 import {
   Connection,
   ParsedTransactionWithMeta,
@@ -35,7 +35,7 @@ import {
   IdlInstructionAccounts,
   IdlInstruction,
   IdlInstructionAccount,
-} from "@coral-xyz/anchor/dist/cjs/idl";
+} from "@anchor-lang/core/dist/cjs/idl";
 
 type DecodedInstruction = {
   name: string;

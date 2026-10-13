@@ -1,7 +1,7 @@
-import * as anchor from "@coral-xyz/anchor";
-import { IdlInstructionAccountItem } from "@coral-xyz/anchor/dist/cjs/idl";
-import { CustomAccountResolver } from "@coral-xyz/anchor/dist/cjs/program/accounts-resolver";
-import { AllInstructions } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
+import * as anchor from "@anchor-lang/core";
+import { IdlInstructionAccountItem } from "@anchor-lang/core/dist/cjs/idl";
+import { CustomAccountResolver } from "@anchor-lang/core/dist/cjs/program/accounts-resolver";
+import { AllInstructions } from "@anchor-lang/core/dist/cjs/program/namespace/types";
 import { PublicKey } from "@solana/web3.js";
 import camelCase from "camelcase";
 import { Accounts, get, set } from "./utils";

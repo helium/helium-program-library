@@ -1,12 +1,11 @@
 import { createSolanaConnection } from "@/lib/solana";
 import {
   getBaseAutomationRentLamports,
-  TASK_RETURN_ACCOUNT_SIZE,
-  calculateFundingForAdditionalDuration,
+  estimateAutomationFunding,
   calculatePeriodsRemaining,
   interpretCronString,
 } from "@/lib/utils/automation-helpers";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { publicProcedure } from "../../../procedures";
 import { fetchAutomationData } from "./automation-data-helpers";
@@ -32,13 +31,19 @@ export const getAutomationStatus =
         recipientRentLamports,
         pdaWalletRentLamports,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
+        minCrankReward,
       } = await fetchAutomationData(walletAddress, provider);
 
-      // Calculate funding needed using the same helper as getFundingEstimate
-      // Using additionalDuration: 0 to get baseline funding needed (for current state)
-      const { cronJobFundingLamports, pdaWalletFundingLamports } =
-        calculateFundingForAdditionalDuration({
+      // Price the status with the same helper as getFundingEstimate, at
+      // additionalDuration: 0 (current state), so its fields sum to that estimate.
+      const { rentFeeLamports, recipientFeeLamports, operationalLamports } =
+        estimateAutomationFunding({
+          cronJobExists: !!cronJobAccount,
+          baseAutomationRentLamports: cronJobAccount
+            ? 0
+            : await getBaseAutomationRentLamports(provider.connection),
+          minCrankRewardLamports: minCrankReward,
           cronJobBalanceLamports,
           cronJobCostPerClaimLamports,
           pdaWalletBalanceLamports,
@@ -48,17 +53,8 @@ export const getAutomationStatus =
           pdaWalletRentLamports,
           additionalDuration: 0,
           ataRentLamports,
-          taskReturnAccountRentLamports,
+          taskReturnAccountFundingLamports,
         });
-
-      const rentFee = cronJobAccount
-        ? 0
-        : (await getBaseAutomationRentLamports(provider.connection)) /
-            LAMPORTS_PER_SOL +
-          TASK_RETURN_ACCOUNT_SIZE;
-      const recipientFee = recipientRentLamports / LAMPORTS_PER_SOL;
-      const operationalSol =
-        (cronJobFundingLamports + pdaWalletFundingLamports) / LAMPORTS_PER_SOL;
 
       // Calculate remaining claims and time
       let remainingClaims: number | undefined;
@@ -89,7 +85,7 @@ export const getAutomationStatus =
         };
 
         // Calculate periods remaining for each pool separately
-        // Accounts for minimum rent requirements, recipient rent, ATA rent, and task return account rent
+        // Accounts for minimum rent requirements, recipient rent, ATA rent, and task return account funding
         const {
           periodsRemaining,
           periodLength,
@@ -105,7 +101,7 @@ export const getAutomationStatus =
           cronJobRentLamports,
           pdaWalletRentLamports,
           ataRentLamports,
-          taskReturnAccountRentLamports,
+          taskReturnAccountFundingLamports,
         });
 
         remainingClaims = periodsRemaining;
@@ -122,9 +118,9 @@ export const getAutomationStatus =
           !!cronJobAccount && !cronJobAccount.removedFromQueue,
         isOutOfSol: cronJobAccount?.removedFromQueue || false,
         currentSchedule,
-        rentFee,
-        recipientFee,
-        operationalSol,
+        rentFee: rentFeeLamports / LAMPORTS_PER_SOL,
+        recipientFee: recipientFeeLamports / LAMPORTS_PER_SOL,
+        operationalSol: operationalLamports / LAMPORTS_PER_SOL,
         remainingClaims,
         fundingPeriodInfo,
         cronJobBalance: cronJobBalanceLamports.toString(),

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init } from "@helium/circuit-breaker-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { BN } from "bn.js";

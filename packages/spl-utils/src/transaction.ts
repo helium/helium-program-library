@@ -1,10 +1,8 @@
-import { AnchorProvider, Program, Provider } from "@coral-xyz/anchor";
+import { AnchorProvider, Program, Provider } from "@anchor-lang/core";
 import {
   AddressLookupTableAccount,
   Commitment,
-  ComputeBudgetProgram,
   Connection,
-  Finality,
   Keypair,
   Message,
   PublicKey,
@@ -25,14 +23,28 @@ import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 import {
   COMPUTE_BUDGET_IX_DATA_SIZE,
+  DEFAULT_COMPUTE_SCALE_UP,
   DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
   MAX_PRIO_FEE,
   callerComputeBudgetTypes,
+  prependComputeBudgetIxs,
   prependedComputeBudgetIxs,
-  setLoadedAccountsDataSizeLimit,
   withPriorityFees,
 } from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
+import { TxVersionOption, resolveTxVersion } from "./txVersion";
+import {
+  MAX_COMPUTE_UNITS,
+  tableComputeUnitsForInstructions,
+} from "./computeUnitTable";
+import {
+  V1_MAX_ACCOUNTS,
+  V1_MAX_INSTRUCTIONS,
+  V1_MAX_SIGNERS,
+  compileV1Transaction,
+  exceedsV1Limits,
+  getTransactionSizeLimit,
+} from "./v1Transaction";
 
 export const chunks = <T>(array: T[], size: number): T[][] =>
   Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) =>
@@ -41,17 +53,6 @@ export const chunks = <T>(array: T[], size: number): T[][] =>
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function promiseAllInOrder<T>(
-  it: (() => Promise<T>)[]
-): Promise<Iterable<T>> {
-  let ret: T[] = [];
-  for (const i of it) {
-    ret.push(await i());
-  }
-
-  return ret;
 }
 
 export const getAddressLookupTableAccounts = async (
@@ -81,7 +82,16 @@ export const getAddressLookupTableAccounts = async (
   }, new Array<AddressLookupTableAccount>());
 };
 
+// Only a resolved 1 builds v1; resolveTxVersion holds the node and signer
+// checks, so an unresolved "auto" stays v0 here.
 export function toVersionedTx(tx: TransactionDraft): VersionedTransaction {
+  if (tx.version === 1) {
+    return compileV1Transaction({
+      feePayer: tx.feePayer,
+      recentBlockhash: tx.recentBlockhash!,
+      instructions: tx.instructions,
+    });
+  }
   const messageV0 = new TransactionMessage({
     payerKey: tx.feePayer,
     recentBlockhash: tx.recentBlockhash!,
@@ -93,12 +103,6 @@ export function toVersionedTx(tx: TransactionDraft): VersionedTransaction {
 export interface InstructionResult<A> {
   instructions: TransactionInstruction[];
   signers: Signer[];
-  output: A;
-}
-
-export interface BigInstructionResult<A> {
-  instructions: TransactionInstruction[][];
-  signers: Signer[][];
   output: A;
 }
 
@@ -129,6 +133,11 @@ export async function sendInstructionsWithPriorityFee(
     loadedAccountsDataSizeLimit?: number;
   } = {}
 ): Promise<string> {
+  const resolved = await resolveTxVersion(provider.connection, {
+    wallet: provider.wallet,
+  });
+  const version =
+    resolved === 1 && exceedsV1Limits(payer, instructions) ? 0 : resolved;
   return await sendInstructions(
     provider,
     await withPriorityFees({
@@ -140,11 +149,13 @@ export async function sendInstructionsWithPriorityFee(
       priorityFeeOptions,
       loadedAccountsDataSizeLimit,
       feePayer: payer,
+      version,
     }),
     signers,
     payer,
     commitment,
-    idlErrors
+    idlErrors,
+    version
   );
 }
 
@@ -154,24 +165,33 @@ export async function sendInstructions(
   signers: Signer[] = [],
   payer: PublicKey = provider.wallet.publicKey,
   commitment: Commitment = "confirmed",
-  idlErrors: Map<number, string> = new Map()
+  idlErrors: Map<number, string> = new Map(),
+  version?: 0 | 1
 ): Promise<string> {
   if (instructions.length == 0) {
     return "";
   }
 
-  let tx = new Transaction();
-  tx.recentBlockhash = (
-    await provider.connection.getLatestBlockhash(commitment)
-  ).blockhash;
-  tx.feePayer = payer || provider.wallet.publicKey;
-  tx.add(...instructions);
+  const feePayer = payer || provider.wallet.publicKey;
+  const resolved =
+    version ??
+    (await resolveTxVersion(provider.connection, { wallet: provider.wallet }));
+  const txVersion =
+    resolved === 1 && exceedsV1Limits(feePayer, instructions) ? 0 : resolved;
+  let tx = await toVersionedTx({
+    feePayer,
+    recentBlockhash: (
+      await provider.connection.getLatestBlockhash(commitment)
+    ).blockhash,
+    instructions,
+    version: txVersion,
+  });
   if (signers.length > 0) {
-    tx.partialSign(...signers);
+    tx.sign(signers);
   }
   if (
-    tx.feePayer.equals(provider.wallet.publicKey) ||
-    tx.instructions.some((ix) =>
+    feePayer.equals(provider.wallet.publicKey) ||
+    instructions.some((ix) =>
       ix.keys.some(
         (key) => key.isSigner && key.pubkey.equals(provider.wallet.publicKey)
       )
@@ -179,11 +199,12 @@ export async function sendInstructions(
   ) {
     tx = await provider.wallet.signTransaction(tx);
   }
+  assertNoMissingSigners([missingSigner(tx)].filter(truthy), []);
 
   try {
     const { txid } = await sendAndConfirmWithRetry(
       provider.connection,
-      tx.serialize(),
+      Buffer.from(tx.serialize()),
       {
         skipPreflight: true,
         maxRetries: 0,
@@ -202,74 +223,6 @@ type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // fro
 
 function truthy<T>(value: T): value is Truthy<T> {
   return !!value;
-}
-
-export async function sendMultipleInstructions(
-  provider: AnchorProvider,
-  instructionGroups: TransactionInstruction[][],
-  signerGroups: Signer[][],
-  payer?: PublicKey,
-  finality: Finality = "confirmed",
-  idlErrors: Map<number, string> = new Map()
-): Promise<Iterable<string>> {
-  const recentBlockhash = (
-    await provider.connection.getLatestBlockhash(finality)
-  ).blockhash;
-
-  const ixAndSigners = instructionGroups
-    .map((instructions, i) => {
-      const signers = signerGroups[i];
-
-      return {
-        instructions,
-        signers,
-      };
-    })
-    .filter(({ instructions }) => instructions.length > 0);
-  const txns = ixAndSigners.map(({ instructions }) => {
-    const tx = new Transaction({
-      feePayer: payer || provider.wallet.publicKey,
-      recentBlockhash,
-    });
-
-    tx.add(...instructions);
-
-    return tx;
-  });
-
-  const txnsSignedByWallet = await provider.wallet.signAllTransactions(txns);
-  const txnsSigned = txnsSignedByWallet
-    .map((tx, index) => {
-      const signers = ixAndSigners[index].signers;
-
-      if (signers.length > 0) {
-        tx.partialSign(...signers);
-      }
-
-      return tx;
-    })
-    .map((tx) => tx.serialize());
-
-  console.log("Sending multiple transactions...");
-  try {
-    return await promiseAllInOrder(
-      txnsSigned.map((txn) => async () => {
-        const { txid } = await sendAndConfirmWithRetry(
-          provider.connection,
-          txn,
-          {
-            skipPreflight: true,
-          },
-          finality
-        );
-        return txid;
-      })
-    );
-  } catch (e) {
-    console.error(e);
-    const wrappedE = ProgramError.parse(e, idlErrors);
-    throw wrappedE == null ? e : wrappedE;
-  }
 }
 
 export async function execute<Output>(
@@ -294,37 +247,6 @@ export async function execute<Output>(
       errors
     );
     return { txid, ...output };
-  }
-
-  // @ts-ignore
-  return output;
-}
-
-export async function executeBig<Output>(
-  program: Program,
-  provider: AnchorProvider,
-  command: BigInstructionResult<Output>,
-  payer: PublicKey = provider.wallet.publicKey,
-  finality?: Finality
-): Promise<Output & { txids?: string[] }> {
-  const { instructions, signers, output } = command;
-  const errors = program.idl.errors?.reduce((acc, err) => {
-    acc.set(err.code, `${err.name}: ${err.msg}`);
-    return acc;
-  }, new Map<number, string>());
-  if (instructions.length > 0) {
-    const txids = await sendMultipleInstructions(
-      provider,
-      instructions,
-      signers,
-      payer || provider.wallet.publicKey,
-      finality,
-      errors
-    );
-    return {
-      ...output,
-      txids: Array.from(txids),
-    };
   }
 
   // @ts-ignore
@@ -453,10 +375,18 @@ export async function sendAndConfirmWithRetry(
   return { txid };
 }
 
+/**
+ * @deprecated Legacy only: throws on v0 and v1 bytes. Use
+ * `VersionedTransaction.deserialize`.
+ */
 export function stringToTransaction(solanaTransaction: string) {
   return Transaction.from(Buffer.from(solanaTransaction));
 }
 
+/**
+ * @deprecated Legacy only: throws on v0 and v1 bytes. Use
+ * `VersionedTransaction.deserialize`.
+ */
 export function bufferToTransaction(solanaTransaction: Buffer) {
   return Transaction.from(solanaTransaction);
 }
@@ -482,6 +412,65 @@ export type Status = {
   currentBatchSize: number;
 };
 const TX_BATCH_SIZE = 100;
+
+// VersionedTransaction.serialize does not verify signatures, so a tx with an
+// unsigned required signer would otherwise be resent until its blockhash
+// expires.
+const missingSigner = (tx: VersionedTransaction): PublicKey | undefined => {
+  const unsigned = tx.signatures.findIndex((sig) => sig.every((b) => b === 0));
+  return unsigned >= 0 ? tx.message.staticAccountKeys[unsigned] : undefined;
+};
+
+/**
+ * Thrown by the bulk senders for an on-chain failure, a missing signer, or any
+ * error after a tx landed, and by `sendInstructions` for a missing signer.
+ * `landedSignatures` lists only txs seen landed. A tx not listed may still land
+ * until its blockhash expires, so wait for expiry before resending it. Read
+ * `landedSignatures` rather than using `instanceof`: the CJS and ESM builds
+ * each define this class.
+ */
+export class BulkSendError extends Error {
+  /** Txs that landed before the throw, ordered by confirmation. */
+  landedSignatures: string[];
+  /** The error that ended the send, if one did. */
+  cause?: unknown;
+
+  constructor({
+    message,
+    missingSigners,
+    landedSignatures,
+    cause,
+  }: {
+    message?: string;
+    missingSigners: PublicKey[];
+    landedSignatures: string[];
+    cause?: unknown;
+  }) {
+    super(
+      [
+        message,
+        missingSigners.length > 0 &&
+          `Missing signature for public key ${missingSigners
+            .map((key) => key.toBase58())
+            .join(", ")}`,
+      ]
+        .filter(truthy)
+        .join(". ")
+    );
+    this.landedSignatures = landedSignatures;
+    this.cause = cause;
+  }
+}
+
+const assertNoMissingSigners = (
+  missingSigners: PublicKey[],
+  landedSignatures: string[]
+) => {
+  if (missingSigners.length > 0) {
+    throw new BulkSendError({ missingSigners, landedSignatures });
+  }
+};
+
 export async function bulkSendTransactions(
   provider: Provider,
   txs: TransactionDraft[],
@@ -491,88 +480,115 @@ export async function bulkSendTransactions(
   maxSignatureBatch: number = TX_BATCH_SIZE
 ): Promise<string[]> {
   let ret: string[] = [];
+  const missingSigners: PublicKey[] = [];
 
   // attempt to chunk by blockhash bounds (so signing doesn't take too long)
   for (let chunk of chunks(txs, maxSignatureBatch)) {
     const thisRet: string[] = [];
-    // Continually send in bulk while resetting blockhash until we send them all
-    while (true) {
-      const recentBlockhash = await withRetries(5, () =>
-        provider.connection.getLatestBlockhash("confirmed")
-      );
-      const blockhashedTxs = await Promise.all(
-        chunk.map(async (tx) => {
-          await populateMissingDraftInfo(provider.connection, tx);
-          return toVersionedTx({
-            instructions: tx.instructions,
-            recentBlockhash: recentBlockhash.blockhash,
-            addressLookupTableAddresses: tx.addressLookupTableAddresses,
-            addressLookupTables: tx.addressLookupTables!,
-            feePayer: tx.feePayer,
-          });
-        })
-      );
-      const signedTxs = (
-        await (provider as AnchorProvider).wallet.signAllTransactions(
-          blockhashedTxs
-        )
-      ).map((tx, i) => {
-        extraSigners.forEach((signer: Keypair) => {
-          if (
-            chunk[i].signers?.some((sig) =>
-              sig.publicKey.equals(signer.publicKey)
-            )
-          ) {
-            tx.sign([signer]);
-          }
-        }, tx);
-        return tx;
-      });
-
-      const txsWithSigs = signedTxs.map((tx, index) => {
-        return {
-          transaction: chunk[index],
-          sig: bs58.encode(tx.signatures[0]),
-        };
-      });
-      const confirmedTxs = await bulkSendRawTransactions(
-        provider.connection,
-        signedTxs.map((s) => Buffer.from(s.serialize())),
-        ({ totalProgress, ...rest }) =>
-          onProgress &&
-          onProgress({
-            ...rest,
-            totalTxs: txs.length,
-            totalProgress: totalProgress + ret.length + thisRet.length,
-          }),
-        recentBlockhash.lastValidBlockHeight,
-        // Hail mary, try with preflight enabled. Sometimes this causes
-        // errors that wouldn't otherwise happen
-        triesRemaining != 1
-      );
-      thisRet.push(...confirmedTxs);
-      if (confirmedTxs.length == signedTxs.length) {
-        break;
-      }
-
-      const retSet = new Set(thisRet);
-
-      chunk = txsWithSigs
-        .filter(({ sig }) => !retSet.has(sig))
-        .map(({ transaction }) => transaction);
-
-      triesRemaining--;
-      if (triesRemaining <= 0) {
-        throw new Error(
-          `Failed to submit all txs after blockhashes expired, ${
-            signedTxs.length - confirmedTxs.length
-          } remain`
+    try {
+      // Continually send in bulk while resetting blockhash until we send them all
+      while (true) {
+        const recentBlockhash = await withRetries(5, () =>
+          provider.connection.getLatestBlockhash("confirmed")
         );
+        const blockhashedTxs = await Promise.all(
+          chunk.map(async (tx) => {
+            await populateMissingDraftInfo(provider.connection, tx);
+            return toVersionedTx({
+              instructions: tx.instructions,
+              recentBlockhash: recentBlockhash.blockhash,
+              addressLookupTableAddresses: tx.addressLookupTableAddresses,
+              addressLookupTables: tx.addressLookupTables!,
+              feePayer: tx.feePayer,
+              version: tx.version,
+            });
+          })
+        );
+        let signedTxs = (
+          await (provider as AnchorProvider).wallet.signAllTransactions(
+            blockhashedTxs
+          )
+        ).map((tx, i) => {
+          extraSigners.forEach((signer: Keypair) => {
+            if (
+              chunk[i].signers?.some((sig) =>
+                sig.publicKey.equals(signer.publicKey)
+              )
+            ) {
+              tx.sign([signer]);
+            }
+          }, tx);
+          return tx;
+        });
+        const missing = signedTxs.map(missingSigner);
+        missingSigners.push(...missing.filter(truthy));
+        signedTxs = signedTxs.filter((_, i) => !missing[i]);
+        chunk = chunk.filter((_, i) => !missing[i]);
+
+        const txsWithSigs = signedTxs.map((tx, index) => {
+          return {
+            transaction: chunk[index],
+            sig: bs58.encode(tx.signatures[0]),
+          };
+        });
+        const confirmedTxs = await bulkSendRawTransactions(
+          provider.connection,
+          signedTxs.map((s) => Buffer.from(s.serialize())),
+          ({ totalProgress, ...rest }) =>
+            onProgress &&
+            onProgress({
+              ...rest,
+              // Unsigned drafts are not sent. One found in a later chunk
+              // lowers this count then.
+              totalTxs: txs.length - missingSigners.length,
+              totalProgress: totalProgress + ret.length + thisRet.length,
+            }),
+          recentBlockhash.lastValidBlockHeight,
+          // Hail mary, try with preflight enabled. Sometimes this causes
+          // errors that wouldn't otherwise happen
+          triesRemaining != 1
+        );
+        thisRet.push(...confirmedTxs);
+        if (confirmedTxs.length == signedTxs.length) {
+          break;
+        }
+
+        const retSet = new Set(thisRet);
+
+        chunk = txsWithSigs
+          .filter(({ sig }) => !retSet.has(sig))
+          .map(({ transaction }) => transaction);
+
+        triesRemaining--;
+        if (triesRemaining <= 0) {
+          throw new Error(
+            `Failed to submit all txs after blockhashes expired, ${
+              signedTxs.length - confirmedTxs.length
+            } remain`
+          );
+        }
       }
+    } catch (e: any) {
+      const landedSignatures = [
+        ...ret,
+        ...thisRet,
+        ...(e?.landedSignatures ?? []),
+      ];
+      // Nothing to add: keep the original error, e.g. a wallet rejection.
+      if (landedSignatures.length === 0 && missingSigners.length === 0) {
+        throw e;
+      }
+      throw new BulkSendError({
+        message: e.message,
+        missingSigners,
+        landedSignatures,
+        cause: e,
+      });
     }
     ret.push(...thisRet);
   }
 
+  assertNoMissingSigners(missingSigners, ret);
   return ret;
 }
 
@@ -591,6 +607,11 @@ export async function bulkSendRawTransactions(
   const txBatchSize = TX_BATCH_SIZE;
   let totalProgress = 0;
   const ret: string[] = [];
+  const missing = txs.map((tx) =>
+    missingSigner(VersionedTransaction.deserialize(tx))
+  );
+  const missingSigners = missing.filter(truthy);
+  txs = txs.filter((_, i) => !missing[i]);
   if (!lastValidBlockHeight) {
     const blockhash = await withRetries(5, () =>
       connection.getLatestBlockhash("confirmed")
@@ -598,78 +619,106 @@ export async function bulkSendRawTransactions(
     lastValidBlockHeight = blockhash.lastValidBlockHeight;
   }
 
-  for (let chunk of chunks(txs, txBatchSize)) {
-    let currentBatchProgress = 0;
+  try {
+    for (let chunk of chunks(txs, txBatchSize)) {
+      let currentBatchProgress = 0;
 
-    let pendingCount = chunk.length;
-    let txids: string[] = [];
-    let lastRetry = 0;
+      let pendingCount = chunk.length;
+      let txids: string[] = [];
+      let lastRetry = 0;
 
-    while (pendingCount > 0) {
-      if (
-        (await withRetries(5, () => connection.getBlockHeight())) >
-        lastValidBlockHeight
-      ) {
-        return ret;
-      }
+      while (pendingCount > 0) {
+        let expired = false;
+        if (
+          (await withRetries(5, () => connection.getBlockHeight("confirmed"))) >
+          lastValidBlockHeight
+        ) {
+          expired = true;
+        }
 
-      // only resend txs every 4s
-      if (lastRetry < new Date().valueOf() - 4 * 1000) {
-        lastRetry = new Date().valueOf();
-        txids = [];
-        for (const tx of chunk) {
-          const txid = await connection.sendRawTransaction(tx, {
-            skipPreflight,
-            maxRetries,
+        // only resend txs every 4s
+        if (!expired && lastRetry < new Date().valueOf() - 4 * 1000) {
+          lastRetry = new Date().valueOf();
+          txids = [];
+          for (const tx of chunk) {
+            const txid = await connection.sendRawTransaction(tx, {
+              skipPreflight,
+              maxRetries,
+            });
+            txids.push(txid);
+          }
+        }
+
+        const statuses = await getAllTxns(connection, txids);
+        const completed = statuses.filter((status) => status !== null);
+        totalProgress += completed.length;
+        currentBatchProgress += completed.length;
+        onProgress &&
+          onProgress({
+            totalTxs: txs.length,
+            totalProgress: totalProgress,
+            currentBatchProgress: currentBatchProgress,
+            currentBatchSize: txBatchSize,
           });
-          txids.push(txid);
+        const failures = completed
+          .map((status) => status !== null && status.meta?.err)
+          .filter(truthy);
+
+        if (failures.length > 0) {
+          const failureIndexes = statuses
+            .map((status, index) => (status?.meta?.err ? index : null))
+            .filter((i) => typeof i !== "undefined" && i !== null);
+          const failedTxs = await Promise.all(
+            failureIndexes.map((index) =>
+              connection.getTransaction(txids[index!], {
+                commitment: "confirmed",
+                maxSupportedTransactionVersion: 1,
+              })
+            )
+          );
+          for (const tx of failedTxs) {
+            console.error(tx?.meta?.logMessages?.join("\n"));
+          }
+          throw new BulkSendError({
+            message: "Failed to run txs",
+            missingSigners,
+            landedSignatures: [
+              ...ret,
+              ...txids.filter(
+                (_, index) => statuses[index] && !statuses[index]!.meta?.err
+              ),
+            ],
+          });
         }
-      }
-
-      const statuses = await getAllTxns(connection, txids);
-      const completed = statuses.filter((status) => status !== null);
-      totalProgress += completed.length;
-      currentBatchProgress += completed.length;
-      onProgress &&
-        onProgress({
-          totalTxs: txs.length,
-          totalProgress: totalProgress,
-          currentBatchProgress: currentBatchProgress,
-          currentBatchSize: txBatchSize,
-        });
-      const failures = completed
-        .map((status) => status !== null && status.meta?.err)
-        .filter(truthy);
-
-      if (failures.length > 0) {
-        const failureIndexes = statuses
-          .map((status, index) => (status?.meta?.err ? index : null))
-          .filter((i) => typeof i !== "undefined" && i !== null);
-        const failedTxs = await Promise.all(
-          failureIndexes.map((index) =>
-            connection.getTransaction(txids[index!], {
-              commitment: "confirmed",
-              maxSupportedTransactionVersion: 1,
-            })
-          )
+        ret.push(
+          ...txids
+            .map((txid, idx) => (statuses[idx] == null ? null : txid))
+            .filter(truthy)
         );
-        for (const tx of failedTxs) {
-          console.error(tx?.meta?.logMessages?.join("\n"));
+        chunk = chunk.filter((_, index) => statuses[index] === null);
+        txids = txids.filter((_, index) => statuses[index] === null);
+        pendingCount -= completed.length;
+        // A tx sent before expiry can still land; the caller resends the rest.
+        if (expired) {
+          assertNoMissingSigners(missingSigners, ret);
+          return ret;
         }
-        throw new Error("Failed to run txs");
+        await sleep(1000); // Wait one seconds before querying again
       }
-      ret.push(
-        ...txids
-          .map((txid, idx) => (statuses[idx] == null ? null : txid))
-          .filter(truthy)
-      );
-      chunk = chunk.filter((_, index) => statuses[index] === null);
-      txids = txids.filter((_, index) => statuses[index] === null);
-      pendingCount -= completed.length;
-      await sleep(1000); // Wait one seconds before querying again
     }
+  } catch (e: any) {
+    // Already carries the landed list (the failure throw, missing signers).
+    if (e?.landedSignatures) throw e;
+    if (ret.length === 0 && missingSigners.length === 0) throw e;
+    throw new BulkSendError({
+      message: e?.message,
+      missingSigners,
+      landedSignatures: ret,
+      cause: e,
+    });
   }
 
+  assertNoMissingSigners(missingSigners, ret);
   return ret;
 }
 
@@ -690,6 +739,119 @@ async function getAllTxns(
   ).flat();
 }
 
+const fitsInTx = async (
+  draft: TransactionDraft,
+  version: 0 | 1,
+  sizeLimit: number
+): Promise<boolean> => {
+  if (version === 1 && exceedsV1Limits(draft.feePayer, draft.instructions)) {
+    return false;
+  }
+  try {
+    return (await toVersionedTx(draft)).serialize().length <= sizeLimit;
+  } catch (e: any) {
+    // v0 serialize throws past its buffer instead of returning the size.
+    if (e.toString().includes("encoding overruns Uint8Array")) {
+      return false;
+    }
+    throw e;
+  }
+};
+
+/**
+ * Pack instruction groups into as few txs as possible. From each start, one
+ * greedy cursor per allowed version grows until it stops fitting; the longer
+ * chunk is emitted, and a tie goes to v0.
+ *
+ * `toProbe` builds the draft a chunk is sized by, so it must carry whatever
+ * the sent tx adds (ComputeBudget ixs, signers).
+ */
+export const packInstructionGroups = async ({
+  groups,
+  versions,
+  toProbe,
+  maxTxSize,
+  maxInstructionsPerTx,
+  computeScaleUp = DEFAULT_COMPUTE_SCALE_UP,
+}: {
+  groups: TransactionInstruction[][];
+  versions: (0 | 1)[];
+  toProbe: (
+    instructions: TransactionInstruction[],
+    version: 0 | 1
+  ) => TransactionDraft;
+  maxTxSize?: number;
+  maxInstructionsPerTx?: number;
+  computeScaleUp?: number;
+}): Promise<{ instructions: TransactionInstruction[]; version: 0 | 1 }[]> => {
+  const sizeLimit = (version: 0 | 1) =>
+    Math.min(maxTxSize ?? Infinity, getTransactionSizeLimit(version));
+  const chunks: { instructions: TransactionInstruction[]; version: 0 | 1 }[] =
+    [];
+  let start = 0;
+  while (start < groups.length) {
+    const fitting = { 0: 0, 1: 0 };
+    let live = versions;
+    let cuBounded = true;
+    for (let end = start + 1; end <= groups.length && live.length; end++) {
+      const instructions = groups.slice(start, end).flat();
+      if (maxInstructionsPerTx && instructions.length > maxInstructionsPerTx) {
+        break;
+      }
+      // Bounds growth only: a lone group is never rejected for its CU.
+      if (end > start + 1 && cuBounded) {
+        try {
+          const tableCu = tableComputeUnitsForInstructions(instructions, {
+            throwOnMiss: true,
+          });
+          if (tableCu * computeScaleUp > MAX_COMPUTE_UNITS) {
+            break;
+          }
+        } catch {
+          // Untabled ix: pack by size alone and let the post-pack
+          // simulation in withPriorityFees check CU.
+          cuBounded = false;
+        }
+      }
+      const stillFitting: (0 | 1)[] = [];
+      for (const version of live) {
+        if (
+          await fitsInTx(
+            toProbe(instructions, version),
+            version,
+            sizeLimit(version)
+          )
+        ) {
+          fitting[version] = end - start;
+          stillFitting.push(version);
+        }
+      }
+      live = stillFitting;
+    }
+
+    const version = fitting[1] > fitting[0] ? 1 : 0;
+    const count = fitting[version];
+    if (count === 0) {
+      const limits = versions.map((v) =>
+        v === 1
+          ? `v1 (${sizeLimit(1)} bytes, ${V1_MAX_ACCOUNTS} accounts, ${V1_MAX_INSTRUCTIONS} instructions, ${V1_MAX_SIGNERS} signers)`
+          : `v0 (${sizeLimit(0)} bytes)`
+      );
+      throw new Error(
+        `Instruction group ${start} fits in no transaction under ${limits.join(
+          " or "
+        )}`
+      );
+    }
+    chunks.push({
+      instructions: groups.slice(start, start + count).flat(),
+      version,
+    });
+    start += count;
+  }
+  return chunks;
+};
+
 // Batch instructions parallel into as many txs as it takes
 export async function batchParallelInstructions({
   provider,
@@ -698,8 +860,9 @@ export async function batchParallelInstructions({
   triesRemaining = 10,
   extraSigners = [],
   maxSignatureBatch = TX_BATCH_SIZE,
-  maxTxSize = 1232,
+  maxTxSize,
   addressLookupTableAddresses = [],
+  version: versionOption,
 }: {
   provider: AnchorProvider;
   instructions: TransactionInstruction[];
@@ -709,65 +872,46 @@ export async function batchParallelInstructions({
   extraSigners?: Keypair[];
   maxSignatureBatch?: number;
   addressLookupTableAddresses?: PublicKey[];
+  version?: TxVersionOption;
 }): Promise<void> {
-  let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
-  const transactions: TransactionDraft[] = [];
   const addressLookupTables = await getAddressLookupTableAccounts(
     provider.connection,
     addressLookupTableAddresses
   );
+  const version = await resolveTxVersion(provider.connection, {
+    version: versionOption,
+    wallet: provider.wallet,
+  });
+  const toDraft = (
+    chunk: TransactionInstruction[],
+    chunkVersion: 0 | 1
+  ): TransactionDraft => ({
+    feePayer: provider.wallet.publicKey,
+    recentBlockhash: blockhash,
+    instructions: chunk,
+    addressLookupTableAddresses,
+    signers: extraSigners.filter((s) =>
+      chunk.some((ix) =>
+        ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
+      )
+    ),
+    addressLookupTables,
+    version: chunkVersion,
+  });
 
-  for (const instruction of instructions) {
-    if (Array.isArray(instruction)) {
-      currentTxInstructions.push(...instruction);
-    } else {
-      currentTxInstructions.push(instruction);
-    }
-    const tx = await toVersionedTx({
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash: blockhash,
-      instructions: currentTxInstructions,
-      addressLookupTableAddresses,
-      signers: extraSigners,
-      addressLookupTables,
-    });
-    try {
-      if (tx.serialize().length + 64 * tx.signatures.length > maxTxSize) {
-        throw new Error("encoding overruns Uint8Array");
-      }
-    } catch (e: any) {
-      if (e.toString().includes("encoding overruns Uint8Array")) {
-        currentTxInstructions.pop();
-        transactions.push({
-          feePayer: provider.wallet.publicKey,
-          recentBlockhash: blockhash,
-          instructions: currentTxInstructions,
-          addressLookupTableAddresses,
-          signers: extraSigners,
-          addressLookupTables,
-        });
-        if (Array.isArray(instruction)) {
-          currentTxInstructions = instruction;
-        } else {
-          currentTxInstructions = [instruction];
-        }
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  if (currentTxInstructions.length > 0) {
-    transactions.push({
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash: blockhash,
-      instructions: currentTxInstructions,
-      addressLookupTableAddresses,
-      signers: extraSigners,
-      addressLookupTables,
-    });
-  }
+  const chunks = await packInstructionGroups({
+    // Callers pass arrays at runtime for ixs that must share a tx.
+    groups: instructions.map((instruction) =>
+      Array.isArray(instruction) ? instruction : [instruction]
+    ),
+    versions: version === 1 ? [1, 0] : [0],
+    toProbe: toDraft,
+    maxTxSize,
+  });
+  const transactions = chunks.map((chunk) =>
+    toDraft(chunk.instructions, chunk.version)
+  );
 
   await bulkSendTransactions(
     provider,
@@ -786,6 +930,7 @@ export async function batchSequentialParallelInstructions({
   triesRemaining = 10,
   extraSigners = [],
   maxSignatureBatch = TX_BATCH_SIZE,
+  version,
 }: {
   provider: AnchorProvider;
   instructions: TransactionInstruction[][];
@@ -794,6 +939,7 @@ export async function batchSequentialParallelInstructions({
   extraSigners?: Keypair[];
   maxSignatureBatch?: number;
   addressLookupTableAddresses?: PublicKey[];
+  version?: TxVersionOption;
 }): Promise<void> {
   for (const instruction of instructions) {
     await batchParallelInstructionsWithPriorityFee(provider, instruction, {
@@ -801,6 +947,7 @@ export async function batchSequentialParallelInstructions({
       triesRemaining,
       extraSigners,
       maxSignatureBatch,
+      version,
     });
   }
 }
@@ -815,7 +962,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     basePriorityFee,
     addressLookupTableAddresses,
     computeScaleUp,
-    maxTxSize = 1232,
+    maxTxSize,
     extraSigners = [],
     useFirstEstimateForAll = false,
     maxInstructionsPerTx,
@@ -824,6 +971,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
     loadedAccountsDataSizeLimit,
     // See withPriorityFees; set false for wallet-signed txs.
     deriveLoadedAccountsDataSizeLimit,
+    version,
   }: {
     commitment?: Commitment;
     // Manually specify limit instead of simulating
@@ -842,9 +990,10 @@ export async function batchInstructionsToTxsWithPriorityFee(
     maxInstructionsPerTx?: number;
     loadedAccountsDataSizeLimit?: number;
     deriveLoadedAccountsDataSizeLimit?: boolean;
+    // Resolved once, then carried onto every draft; see TransactionDraft.version.
+    version?: TxVersionOption;
   } = {}
 ): Promise<TransactionDraft[]> {
-  let currentTxInstructions: TransactionInstruction[] = [];
   const blockhash = (await provider.connection.getLatestBlockhash(commitment))
     .blockhash;
   const transactions: TransactionDraft[] = [];
@@ -852,6 +1001,10 @@ export async function batchInstructionsToTxsWithPriorityFee(
     provider.connection,
     addressLookupTableAddresses || []
   );
+  const resolvedVersion = await resolveTxVersion(provider.connection, {
+    version,
+    wallet: provider.wallet,
+  });
 
   let firstTxComputeBudgetIxs: TransactionInstruction[] | null = null;
   // Price a full chunk and push it as a draft. When the first chunk's
@@ -859,7 +1012,10 @@ export async function batchInstructionsToTxsWithPriorityFee(
   // later chunks — skipping any CB type the chunk already carries, since the
   // runtime rejects duplicate ComputeBudget instruction types
   // (DuplicateInstruction) — instead of re-estimating per chunk.
-  const flushChunk = async (chunk: TransactionInstruction[]) => {
+  const flushChunk = async (
+    chunk: TransactionInstruction[],
+    chunkVersion: 0 | 1
+  ) => {
     let ixs: TransactionInstruction[];
     if (firstTxComputeBudgetIxs) {
       const chunkCbTypes = callerComputeBudgetTypes(chunk);
@@ -880,6 +1036,8 @@ export async function batchInstructionsToTxsWithPriorityFee(
         feePayer: provider.wallet.publicKey,
         loadedAccountsDataSizeLimit,
         deriveLoadedAccountsDataSizeLimit,
+        // Simulate in the version the draft is sent in.
+        version: chunkVersion,
       });
       if (useFirstEstimateForAll) {
         // A sim-derived data-size limit was measured against THIS tx's
@@ -906,68 +1064,44 @@ export async function batchInstructionsToTxsWithPriorityFee(
           ix.keys.some((k) => k.pubkey.equals(s.publicKey) && k.isSigner)
         )
       ),
+      version: chunkVersion,
     });
   };
-  for (const instruction of instructions) {
-    if (!instruction) continue;
-    const instrArr = Array.isArray(instruction) ? instruction : [instruction];
-    const prevLen = currentTxInstructions.length;
-    currentTxInstructions.push(...instrArr);
-    const tx = await toVersionedTx({
-      instructions: [
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units: computeUnitLimit || 100000,
-        }),
-        ComputeBudgetProgram.setComputeUnitPrice({
-          // Placeholder, will be replaced with actual value
+  const chunks = await packInstructionGroups({
+    groups: instructions
+      .filter((instruction) => instruction)
+      .map((instruction) =>
+        Array.isArray(instruction) ? instruction : [instruction]
+      ),
+    versions: resolvedVersion === 1 ? [1, 0] : [0],
+    toProbe: (chunk, chunkVersion) => {
+      // Probe must match the real tx's ix count or the size check
+      // mis-measures: under-counting overflows maxTxSize, over-counting
+      // splits early. The placeholder values don't affect sizing.
+      return {
+        instructions: prependComputeBudgetIxs(chunk, {
+          computeUnits: computeUnitLimit || 100000,
           microLamports: 1,
+          loadedAccountsDataSizeLimit:
+            loadedAccountsDataSizeLimit != null ||
+            deriveLoadedAccountsDataSizeLimit !== false
+              ? (loadedAccountsDataSizeLimit ??
+                DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT)
+              : undefined,
         }),
-        // Probe must match the real tx's ix count or the size check
-        // mis-measures: under-counting overflows maxTxSize, over-counting
-        // splits early. The ix is a fixed 5 bytes, so the placeholder value
-        // doesn't affect sizing. Omit it when the real tx won't carry one.
-        ...(loadedAccountsDataSizeLimit != null ||
-        deriveLoadedAccountsDataSizeLimit !== false
-          ? [
-              setLoadedAccountsDataSizeLimit(
-                loadedAccountsDataSizeLimit ??
-                  DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
-              ),
-            ]
-          : []),
-        ...currentTxInstructions,
-      ],
-      addressLookupTableAddresses: addressLookupTableAddresses || [],
-      feePayer: provider.wallet.publicKey,
-      recentBlockhash: blockhash,
-      addressLookupTables,
-    });
-    try {
-      if (
-        tx.serialize().length + 64 * tx.signatures.length > maxTxSize ||
-        (maxInstructionsPerTx &&
-          currentTxInstructions.length > maxInstructionsPerTx)
-      ) {
-        throw new Error("encoding overruns Uint8Array");
-      }
-    } catch (e: any) {
-      if (e.toString().includes("encoding overruns Uint8Array")) {
-        currentTxInstructions = currentTxInstructions.slice(0, prevLen);
-        if (currentTxInstructions.length > 0) {
-          await flushChunk(currentTxInstructions);
-        }
-
-        // Copy — aliasing instrArr would mutate the caller's group array on
-        // the next push, corrupting inputs across repeated batch calls.
-        currentTxInstructions = [...instrArr];
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  if (currentTxInstructions.length > 0) {
-    await flushChunk(currentTxInstructions);
+        addressLookupTableAddresses: addressLookupTableAddresses || [],
+        feePayer: provider.wallet.publicKey,
+        recentBlockhash: blockhash,
+        addressLookupTables,
+        version: chunkVersion,
+      };
+    },
+    maxTxSize,
+    maxInstructionsPerTx,
+    computeScaleUp,
+  });
+  for (const chunk of chunks) {
+    await flushChunk(chunk.instructions, chunk.version);
   }
 
   return transactions;
@@ -986,6 +1120,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     basePriorityFee,
     extraSigners,
     maxSignatureBatch = TX_BATCH_SIZE,
+    version,
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
@@ -996,6 +1131,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     basePriorityFee?: number;
     extraSigners?: Keypair[];
     maxSignatureBatch?: number;
+    version?: TxVersionOption;
   } = {}
 ): Promise<void> {
   const transactions = await batchInstructionsToTxsWithPriorityFee(
@@ -1005,6 +1141,7 @@ export async function batchParallelInstructionsWithPriorityFee(
       computeUnitLimit,
       basePriorityFee,
       computeScaleUp,
+      version,
     }
   );
 

@@ -6,7 +6,7 @@ TypeScript SDK for the [welcome-pack program](../../programs/welcome-pack), whic
 
 ```ts
 import { init } from "@helium/welcome-pack-sdk"
-import { AnchorProvider } from "@coral-xyz/anchor"
+import { AnchorProvider } from "@anchor-lang/core"
 
 const program = await init(AnchorProvider.env())
 ```

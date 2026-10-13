@@ -1,6 +1,6 @@
 import { init as initDc, mintDataCredits } from "@helium/data-credits-sdk";
 import { toBN, DC_MINT, sendInstructions } from "@helium/spl-utils";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   createAssociatedTokenAccountIdempotent,
   createAssociatedTokenAccountIdempotentInstruction,

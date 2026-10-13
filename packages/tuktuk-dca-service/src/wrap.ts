@@ -1,4 +1,4 @@
-import { Idl, Program } from "@coral-xyz/anchor";
+import { Idl, Program } from "@anchor-lang/core";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,

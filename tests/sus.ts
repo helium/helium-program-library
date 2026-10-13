@@ -1,4 +1,4 @@
-import { AnchorProvider, Wallet } from "@coral-xyz/anchor";
+import { AnchorProvider, Wallet } from "@anchor-lang/core";
 import { init as initDc } from "@helium/data-credits-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { DC_MINT, HNT_MINT, IOT_MINT } from "@helium/spl-utils";

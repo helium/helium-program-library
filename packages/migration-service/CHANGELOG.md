@@ -1,5 +1,23 @@
 # Change Log
 
+## 0.11.23
+
+### Patch Changes
+
+- Updated dependencies [[`9f99b45`](https://github.com/helium/helium-program-library/commit/9f99b458c442cd11909e7fccb4db33f373c33c8b), [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0), [`6f11300`](https://github.com/helium/helium-program-library/commit/6f11300031422e9468dc9c0ad813fad9eaa76d3c), [`7830992`](https://github.com/helium/helium-program-library/commit/78309926e86fd0de14a157d7e4c903fde04b3981), [`b26c94b`](https://github.com/helium/helium-program-library/commit/b26c94b2447cdc03eb0b997e7efcae7ed2891325), [`a9b1301`](https://github.com/helium/helium-program-library/commit/a9b13019bb52e8e9015f3fcfaabb4308c8aeddc6), [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283)]:
+  - @helium/account-fetch-cache@0.11.17
+  - @helium/circuit-breaker-sdk@0.12.0
+  - @helium/data-credits-sdk@0.13.0
+  - @helium/distributor-oracle@0.14.0
+  - @helium/helium-entity-manager-sdk@0.12.0
+  - @helium/helium-sub-daos-sdk@0.13.0
+  - @helium/idls@0.12.0
+  - @helium/lazy-distributor-sdk@0.13.0
+  - @helium/lazy-transactions-sdk@0.12.0
+  - @helium/spl-utils@0.14.0
+  - @helium/treasury-management-sdk@0.12.0
+  - @helium/voter-stake-registry-sdk@0.13.0
+
 ## 0.11.22
 
 ### Patch Changes

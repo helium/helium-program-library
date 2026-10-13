@@ -56,6 +56,7 @@ export const useClaimAllPositionsRewards = () => {
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
+            version: 0,
           });
         }
       }

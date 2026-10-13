@@ -1,6 +1,6 @@
 import { createServer, Server } from "http";
 import { AddressInfo } from "net";
-import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
+import { idlAddress } from "@anchor-lang/core/dist/cjs/idl";
 import {
   delegatedPositionKey,
   EPOCH_LENGTH,
@@ -191,20 +191,19 @@ describe("delegatePositions account resolution", () => {
 
   it("reads ownership and claim bots in batches, not once per position", async () => {
     // #given two undelegated positions to automate in one request
-    const positions = await Promise.all([
-      createAndFundPosition(ctx, {
-        amount: "100000000",
-        lockupKind: "cliff",
-        lockupPeriodsInDays: 365,
-        subDaoMint: MOBILE_MINT,
-      }),
-      createAndFundPosition(ctx, {
-        amount: "100000000",
-        lockupKind: "cliff",
-        lockupPeriodsInDays: 365,
-        subDaoMint: MOBILE_MINT,
-      }),
-    ]);
+    // One at a time: surfpool refused one of two creates sent together with
+    // "This transaction has already been processed".
+    const positions = [];
+    for (let i = 0; i < 2; i++) {
+      positions.push(
+        await createAndFundPosition(ctx, {
+          amount: "100000000",
+          lockupKind: "cliff",
+          lockupPeriodsInDays: 365,
+          subDaoMint: MOBILE_MINT,
+        }),
+      );
+    }
 
     const taskQueue = new PublicKey(DEFAULT_HPL_CRONS_TASK_QUEUE);
     const perPositionAccounts = positions.flatMap(({ positionMint }) => {

@@ -14,6 +14,9 @@ import { MAX_COMPUTE_UNITS, tableComputeUnits } from "./computeUnitTable";
 const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;
 export const MAX_PRIO_FEE = 2500000;
 
+// Headroom over simulated (or table-bounded) compute for runtime drift.
+export const DEFAULT_COMPUTE_SCALE_UP = 1.1;
+
 // Fallback loaded-accounts data size when simulation can't measure it —
 // same role the CU table plays for compute units. SIMD-0553 charges the
 // REQUESTED size (8 cost units per 32 KiB), so the primary path derives the
@@ -263,7 +266,7 @@ export async function withPriorityFees({
   basePriorityFee,
   maxPriorityFee = MAX_PRIO_FEE,
   priorityFeeOptions,
-  computeScaleUp = 1.1,
+  computeScaleUp = DEFAULT_COMPUTE_SCALE_UP,
   // Explicit value pins the limit; when omitted it's derived from the
   // simulation's measured size, or left unset (runtime 64 MiB default) when
   // no simulation validated a ceiling.
@@ -352,7 +355,7 @@ export async function withPriorityFees({
     });
     let budget = await estimateComputeBudget(
       connection,
-      toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),
+      await toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),
       { computeScaleUp }
     );
     // Whether the sim that produced `budget` ran under our injected ceiling —
@@ -371,7 +374,7 @@ export async function withPriorityFees({
         // runtime 64 MiB default.
         budget = await estimateComputeBudget(
           connection,
-          toVersionedTx({
+          await toVersionedTx({
             ...tx,
             instructions: prependComputeBudgetIxs(tx.instructions, {
               computeUnits: MAX_COMPUTE_UNITS,

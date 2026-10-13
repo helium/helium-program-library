@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { SOLANA_URL } from "../env";
 
 anchor.setProvider(anchor.AnchorProvider.local(SOLANA_URL));

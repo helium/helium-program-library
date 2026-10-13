@@ -41,7 +41,7 @@ import { env } from "../env";
 import { createSolanaConnection } from "../solana";
 import { initHemLocal } from "../utils/hotspot-helpers";
 
-import type { AnchorProvider, IdlTypes, Program } from "@coral-xyz/anchor";
+import type { AnchorProvider, IdlTypes, Program } from "@anchor-lang/core";
 
 type HemProgram = Awaited<ReturnType<typeof initHemLocal>>;
 type HemIdl = HemProgram extends Program<infer T> ? T : never;
