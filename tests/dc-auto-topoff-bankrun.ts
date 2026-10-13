@@ -865,6 +865,39 @@ describe("dc-auto-topoff under bankrun", () => {
       );
     });
 
+    it("leaves a task larger than the decode limit queued", async () => {
+      // A compiled transaction with 90 account keys, no instructions and no signer seeds. It is
+      // written onto the task directly.
+      const largeTransaction = Buffer.concat([
+        Buffer.from([0, 0, 0, 0, 90, 0, 0, 0]),
+        Buffer.alloc(32 * 90, 7),
+        Buffer.alloc(8),
+      ]);
+      const own = (await readAccount(ctx, closeAccounts.nextTask))!;
+      const transaction = tuktukProgram.coder.types.encode(
+        "transactionSourceV0",
+        tuktukProgram.coder.accounts.decode("taskV0", own).transaction
+      );
+      const at = own.indexOf(transaction);
+      expect(at).to.be.greaterThan(-1);
+      const large = Buffer.concat([
+        own.subarray(0, at),
+        largeTransaction,
+        own.subarray(at + transaction.length),
+      ]);
+      expect(large.length).to.be.greaterThan(2048);
+      await overwriteAccountData(ctx, closeAccounts.nextTask, large);
+
+      await program.methods.closeDcaV0().accountsPartial(closeAccounts).rpc();
+
+      expect(await readAccount(ctx, closeAccounts.nextTask)).to.deep.equal(
+        large
+      );
+      expect(await readAccount(ctx, dca), "the DCA should be closed").to.equal(
+        null
+      );
+    });
+
     it("refuses a signer that is not the top off's authority", async () => {
       const stranger = Keypair.generate();
       await expectAnchorError(
