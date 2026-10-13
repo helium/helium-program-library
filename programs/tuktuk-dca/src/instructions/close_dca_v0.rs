@@ -13,7 +13,7 @@ use tuktuk_program::{
   TaskQueueAuthorityV0, TaskV0,
 };
 
-use crate::{dca_seeds, queue_authority_seeds, state::*};
+use crate::{dca_seeds, errors::ErrorCode, queue_authority_seeds, state::*};
 
 #[derive(Accounts)]
 pub struct CloseDcaV0<'info> {
@@ -74,7 +74,26 @@ pub struct CloseDcaV0<'info> {
   pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
+/// The account that `task` names as its rent refund: one of `candidates`, or a writable account
+/// in `remaining_accounts`.
+pub fn rent_refund_account<'info>(
+  task: &AccountInfo,
+  candidates: &[AccountInfo<'info>],
+  remaining_accounts: &[AccountInfo<'info>],
+) -> Result<AccountInfo<'info>> {
+  let rent_refund = try_from!(Account<TaskV0>, task)?.rent_refund;
+  if let Some(account) = candidates.iter().find(|a| a.key() == rent_refund) {
+    return Ok(account.clone());
+  }
+  let account = remaining_accounts
+    .iter()
+    .find(|a| a.key() == rent_refund)
+    .ok_or(ErrorCode::RentRefundAccountMissing)?;
+  require!(account.is_writable, ErrorCode::RentRefundAccountNotWritable);
+  Ok(account.clone())
+}
+
+pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, CloseDcaV0<'info>>) -> Result<()> {
   let dca = ctx.accounts.dca.load()?;
   let authority = dca.authority;
   let input_mint = dca.input_mint;
@@ -123,17 +142,22 @@ pub fn handler(ctx: Context<CloseDcaV0>) -> Result<()> {
     if next_task.queued_at != ctx.accounts.dca.load()?.queued_at {
       return Ok(());
     }
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_task,
+      &[
+        ctx.accounts.authority.to_account_info(),
+        ctx.accounts.rent_refund.to_account_info(),
+        ctx.accounts.task_queue.to_account_info(),
+      ],
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: if next_task.rent_refund == ctx.accounts.rent_refund.key() {
-          ctx.accounts.rent_refund.to_account_info()
-        } else {
-          ctx.accounts.task_queue.to_account_info()
-        },
+        rent_refund,
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(ctx.bumps.queue_authority)],

@@ -60,7 +60,7 @@ pub mod tuktuk_dca {
     instructions::initialize_dca_v0::handler_nested(ctx, args)
   }
 
-  pub fn close_dca_v0(ctx: Context<CloseDcaV0>) -> Result<()> {
+  pub fn close_dca_v0<'info>(ctx: Context<'_, '_, '_, 'info, CloseDcaV0<'info>>) -> Result<()> {
     instructions::close_dca_v0::handler(ctx)
   }
 
