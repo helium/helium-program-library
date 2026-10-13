@@ -13,6 +13,7 @@ import {
   taskQueueNameMappingKey,
   tuktukConfigKey,
 } from "@helium/tuktuk-sdk";
+import { createMemoInstruction } from "@solana/spl-memo";
 import {
   AccountLayout,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -23,6 +24,7 @@ import {
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
+  AccountMeta,
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
@@ -95,6 +97,20 @@ const SUB_DAO = new PublicKey("Gm9xDCJawDEKDrrQW6haw94gABaYzQwCq4ZQU8h8bd22");
 const CIRCUIT_BREAKER = new PublicKey(
   "sZgXQVqAv9atfSuwNJnHgSf4tqsos6kRajANmBaBmSx"
 );
+
+const RENT_REFUND_MISSING =
+  "Error Code: RentRefundAccountMissing. Error Number: 6013.";
+const RENT_REFUND_NOT_WRITABLE =
+  "Error Code: RentRefundAccountNotWritable. Error Number: 6014.";
+// The same two errors of tuktuk-dca, which a close_dca_v0 reaches by CPI.
+const DCA_RENT_REFUND_MISSING =
+  "Error Code: RentRefundAccountMissing. Error Number: 6010.";
+const DCA_RENT_REFUND_NOT_WRITABLE =
+  "Error Code: RentRefundAccountNotWritable. Error Number: 6011.";
+const LEGS = [
+  { leg: "DC", field: "nextTask" },
+  { leg: "HNT", field: "nextHntTask" },
+] as const;
 
 /** A fixed-width byte array field, as the IDL declares it. */
 const padded = (text: string, width: number) => {
@@ -180,6 +196,7 @@ describe("dc-auto-topoff under bankrun", () => {
         ensureCloned("hnt_price_feed", HNT_PRICE_FEED),
         ensureCloned("usdc_price_feed", USDC_PRICE_FEED),
         ensureCloned("dao", DAO),
+        ensureCloned("hnt_mint", MAINNET_HNT_MINT),
         ensureCloned("delegated_data_credits", DELEGATED_DATA_CREDITS),
         ensureCloned("dc_escrow", ESCROW_ACCOUNT),
       ]
@@ -357,8 +374,8 @@ describe("dc-auto-topoff under bankrun", () => {
     };
   }
 
-  /** Queues both legs on the next free task ids with schedule_task_v0. */
-  async function scheduleBothLegs(autoTopOff: PublicKey) {
+  /** Queues both legs on the next free task ids with schedule_task_v0, paid for by `payer`. */
+  async function scheduleBothLegs(autoTopOff: PublicKey, payer?: Keypair) {
     const { taskBitmap, capacity } =
       await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
     const [taskId, hntTaskId] = nextAvailableTaskIds(
@@ -373,36 +390,60 @@ describe("dc-auto-topoff under bankrun", () => {
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
       ])
       .accounts({
-        payer: me,
+        payer: payer?.publicKey ?? me,
         autoTopOff,
         task: taskKey(taskQueue, taskId)[0],
         hntTask: taskKey(taskQueue, hntTaskId)[0],
       })
+      .signers(payer ? [payer] : [])
       .rpc();
     return { taskId, hntTaskId };
   }
 
+  // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
+  // queue_task_v0 created and the queue itself for one a run returned. A leg that was already
+  // dequeued has no task to read, and the instructions that dequeue skip it, so any address does.
+  // Read through banksClient: anchor's fetchNullable goes through BankrunConnectionProxy,
+  // which throws on a missing account rather than returning null.
+  const refundFor = async (task: PublicKey) => {
+    const data = await readAccount(ctx, task);
+    return data && data.length > 0
+      ? (tuktukProgram.coder.accounts.decode("taskV0", data)
+          .rentRefund as PublicKey)
+      : me;
+  };
+
+  const rentRefundMeta = (
+    pubkey: PublicKey,
+    isWritable = true
+  ): AccountMeta => ({ pubkey, isWritable, isSigner: false });
+
+  /**
+   * Writes `rentRefund` onto the task. Tuktuk gives a task the payer that queued it or the task
+   * queue, so any other rent refund is written straight to the ledger.
+   */
+  const nameRentRefund = async (task: PublicKey, rentRefund: PublicKey) =>
+    overwriteAccountData(
+      ctx,
+      task,
+      await tuktukProgram.coder.accounts.encode("taskV0", {
+        ...(await tuktukProgram.account.taskV0.fetch(task)),
+        rentRefund,
+      })
+    );
+
   /**
    * Frees both task addresses the top off recorded, leaving `next_task` / `next_hnt_task`
-   * naming addresses no task occupies. A `schedule` is stored by the same update.
+   * naming addresses no task occupies. A `schedule` is stored by the same update. Given
+   * `remainingAccounts`, the update names `me` as both task rent refunds, so any other rent
+   * refund has to come from the remaining accounts.
    */
   async function dequeueBothLegs(
     autoTopOff: PublicKey,
-    schedule: string | null = null
+    schedule: string | null = null,
+    remainingAccounts?: AccountMeta[]
   ) {
     const state = await program.account.autoTopOffV0.fetch(autoTopOff);
-    // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
-    // queue_task_v0 created and the queue itself for one a run returned. A leg that was already
-    // dequeued has no task to read, and update_auto_top_off_v0 skips it, so any address does.
-    // Read through banksClient: anchor's fetchNullable goes through BankrunConnectionProxy,
-    // which throws on a missing account rather than returning null.
-    const refundFor = async (task: PublicKey) => {
-      const data = await readAccount(ctx, task);
-      return data && data.length > 0
-        ? (tuktukProgram.coder.accounts.decode("taskV0", data)
-            .rentRefund as PublicKey)
-        : me;
-    };
     await program.methods
       .updateAutoTopOffV0({
         schedule,
@@ -419,13 +460,16 @@ describe("dc-auto-topoff under bankrun", () => {
         taskQueue,
         nextTask: state.nextTask,
         nextHntTask: state.nextHntTask,
-        taskRentRefund: await refundFor(state.nextTask),
-        hntTaskRentRefund: await refundFor(state.nextHntTask),
+        taskRentRefund: remainingAccounts ? me : await refundFor(state.nextTask),
+        hntTaskRentRefund: remainingAccounts
+          ? me
+          : await refundFor(state.nextHntTask),
         // The mint is not being changed, so the leg keeps the one it has.
         dcaMint: null,
         dcaMintAccount: null,
         currentDcaMintAccount: null,
       })
+      .remainingAccounts(remainingAccounts ?? [])
       .rpc();
   }
 
@@ -528,6 +572,62 @@ describe("dc-auto-topoff under bankrun", () => {
       .signers([otherAuthority])
       .rpc();
     return taskKey(taskQueue, taskId)[0];
+  }
+
+  /**
+   * Queues a memo task at each id. The transaction of a memo task names no top off.
+   */
+  async function queueMemoTasksAt(taskIds: number[]) {
+    const { transaction, remainingAccounts } = compileTransaction(
+      [createMemoInstruction("memo", [])],
+      []
+    );
+    for (const id of taskIds) {
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id,
+          trigger: { now: {} },
+          transaction: { compiledV0: [transaction] },
+          crankReward: null,
+          freeTasks: 0,
+          description: "memo",
+        })
+        .accounts({
+          payer: me,
+          queueAuthority: otherAuthority.publicKey,
+          taskQueueAuthority: taskQueueAuthorityKey(
+            taskQueue,
+            otherAuthority.publicKey
+          )[0],
+          taskQueue,
+          task: taskKey(taskQueue, id)[0],
+        })
+        .remainingAccounts(remainingAccounts)
+        .signers([otherAuthority])
+        .rpc();
+    }
+  }
+
+  /**
+   * Queues a memo task at each address the top off records. Returns those addresses.
+   */
+  async function memoTasksAtRecordedLegs(autoTopOff: PublicKey) {
+    const { nextTask, nextHntTask } =
+      await program.account.autoTopOffV0.fetch(autoTopOff);
+    const own = await Promise.all(
+      [nextTask, nextHntTask].map((task) =>
+        tuktukProgram.account.taskV0.fetch(task)
+      )
+    );
+    for (const task of own) {
+      // Each task that schedule_task_v0 queued names the top off.
+      expect(
+        task.transaction.compiledV0![0].accounts.map((a) => a.toBase58())
+      ).to.include(autoTopOff.toBase58());
+    }
+    await freeRecordedLegs(autoTopOff);
+    await queueMemoTasksAt(own.map((task) => task.id));
+    return { nextTask, nextHntTask };
   }
 
   // Every transaction in one bankrun context carries the same blockhash, so two cranks of the
@@ -684,6 +784,59 @@ describe("dc-auto-topoff under bankrun", () => {
         (held + inDca).toString()
       );
       expect(await readAccount(ctx, dca)).to.equal(null);
+    });
+
+    it("refunds the DCA's task to the task queue with no remaining account", async () => {
+      expect((await refundFor(closeAccounts.nextTask)).toBase58()).to.equal(
+        taskQueue.toBase58()
+      );
+      const taskLamports = await lamportsOf(closeAccounts.nextTask);
+      const queueBefore = await lamportsOf(taskQueue);
+
+      await program.methods.closeDcaV0().accountsPartial(closeAccounts).rpc();
+
+      expect(await readAccount(ctx, closeAccounts.nextTask)).to.equal(null);
+      expect(await readAccount(ctx, dca)).to.equal(null);
+      expect(await lamportsOf(taskQueue)).to.equal(queueBefore + taskLamports);
+    });
+
+    describe("with a task whose rent refund is no account of the instruction", () => {
+      let rentRefund: PublicKey;
+
+      const close = (remainingAccounts: AccountMeta[]) =>
+        program.methods
+          .closeDcaV0()
+          .accountsPartial(closeAccounts)
+          .remainingAccounts(remainingAccounts)
+          .rpc();
+
+      beforeEach(async () => {
+        rentRefund = Keypair.generate().publicKey;
+        await nameRentRefund(closeAccounts.nextTask, rentRefund);
+      });
+
+      it("refunds the task to a writable remaining account", async () => {
+        const taskLamports = await lamportsOf(closeAccounts.nextTask);
+
+        await close([rentRefundMeta(rentRefund)]);
+
+        expect(await readAccount(ctx, closeAccounts.nextTask)).to.equal(null);
+        expect(await readAccount(ctx, dca)).to.equal(null);
+        expect(await lamportsOf(rentRefund)).to.equal(taskLamports);
+      });
+
+      it("fails when the rent refund is not passed", async () => {
+        await expectError(DCA_RENT_REFUND_MISSING, close([]));
+        expect(await readAccount(ctx, dca)).to.not.equal(null);
+      });
+
+      it("fails when the rent refund is a read-only remaining account", async () => {
+        await expectError(
+          DCA_RENT_REFUND_NOT_WRITABLE,
+          close([rentRefundMeta(rentRefund, false)])
+        );
+        expect(await readAccount(ctx, dca)).to.not.equal(null);
+      });
     });
 
     it("leaves a task at the recorded address that this DCA did not queue", async () => {
@@ -1033,6 +1186,60 @@ describe("dc-auto-topoff under bankrun", () => {
       );
     });
 
+    it("leaves tasks whose transaction does not name the top off queued", async () => {
+      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
+      const { nextTask, nextHntTask } = await memoTasksAtRecordedLegs(autoTopOff);
+      const task = await readAccount(ctx, nextTask);
+      const hntTask = await readAccount(ctx, nextHntTask);
+      expect(task).to.not.equal(null);
+      expect(hntTask).to.not.equal(null);
+
+      await dequeueBothLegs(autoTopOff);
+
+      expect(await readAccount(ctx, nextTask)).to.deep.equal(task);
+      expect(await readAccount(ctx, nextHntTask)).to.deep.equal(hntTask);
+      const after = await program.account.autoTopOffV0.fetch(autoTopOff);
+      expect(after.nextTask.toBase58()).to.equal(autoTopOff.toBase58());
+      expect(after.nextHntTask.toBase58()).to.equal(autoTopOff.toBase58());
+    });
+
+    for (const { leg, field } of LEGS) {
+      describe(`with a ${leg} task whose rent refund is no account of the instruction`, () => {
+        let autoTopOff: PublicKey;
+        let task: PublicKey;
+        let rentRefund: PublicKey;
+
+        beforeEach(async () => {
+          autoTopOff = (await autoTopOffWith(50_000_000, 1_000_000_000)).autoTopOff;
+          task = (await program.account.autoTopOffV0.fetch(autoTopOff))[field];
+          rentRefund = Keypair.generate().publicKey;
+          await nameRentRefund(task, rentRefund);
+        });
+
+        it("refunds the task to a writable remaining account", async () => {
+          const taskLamports = await lamportsOf(task);
+
+          await dequeueBothLegs(autoTopOff, null, [rentRefundMeta(rentRefund)]);
+
+          expect(await readAccount(ctx, task)).to.equal(null);
+          expect(await lamportsOf(rentRefund)).to.equal(taskLamports);
+        });
+
+        it("fails when the rent refund is not passed", async () => {
+          await expectError(RENT_REFUND_MISSING, dequeueBothLegs(autoTopOff, null, []));
+          expect(await readAccount(ctx, task)).to.not.equal(null);
+        });
+
+        it("fails when the rent refund is a read-only remaining account", async () => {
+          await expectError(
+            RENT_REFUND_NOT_WRITABLE,
+            dequeueBothLegs(autoTopOff, null, [rentRefundMeta(rentRefund, false)])
+          );
+          expect(await readAccount(ctx, task)).to.not.equal(null);
+        });
+      });
+    }
+
     it("leaves the DCA mint alone when it is not passed", async () => {
       const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
       const before = await program.account.autoTopOffV0.fetch(autoTopOff);
@@ -1185,6 +1392,200 @@ describe("dc-auto-topoff under bankrun", () => {
         getAssociatedTokenAddressSync(newMint, autoTopOff, true).toBase58(),
       );
     });
+  });
+
+  describe("closing the top off", () => {
+    /**
+     * A top off close_auto_top_off_v0 accepts, with both legs queued by `payer`, or by `me`
+     * without one. The close parses the dao and its HNT mint and closes the HNT and DC accounts,
+     * so each is a real account.
+     */
+    async function closableAutoTopOff(payer?: Keypair) {
+      const [autoTopOff] = autoTopOffKey(DELEGATED_DATA_CREDITS, me);
+      const { autoTopOff: created } = await autoTopOffWith(
+        50_000_000,
+        1_000_000_000,
+        1_000_000_000n,
+        {
+          delegatedDataCredits: DELEGATED_DATA_CREDITS,
+          dataCredits: DATA_CREDITS,
+          subDao: SUB_DAO,
+          dao: DAO,
+          dcMint: DC_MINT,
+          hntMint: MAINNET_HNT_MINT,
+          hntAccount: await ataWith(MAINNET_HNT_MINT, autoTopOff, 0n),
+          escrowAccount: ESCROW_ACCOUNT,
+          circuitBreaker: CIRCUIT_BREAKER,
+          dcAccount: await ataWith(await createMint(0), autoTopOff, 0n),
+        }
+      );
+      expect(created.toBase58()).to.equal(autoTopOff.toBase58());
+      if (!payer) return autoTopOff;
+      // The fixture queued both legs as `me`, which also pays for the close. Queue them again
+      // as `payer`, so the refund lands on an account the close moves nothing else through.
+      await send([
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: payer.publicKey,
+          lamports: 1_000_000_000,
+        }),
+      ]);
+      await dequeueBothLegs(autoTopOff);
+      await scheduleBothLegs(autoTopOff, payer);
+      return autoTopOff;
+    }
+
+    /**
+     * What tuktuk holds in a task, and so what a dequeue refunds: rent exemption for the task's
+     * size, and its crank reward, which is this queue's min_crank_reward of 1.
+     */
+    const lamportsHeldBy = async (task: PublicKey) =>
+      (await provider.connection.getMinimumBalanceForRentExemption(
+        (await readAccount(ctx, task))!.length
+      )) + 1;
+
+    const closeTopOff = (
+      autoTopOff: PublicKey,
+      remainingAccounts: AccountMeta[] = []
+    ) =>
+      program.methods
+        .closeAutoTopOffV0()
+        .accounts({
+          autoTopOff,
+          rentRefund: me,
+          hntMint: MAINNET_HNT_MINT,
+        })
+        .remainingAccounts(remainingAccounts)
+        .rpc();
+
+    it("refunds tasks the authority queued with no remaining account", async () => {
+      const autoTopOff = await closableAutoTopOff();
+      const { nextTask, nextHntTask } =
+        await program.account.autoTopOffV0.fetch(autoTopOff);
+      expect((await refundFor(nextTask)).toBase58()).to.equal(me.toBase58());
+      expect((await refundFor(nextHntTask)).toBase58()).to.equal(me.toBase58());
+
+      await closeTopOff(autoTopOff);
+
+      expect(await readAccount(ctx, nextTask)).to.equal(null);
+      expect(await readAccount(ctx, nextHntTask)).to.equal(null);
+      expect(await readAccount(ctx, autoTopOff)).to.equal(null);
+    });
+
+    it("refunds each task's rent to the payer that queued it", async () => {
+      const payer = Keypair.generate();
+      const autoTopOff = await closableAutoTopOff(payer);
+      const { nextTask, nextHntTask } =
+        await program.account.autoTopOffV0.fetch(autoTopOff);
+      const taskRentRefund = await refundFor(nextTask);
+      const hntTaskRentRefund = await refundFor(nextHntTask);
+      expect(taskRentRefund.toBase58()).to.equal(payer.publicKey.toBase58());
+      expect(hntTaskRentRefund.toBase58()).to.equal(
+        payer.publicKey.toBase58()
+      );
+      const taskLamports = await lamportsHeldBy(nextTask);
+      const hntTaskLamports = await lamportsHeldBy(nextHntTask);
+      expect(await lamportsOf(nextTask)).to.equal(taskLamports);
+      expect(await lamportsOf(nextHntTask)).to.equal(hntTaskLamports);
+      const before = await lamportsOf(payer.publicKey);
+
+      await closeTopOff(autoTopOff, [rentRefundMeta(payer.publicKey)]);
+
+      expect(await readAccount(ctx, nextTask)).to.equal(null);
+      expect(await readAccount(ctx, nextHntTask)).to.equal(null);
+      expect(await readAccount(ctx, autoTopOff)).to.equal(null);
+      expect(await lamportsOf(payer.publicKey)).to.equal(
+        before + taskLamports + hntTaskLamports
+      );
+    });
+
+    it("refunds a task that a run returned to the task queue", async () => {
+      const payer = Keypair.generate();
+      const autoTopOff = await closableAutoTopOff(payer);
+      const due = await program.account.autoTopOffV0.fetch(autoTopOff);
+      await warpTo(ctx, BigInt(due.nextTaskTime.toString()) + 1n);
+      await crank(due.nextTask);
+
+      const { nextTask, nextHntTask } =
+        await program.account.autoTopOffV0.fetch(autoTopOff);
+      const taskRentRefund = await refundFor(nextTask);
+      const hntTaskRentRefund = await refundFor(nextHntTask);
+      expect(taskRentRefund.toBase58()).to.equal(
+        taskQueue.toBase58(),
+        "the run should have returned a DC task that refunds to the task queue"
+      );
+      expect(hntTaskRentRefund.toBase58()).to.equal(
+        payer.publicKey.toBase58()
+      );
+      const taskLamports = await lamportsHeldBy(nextTask);
+      const hntTaskLamports = await lamportsHeldBy(nextHntTask);
+      expect(await lamportsOf(nextTask)).to.equal(taskLamports);
+      expect(await lamportsOf(nextHntTask)).to.equal(hntTaskLamports);
+      const queueBefore = await lamportsOf(taskQueue);
+      const payerBefore = await lamportsOf(payer.publicKey);
+
+      await closeTopOff(autoTopOff, [rentRefundMeta(payer.publicKey)]);
+
+      expect(await readAccount(ctx, nextTask)).to.equal(null);
+      expect(await readAccount(ctx, nextHntTask)).to.equal(null);
+      expect(await readAccount(ctx, autoTopOff)).to.equal(null);
+      expect(await lamportsOf(taskQueue)).to.equal(queueBefore + taskLamports);
+      expect(await lamportsOf(payer.publicKey)).to.equal(
+        payerBefore + hntTaskLamports
+      );
+    });
+
+    it("leaves tasks whose transaction does not name the top off queued", async () => {
+      const autoTopOff = await closableAutoTopOff(Keypair.generate());
+      const { nextTask, nextHntTask } = await memoTasksAtRecordedLegs(autoTopOff);
+      const task = await readAccount(ctx, nextTask);
+      const hntTask = await readAccount(ctx, nextHntTask);
+      expect(task).to.not.equal(null);
+      expect(hntTask).to.not.equal(null);
+
+      await closeTopOff(autoTopOff);
+
+      expect(await readAccount(ctx, nextTask)).to.deep.equal(task);
+      expect(await readAccount(ctx, nextHntTask)).to.deep.equal(hntTask);
+      expect(await readAccount(ctx, autoTopOff)).to.equal(null);
+    });
+
+    for (const { leg, field } of LEGS) {
+      describe(`with a ${leg} task whose rent refund is no account of the instruction`, () => {
+        let autoTopOff: PublicKey;
+        let task: PublicKey;
+        let rentRefund: PublicKey;
+
+        beforeEach(async () => {
+          autoTopOff = await closableAutoTopOff();
+          task = (await program.account.autoTopOffV0.fetch(autoTopOff))[field];
+          rentRefund = Keypair.generate().publicKey;
+          await nameRentRefund(task, rentRefund);
+        });
+
+        it("refunds the task to a writable remaining account", async () => {
+          const taskLamports = await lamportsOf(task);
+
+          await closeTopOff(autoTopOff, [rentRefundMeta(rentRefund)]);
+
+          expect(await readAccount(ctx, task)).to.equal(null);
+          expect(await lamportsOf(rentRefund)).to.equal(taskLamports);
+        });
+
+        it("fails when the rent refund is not passed", async () => {
+          await expectError(RENT_REFUND_MISSING, closeTopOff(autoTopOff, []));
+          expect(await readAccount(ctx, task)).to.not.equal(null);
+        });
+
+        it("fails when the rent refund is a read-only remaining account", async () => {
+          await expectError(
+            RENT_REFUND_NOT_WRITABLE,
+            closeTopOff(autoTopOff, [rentRefundMeta(rentRefund, false)])
+          );
+          expect(await readAccount(ctx, task)).to.not.equal(null);
+        });
+      });
+    }
   });
 
   it("runs the DC leg on its own schedule, not on the address alone", async () => {
