@@ -32,6 +32,7 @@ import {
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
+import { resolveTaskRentRefund } from "./mini-fanout-utils";
 import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 import {
   init as initTuktuk,
@@ -236,6 +237,14 @@ export async function run(args: any = process.argv) {
         autoTopOff: autoTopOff!,
         rentRefund: authority,
       })
+      .remainingAccounts(
+        await resolveTaskRentRefund(
+          tuktukProgram,
+          [autoTopOffAcc.nextTask, autoTopOffAcc.nextHntTask],
+          autoTopOff!,
+          dcAutoTopoffProgram.programId
+        )
+      )
       .instruction();
     instructions.push(closeIx);
 

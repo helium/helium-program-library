@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.14.1
+
+### Patch Changes
+
+- [#1354](https://github.com/helium/helium-program-library/pull/1354) [`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297) Thanks [@bryzettler](https://github.com/bryzettler)! - Raise the compute unit table rows of six instructions that dequeue a task (`dc_auto_top`, `hpl_crons`, `mini_fanout`, `tuktuk_dca`) to the highest measured sample.
+
 ## 0.14.0
 
 ### Minor Changes

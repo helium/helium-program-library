@@ -171,6 +171,13 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
           : await tuktukProgram.account.taskV0.fetchNullable(
               miniFanoutAccount.nextTask
             );
+        const preTask =
+          miniFanoutAccount.preTask &&
+          !miniFanoutAccount.nextPreTask.equals(miniFanout)
+            ? await tuktukProgram.account.taskV0.fetchNullable(
+                miniFanoutAccount.nextPreTask
+              )
+            : null;
 
         const closeIx = await mfProgram.methods
           .closeMiniFanoutV0()
@@ -179,6 +186,17 @@ export const deleteMethod = publicProcedure.rewardContract.delete.handler(
             taskRentRefund:
               task?.rentRefund || new PublicKey(signerWalletAddress),
           })
+          .remainingAccounts(
+            preTask
+              ? [
+                  {
+                    pubkey: preTask.rentRefund,
+                    isWritable: true,
+                    isSigner: false,
+                  },
+                ]
+              : []
+          )
           .instruction();
 
         const setRecipientIx = await (

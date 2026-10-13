@@ -18,4 +18,8 @@ pub enum ErrorCode {
   TooManyFreeTasks,
   #[msg("Task queue does not match the epoch tracker's task queue")]
   InvalidTaskQueue,
+  #[msg("The rent refund of the task is not an account of the instruction")]
+  RentRefundAccountMissing,
+  #[msg("The rent refund of the task is not writable")]
+  RentRefundAccountNotWritable,
 }

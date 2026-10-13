@@ -191,10 +191,9 @@ describe("delegatePositions account resolution", () => {
 
   it("reads ownership and claim bots in batches, not once per position", async () => {
     // #given two undelegated positions to automate in one request
-    // One after the other: each create returns a Jito tip tx that is the same
-    // bytes for a given blockhash and tip account, so two submitted in the same
-    // slot collide as "already processed".
-    const positions: { positionMint: string }[] = [];
+    // One at a time: surfpool refused one of two creates sent together with
+    // "This transaction has already been processed".
+    const positions = [];
     for (let i = 0; i < 2; i++) {
       positions.push(
         await createAndFundPosition(ctx, {

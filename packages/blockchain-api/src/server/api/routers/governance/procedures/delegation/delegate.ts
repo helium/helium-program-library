@@ -30,6 +30,7 @@ import {
 } from "@helium/voter-stake-registry-sdk";
 import { NATIVE_MINT } from "@solana/spl-token";
 import {
+  AccountMeta,
   LAMPORTS_PER_SOL,
   PublicKey,
   SYSVAR_CLOCK_PUBKEY,
@@ -68,6 +69,8 @@ import {
   initDelegationClaimBotAccounts,
   startDelegationClaimBotAccounts,
   closeDelegationClaimBotAccounts,
+  fetchTaskRentRefunds,
+  delegationSubmitsInParallel,
 } from "../helpers";
 import type { InstructionGroup } from "../helpers";
 
@@ -169,6 +172,30 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
             )
         : Promise.resolve(null),
     ]);
+
+    // Tuktuk closes a bot's next task only to the rent refund that task names. One read per
+    // 100 tasks covers every bot that still points at a task.
+    const nextTaskKeys: PublicKey[] = [];
+    for (const bot of delegationClaimBots) {
+      if (bot && !bot.nextTask.equals(PublicKey.default)) {
+        nextTaskKeys.push(bot.nextTask);
+      }
+    }
+    const taskRentRefunds =
+      nextTaskKeys.length > 0
+        ? await import("@helium/tuktuk-sdk")
+            .then((m) => initCachedProgram(m.init, m.PROGRAM_ID, provider))
+            .then((tuktukProgram) =>
+              fetchTaskRentRefunds(connection, tuktukProgram, nextTaskKeys),
+            )
+        : new Map<string, PublicKey>();
+    /** The remaining accounts that let an instruction refund the task it dequeues. */
+    const taskRentRefundMetas = (nextTask: PublicKey): AccountMeta[] => {
+      const rentRefund = taskRentRefunds.get(nextTask.toBase58());
+      return rentRefund
+        ? [{ pubkey: rentRefund, isWritable: true, isSigner: false }]
+        : [];
+    };
 
     const registrarCache = new Map<
       string,
@@ -597,6 +624,7 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
                   rentRefund: claimBot.rentRefund,
                 }),
               )
+              .remainingAccounts(taskRentRefundMetas(claimBot.nextTask))
               .instruction(),
           );
         }
@@ -633,6 +661,9 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
                   dao: subDaoAcc.dao,
                   hntMint: HNT_MINT,
                 }),
+              )
+              .remainingAccounts(
+                claimBot ? taskRentRefundMetas(claimBot.nextTask) : [],
               )
               .instruction(),
           );
@@ -763,7 +794,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     return {
       transactionData: {
         transactions: allTransactions,
-        parallel: !hasClaimTransactions,
+        parallel: delegationSubmitsInParallel({
+          hasClaimTransactions,
+          positions: positionPlans,
+        }),
         tag,
         actionMetadata: {
           type: "delegation_delegate",

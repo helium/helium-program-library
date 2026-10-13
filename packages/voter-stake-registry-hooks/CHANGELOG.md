@@ -1,5 +1,21 @@
 # Change Log
 
+## 0.14.1
+
+### Patch Changes
+
+- [#1354](https://github.com/helium/helium-program-library/pull/1354) [`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297) Thanks [@bryzettler](https://github.com/bryzettler)! - Each task dequeue in `dc_auto_top`, `hpl_crons`, `mini_fanout`, and `tuktuk_dca` now refunds the task's rent to the account the task names as its `rent_refund`. The handler selects that account from the writable accounts of the instruction, then from the remaining accounts, where it must be writable. The account lists of the instructions do not change. Each program has two new errors, `RentRefundAccountMissing` and `RentRefundAccountNotWritable`.
+
+  `@helium/hpl-crons-sdk` adds `taskRentRefund(tuktukProgram, task)`. It reads a task and returns its rent refund as one writable remaining account, or an empty list when the task does not exist.
+
+  The governance hooks and the admin CLI commands that close or restart a task append that account when the instruction does not have it.
+
+- Updated dependencies [[`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297), [`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297)]:
+  - @helium/spl-utils@0.14.1
+  - @helium/hpl-crons-sdk@0.15.0
+  - @helium/idls@0.12.1
+  - @helium/automation-hooks@0.14.1
+
 ## 0.14.0
 
 ### Minor Changes

@@ -637,6 +637,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
           : await tuktukProgram.account.taskV0.fetchNullable(
               miniFanoutAccount.nextTask,
             );
+        const preTask =
+          miniFanoutAccount.preTask &&
+          !miniFanoutAccount.nextPreTask.equals(miniFanoutKey)
+            ? await tuktukProgram.account.taskV0.fetchNullable(
+                miniFanoutAccount.nextPreTask,
+              )
+            : null;
         closeGroup.push(
           await miniFanoutProgram.methods
             .closeMiniFanoutV0()
@@ -645,6 +652,17 @@ export const migrate = publicProcedure.migration.migrate.handler(
               owner: sourcePubkey,
               taskRentRefund: task?.rentRefund || feePayer,
             })
+            .remainingAccounts(
+              preTask
+                ? [
+                    {
+                      pubkey: preTask.rentRefund,
+                      isWritable: true,
+                      isSigner: false,
+                    },
+                  ]
+                : [],
+            )
             .instruction(),
         );
         groups.push(closeGroup);
