@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.14.2
+
+### Patch Changes
+
+- [#1357](https://github.com/helium/helium-program-library/pull/1357) [`efbc00f`](https://github.com/helium/helium-program-library/commit/efbc00f50e051366b2186b722d187312dfb12f18) Thanks [@bryzettler](https://github.com/bryzettler)! - Cap the `getRecentPrioritizationFees` fallback of `estimatePrioritizationFee` at `maxPriorityFee`, as the `getPriorityFeeEstimate` path already does.
+
 ## 0.14.1
 
 ### Patch Changes
