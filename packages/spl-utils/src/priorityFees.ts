@@ -132,7 +132,7 @@ export async function estimatePrioritizationFee(
     });
 
     if (priorityFees.length < 1) {
-      return Math.max(basePriorityFee || 0, 1);
+      return Math.min(maxPriorityFee, Math.max(basePriorityFee || 0, 1));
     }
 
     // get max priority fee per slot (and sort by slot from old to new)
@@ -166,7 +166,10 @@ export async function estimatePrioritizationFee(
             recentFees[mid].prioritizationFee) /
           2;
 
-    return Math.max(basePriorityFee || 1, Math.ceil(medianFee));
+    return Math.min(
+      maxPriorityFee,
+      Math.max(basePriorityFee || 1, Math.ceil(medianFee))
+    );
   }
 }
 
