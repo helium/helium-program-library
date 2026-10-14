@@ -1178,18 +1178,23 @@ describe("dc-auto-topoff under bankrun", () => {
 
   describe("an hourly schedule set a quarter hour before midnight UTC", () => {
     it("schedules the next run for midnight", async () => {
-      // Two day boundaries ahead, so the warp only moves the clock forward.
-      const day = 86_400n;
-      const now = (await ctx.banksClient.getClock()).unixTimestamp;
-      const midnight = (now / day + 2n) * day;
-      await warpTo(ctx, midnight - 15n * 60n);
+      // A fixed mid-month day, so the result does not depend on where earlier tests left the
+      // clock. The suite's clock is put back afterwards for the tests that follow.
+      // 2026-09-14 23:45:00 UTC, and the midnight that follows it.
+      const quarterToMidnight = 1_789_429_500n;
+      const midnight = 1_789_430_400n;
+      const suiteClock = (await ctx.banksClient.getClock()).unixTimestamp;
+      await warpTo(ctx, quarterToMidnight);
+      try {
+        const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
+        await dequeueBothLegs(autoTopOff, "0 0 * * * *");
+        await scheduleBothLegs(autoTopOff);
 
-      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
-      await dequeueBothLegs(autoTopOff, "0 0 * * * *");
-      await scheduleBothLegs(autoTopOff);
-
-      const scheduled = await program.account.autoTopOffV0.fetch(autoTopOff);
-      expect(scheduled.nextTaskTime.toString()).to.equal(midnight.toString());
+        const scheduled = await program.account.autoTopOffV0.fetch(autoTopOff);
+        expect(scheduled.nextTaskTime.toString()).to.equal(midnight.toString());
+      } finally {
+        await warpTo(ctx, suiteClock);
+      }
     });
   });
 
