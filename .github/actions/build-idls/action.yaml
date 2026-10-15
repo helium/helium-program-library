@@ -7,8 +7,12 @@ runs:
     - uses: ./.github/actions/setup/
 
     # Cache the FINAL consumed artifact. On hit we skip anchor + tsc entirely.
-    - uses: actions/cache@v4
-      name: Cache IDLs final artifact
+    # Every cache here is split into restore + save, and only develop and master save, as in
+    # build-anchor. A save from a `docker-*` tag or a PR ref can be restored by that ref alone, and
+    # the 1.3 GB `target/debug` copies they left filled the 10 GB store and evicted the develop
+    # seed every PR restores. npm-publish (push to develop) seeds these keys.
+    - uses: actions/cache/restore@v4
+      name: Restore IDLs final artifact
       id: cache-idls-lib
       with:
         path: |
@@ -22,9 +26,10 @@ runs:
     - uses: ./.github/actions/setup-anchor/
       if: steps.cache-idls-lib.outputs.cache-hit != 'true'
 
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       if: steps.cache-idls-lib.outputs.cache-hit != 'true'
-      name: Cache Cargo registry + index
+      name: Restore Cargo registry + index
+      id: cache-cargo-registry
       with:
         path: |
           ~/.cargo/registry/index/
@@ -36,9 +41,10 @@ runs:
 
     # `anchor idl build` runs `cargo test --features idl-build` on the program lib
     # (NOT a BPF build), so target/debug is what gets populated.
-    - uses: actions/cache@v4
+    - uses: actions/cache/restore@v4
       if: steps.cache-idls-lib.outputs.cache-hit != 'true'
-      name: Cache cargo target (idl build)
+      name: Restore cargo target (idl build)
+      id: cache-cargo-target
       with:
         path: ./target/debug
         key: cargo-target-idl-${{ runner.os }}-${{ env.ANCHOR_VERSION }}-${{ hashFiles('programs/**/*.rs', 'Cargo.lock') }}
@@ -69,3 +75,30 @@ runs:
       if: steps.cache-idls-lib.outputs.cache-hit != 'true'
       shell: bash
       run: pnpm turbo run build --filter=@helium/idls
+
+    - uses: actions/cache/save@v4
+      name: Save Cargo registry + index
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true' && steps.cache-cargo-registry.outputs.cache-hit != 'true' && (github.ref_name == 'develop' || github.ref_name == 'master')
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-${{ runner.os }}-idl-${{ hashFiles('**/Cargo.lock') }}
+
+    - uses: actions/cache/save@v4
+      name: Save cargo target (idl build)
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true' && steps.cache-cargo-target.outputs.cache-hit != 'true' && (github.ref_name == 'develop' || github.ref_name == 'master')
+      with:
+        path: ./target/debug
+        key: cargo-target-idl-${{ runner.os }}-${{ env.ANCHOR_VERSION }}-${{ hashFiles('programs/**/*.rs', 'Cargo.lock') }}
+
+    - uses: actions/cache/save@v4
+      name: Save IDLs final artifact
+      if: steps.cache-idls-lib.outputs.cache-hit != 'true' && (github.ref_name == 'develop' || github.ref_name == 'master')
+      with:
+        path: |
+          ./packages/idls/lib
+          ./target/idl
+          ./target/types
+        key: idls-lib-${{ runner.os }}-v0001-${{ env.ANCHOR_VERSION }}-${{ hashFiles('programs/**/*.rs', 'programs/**/Cargo.toml', 'utils/**/*.rs', 'utils/**/Cargo.toml', 'utils/**/idls/**', 'Cargo.lock', 'Anchor.toml') }}

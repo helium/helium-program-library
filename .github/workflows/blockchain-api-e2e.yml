@@ -256,7 +256,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-          cache: "pnpm"
+
+      # The pnpm store under setup-ts's key, which develop and master save. `cache: pnpm` on
+      # setup-node would hold a second copy of the same store under its own key.
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Restore pnpm store
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('./pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
 
       # download-artifact drops the executable bit.
       - name: Download surfpool binary
