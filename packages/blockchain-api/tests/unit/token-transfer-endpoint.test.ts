@@ -222,7 +222,7 @@ describe("POST /tokens/transfer fee payer", () => {
     ).catch((e) => e);
 
     expect((error as ORPCError<string, unknown>).message).to.eq(
-      "Insufficient SOL balance for transaction fees"
+      "Insufficient SOL balance for transaction fees and account rent"
     );
     // The stub's fee plus the min-wallet buffer, and not a lamport of the
     // 100_000_000 being transferred.

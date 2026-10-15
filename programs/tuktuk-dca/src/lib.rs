@@ -60,12 +60,19 @@ pub mod tuktuk_dca {
     instructions::initialize_dca_v0::handler_nested(ctx, args)
   }
 
-  pub fn close_dca_v0(ctx: Context<CloseDcaV0>) -> Result<()> {
+  pub fn close_dca_v0<'info>(ctx: Context<'_, '_, '_, 'info, CloseDcaV0<'info>>) -> Result<()> {
     instructions::close_dca_v0::handler(ctx)
   }
 
   pub fn lend_v0(ctx: Context<LendV0>) -> Result<()> {
     instructions::lend_v0::handler(ctx)
+  }
+
+  pub fn swap_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, SwapV0<'info>>,
+    args: SwapArgsV0,
+  ) -> Result<()> {
+    instructions::swap_v0::handler(ctx, args)
   }
 
   pub fn check_repay_v0(

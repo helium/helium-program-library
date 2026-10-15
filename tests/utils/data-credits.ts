@@ -1,4 +1,4 @@
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { PublicKey } from "@solana/web3.js";
 import { toBN } from "../../packages/spl-utils/src";

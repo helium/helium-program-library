@@ -60,14 +60,16 @@ pub mod dc_auto_top {
     instructions::top_off_hnt_v0::handler(ctx)
   }
 
-  pub fn update_auto_top_off_v0(
-    ctx: Context<UpdateAutoTopOffV0>,
+  pub fn update_auto_top_off_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateAutoTopOffV0<'info>>,
     args: UpdateAutoTopOffArgsV0,
   ) -> Result<()> {
     instructions::update_auto_top_off_v0::handler(ctx, args)
   }
 
-  pub fn close_auto_top_off_v0(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
+  pub fn close_auto_top_off_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, CloseAutoTopOffV0<'info>>,
+  ) -> Result<()> {
     instructions::close_auto_top_off_v0::handler(ctx)
   }
 
@@ -78,7 +80,7 @@ pub mod dc_auto_top {
     instructions::initialize_auto_top_off_v0::handler(ctx, args)
   }
 
-  pub fn close_dca_v0(ctx: Context<CloseDcaV0>) -> Result<()> {
+  pub fn close_dca_v0<'info>(ctx: Context<'_, '_, '_, 'info, CloseDcaV0<'info>>) -> Result<()> {
     instructions::close_dca_v0::handler(ctx)
   }
 

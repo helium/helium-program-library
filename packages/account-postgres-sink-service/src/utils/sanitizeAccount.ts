@@ -4,7 +4,7 @@ const sanitizeValue = (value: any): any => {
   if (value === "undefined" || value === null || value === "") return null;
   if (value instanceof Buffer) return value;
   if (value.toBase58) return value.toBase58();
-  if (value instanceof BN) {
+  if (BN.isBN(value)) {
     const val = value.toString();
     if (val == "") {
       return null;

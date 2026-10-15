@@ -1,5 +1,23 @@
 # Change Log
 
+## 0.11.22
+
+### Patch Changes
+
+- Updated dependencies [[`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297), [`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297)]:
+  - @helium/spl-utils@0.14.1
+  - @helium/hpl-crons-sdk@0.15.0
+  - @helium/idls@0.12.1
+
+## 0.11.21
+
+### Patch Changes
+
+- Updated dependencies [[`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0), [`6f11300`](https://github.com/helium/helium-program-library/commit/6f11300031422e9468dc9c0ad813fad9eaa76d3c), [`b26c94b`](https://github.com/helium/helium-program-library/commit/b26c94b2447cdc03eb0b997e7efcae7ed2891325), [`a9b1301`](https://github.com/helium/helium-program-library/commit/a9b13019bb52e8e9015f3fcfaabb4308c8aeddc6), [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283)]:
+  - @helium/hpl-crons-sdk@0.14.0
+  - @helium/idls@0.12.0
+  - @helium/spl-utils@0.14.0
+
 ## 0.11.20
 
 ### Patch Changes

@@ -161,8 +161,8 @@ export const multiTransfer = publicProcedure.tokens.multiTransfer.handler(
     if (walletBalance < requiredBalance) {
       throw errors.INSUFFICIENT_FUNDS({
         message: isSol
-          ? "Insufficient SOL balance for transfers and transaction fees"
-          : "Insufficient SOL balance for transaction fees",
+          ? "Insufficient SOL balance for transfers, transaction fees and account rent"
+          : "Insufficient SOL balance for transaction fees and account rent",
         data: { required: requiredBalance, available: walletBalance },
       });
     }

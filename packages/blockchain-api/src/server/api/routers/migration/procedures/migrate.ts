@@ -51,6 +51,7 @@ import {
   chunks,
   getAsset,
   getAssetProof,
+  getTransactionSizeLimit,
   HELIUM_COMMON_LUT,
   HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
@@ -636,6 +637,13 @@ export const migrate = publicProcedure.migration.migrate.handler(
           : await tuktukProgram.account.taskV0.fetchNullable(
               miniFanoutAccount.nextTask,
             );
+        const preTask =
+          miniFanoutAccount.preTask &&
+          !miniFanoutAccount.nextPreTask.equals(miniFanoutKey)
+            ? await tuktukProgram.account.taskV0.fetchNullable(
+                miniFanoutAccount.nextPreTask,
+              )
+            : null;
         closeGroup.push(
           await miniFanoutProgram.methods
             .closeMiniFanoutV0()
@@ -644,6 +652,17 @@ export const migrate = publicProcedure.migration.migrate.handler(
               owner: sourcePubkey,
               taskRentRefund: task?.rentRefund || feePayer,
             })
+            .remainingAccounts(
+              preTask
+                ? [
+                    {
+                      pubkey: preTask.rentRefund,
+                      isWritable: true,
+                      isSigner: false,
+                    },
+                  ]
+                : [],
+            )
             .instruction(),
         );
         groups.push(closeGroup);
@@ -826,6 +845,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       commitment: "finalized" as const,
       // Wallet-signed: guard ixs may be appended (see withPriorityFees).
       deriveLoadedAccountsDataSizeLimit: false,
+      version: 0 as const,
     };
 
     const addDrafts = (drafts: TransactionDraft[], description: string) => {
@@ -966,8 +986,9 @@ export const migrate = publicProcedure.migration.migrate.handler(
       // Try fitting the tip into an existing draft (last first, then others)
       for (let i = allDrafts.length - 1; i >= 0; i--) {
         allDrafts[i].instructions.push(tipIx);
-        const testTx = toVersionedTx(allDrafts[i]);
-        if (testTx.serialize().length <= 1232) {
+        const testTx = await toVersionedTx(allDrafts[i]);
+        // batchOpts pins these drafts to v0.
+        if (testTx.serialize().length <= getTransactionSizeLimit(0)) {
           tipPlaced = true;
           break;
         }
@@ -993,6 +1014,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
             ],
             feePayer,
             addressLookupTableAddresses: [lut],
+            version: 0,
           } as TransactionDraft);
           txMetadata.push({
             type: TRANSACTION_TYPES.MIGRATION,
@@ -1008,7 +1030,9 @@ export const migrate = publicProcedure.migration.migrate.handler(
     }
 
     // Step 5: Convert drafts to VersionedTransactions and sign with fee payer
-    const allTxs = allDrafts.map((draft) => toVersionedTx(draft));
+    const allTxs = await Promise.all(
+      allDrafts.map((draft) => toVersionedTx(draft)),
+    );
 
     // Determine which client wallets are required signers on a transaction
     function getRequiredClientSigners(

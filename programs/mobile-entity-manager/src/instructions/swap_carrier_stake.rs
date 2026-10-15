@@ -14,6 +14,7 @@ pub struct SwapCarrierStake<'info> {
   pub payer: Signer<'info>,
   pub update_authority: Signer<'info>,
   #[account(
+    mut,
     has_one = sub_dao,
     has_one = update_authority
   )]
@@ -100,6 +101,10 @@ pub fn handler(ctx: Context<SwapCarrierStake>) -> Result<()> {
     ),
     CARRIER_STAKE_AMOUNT,
   )?;
+
+  // The stake lives at a new address now. `escrow` is what every other instruction resolves
+  // the stake through, so leaving it naming the closed account puts the stake beyond reach.
+  ctx.accounts.carrier.escrow = ctx.accounts.new_escrow.key();
 
   Ok(())
 }

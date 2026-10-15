@@ -30,7 +30,7 @@ runs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
     # Key layout: build-<os>-<anchor version>-<anchor sha>-v0002-<devnet>-<testing>-<program>-<hash of programs/>.
     # The `programs/` hash is last so that everything identifying the build flavour sits in the
     # restore-keys prefix. A PR that touches `programs/**` can never hit the exact key, and with no

@@ -1,5 +1,37 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0) Thanks [@bryzettler](https://github.com/bryzettler)! - Move from `@coral-xyz/anchor` to `@anchor-lang/core` 0.31.2, the package Anchor now publishes its TypeScript client under. When a transaction lands and then fails, `sendAndConfirm` and `sendAll` now throw a `SendTransactionError` that holds the program logs and the original error message. Errors from `simulate` now also hold the program logs. With `@solana/web3.js` 1.92 or later, 0.31.1 lost them. Preflight failures are unchanged. `sendAndConfirm` and `sendAll` now fetch the blockhash at `commitment` when `preflightCommitment` is not set. SDK functions typed on `Program` reject a `Program` built from `@coral-xyz/anchor`, so consumers must import `Program` from `@anchor-lang/core`. A provider or IDL from either package is accepted. A pnpm or npm override can alias `@coral-xyz/anchor@^0.31` to `npm:@anchor-lang/core@0.31.2`. This override puts third-party SDKs on the same 0.31.2 code. Under npm, or pnpm with `node-linker=hoisted`, the override installs a second copy of the module, and `setProvider` state and `instanceof` checks do not cross between the two package names. Under the default pnpm linker, both names load one copy.
+
+### Patch Changes
+
+- Updated dependencies [[`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0), [`6f11300`](https://github.com/helium/helium-program-library/commit/6f11300031422e9468dc9c0ad813fad9eaa76d3c), [`7830992`](https://github.com/helium/helium-program-library/commit/78309926e86fd0de14a157d7e4c903fde04b3981), [`b26c94b`](https://github.com/helium/helium-program-library/commit/b26c94b2447cdc03eb0b997e7efcae7ed2891325), [`a9b1301`](https://github.com/helium/helium-program-library/commit/a9b13019bb52e8e9015f3fcfaabb4308c8aeddc6), [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283)]:
+  - @helium/anchor-resolvers@0.12.0
+  - @helium/helium-entity-manager-sdk@0.12.0
+  - @helium/idls@0.12.0
+  - @helium/spl-utils@0.14.0
+
+## 0.11.19
+
+### Patch Changes
+
+- [#1340](https://github.com/helium/helium-program-library/pull/1340) [`6382fde`](https://github.com/helium/helium-program-library/commit/6382fde9a155564851b6096a2bc698759b4c4977) Thanks [@madninja](https://github.com/madninja)! - Add `close_carrier_v0` and `close_incentive_program_v0` to `mobile-entity-manager`, and fix `swap_carrier_stake` to record the escrow it moves the stake to.
+
+  A carrier had no way to release its stake. `revoke_carrier_v0` only sets `approved = false`, and `swap_carrier_stake` is a collateral migration rather than a release: it returns the legacy DNT stake and posts `CARRIER_STAKE_AMOUNT` of HNT in the same instruction, so the collateral posted never falls.
+
+  `close_carrier_v0` transfers the escrow out, closes it, and closes the `CarrierV0`. It is signed by `sub_dao.authority`, matching approve and revoke, while `destination` is constrained to a token account owned by `carrier.update_authority`, so retiring a carrier cannot move its stake anywhere the carrier does not control. `!carrier.approved` is required. Close every `IncentiveEscrowProgramV0` under a carrier before the carrier itself: they are reached through the `CarrierV0` and cannot be closed once it is gone.
+
+  `close_incentive_program_v0` retires an incentive escrow program whose window has passed, signed by `issuing_authority`.
+
+  `swap_carrier_stake` previously left `carrier.escrow` naming the account it had just closed, which put the new stake beyond the reach of any instruction that resolves the escrow through that field. It now records the new escrow.
+
+- Updated dependencies [[`6382fde`](https://github.com/helium/helium-program-library/commit/6382fde9a155564851b6096a2bc698759b4c4977)]:
+  - @helium/idls@0.11.33
+  - @helium/spl-utils@0.13.5
+
 ## 0.11.18
 
 ### Patch Changes

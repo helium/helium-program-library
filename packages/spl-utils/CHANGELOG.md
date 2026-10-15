@@ -1,5 +1,55 @@
 # Change Log
 
+## 0.14.2
+
+### Patch Changes
+
+- [#1357](https://github.com/helium/helium-program-library/pull/1357) [`efbc00f`](https://github.com/helium/helium-program-library/commit/efbc00f50e051366b2186b722d187312dfb12f18) Thanks [@bryzettler](https://github.com/bryzettler)! - Cap the `getRecentPrioritizationFees` fallback of `estimatePrioritizationFee` at `maxPriorityFee`, as the `getPriorityFeeEstimate` path already does.
+
+## 0.14.1
+
+### Patch Changes
+
+- [#1354](https://github.com/helium/helium-program-library/pull/1354) [`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297) Thanks [@bryzettler](https://github.com/bryzettler)! - Raise the compute unit table rows of six instructions that dequeue a task (`dc_auto_top`, `hpl_crons`, `mini_fanout`, `tuktuk_dca`) to the highest measured sample.
+
+## 0.14.0
+
+### Minor Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0) Thanks [@bryzettler](https://github.com/bryzettler)! - Move from `@coral-xyz/anchor` to `@anchor-lang/core` 0.31.2, the package Anchor now publishes its TypeScript client under. When a transaction lands and then fails, `sendAndConfirm` and `sendAll` now throw a `SendTransactionError` that holds the program logs and the original error message. Errors from `simulate` now also hold the program logs. With `@solana/web3.js` 1.92 or later, 0.31.1 lost them. Preflight failures are unchanged. `sendAndConfirm` and `sendAll` now fetch the blockhash at `commitment` when `preflightCommitment` is not set. SDK functions typed on `Program` reject a `Program` built from `@coral-xyz/anchor`, so consumers must import `Program` from `@anchor-lang/core`. A provider or IDL from either package is accepted. A pnpm or npm override can alias `@coral-xyz/anchor@^0.31` to `npm:@anchor-lang/core@0.31.2`. This override puts third-party SDKs on the same 0.31.2 code. Under npm, or pnpm with `node-linker=hoisted`, the override installs a second copy of the module, and `setProvider` state and `instanceof` checks do not cross between the two package names. Under the default pnpm linker, both names load one copy.
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283) Thanks [@bryzettler](https://github.com/bryzettler)! - `@helium/spl-utils` now builds v1 transactions when the node and a keypair-backed signer support them. Wallet adapters stay on v0 unless a per-call `version` forces a version. `HPL_TX_VERSION=v0` forces v0. `HPL_TX_VERSION=v1` skips node detection, but a signer without v1 support still gets v0. Any `HPL_TX_VERSION` value other than `v0`, `v1` or `auto` throws. `sendInstructions` falls back to v0 when the instructions exceed the v1 limits, and takes an optional `version`. The batchers pick v1 or v0 for each transaction. Both batchers now throw when a single instruction group fits in no transaction version, instead of sending an oversize transaction. The `executeRemoteTxn` family, `executeBig`, `BigInstructionResult`, `sendMultipleInstructions` and `createNft` are no longer exported; `createNft` moved to the tests. `stringToTransaction` and `bufferToTransaction` are deprecated. `createAtaAndMint` and `createAtaAndTransfer` now honour only `commitment` from their `ConfirmOptions`. `mintTo`, `createMint` and `createAtaAndMint` now send through `sendInstructions` with preflight skipped. `@helium/sus` now simulates and prices v1 transactions. `TransactionCompletionQueue` now removes its websocket signature subscription when a confirmation wait resolves, fails or times out, instead of leaving it open on the shared connection. `bulkSendTransactions` and `bulkSendRawTransactions` no longer resend a transaction with an unsigned required signer until expiry. They send the signed ones, then throw "Missing signature for public key …". When an on-chain failure or blockhash expiry ends the call first, its error also names the missing signers found so far. `@helium/distributor-oracle` `minRent` now rejects, and does not cache, a rent of 0 from an RPC error body.
+
+### Patch Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`6f11300`](https://github.com/helium/helium-program-library/commit/6f11300031422e9468dc9c0ad813fad9eaa76d3c) Thanks [@bryzettler](https://github.com/bryzettler)! - `bulkSendTransactions` and `bulkSendRawTransactions` now throw a `BulkSendError` for an on-chain failure, a missing signer, or any error after a transaction landed. Its `landedSignatures` field lists the signatures of the transactions that landed before the throw, ordered by confirmation, so a caller can skip them on a resend. Read the field instead of using `instanceof`, because the CJS and ESM builds each define the class. The message keeps its old text. When an on-chain failure or blockhash expiry ends the call and a required signer is missing, the message names the failure, then the missing signers found so far. The original error is on `cause`. An error thrown before anything landed and with no missing signer is rethrown unchanged. `sendInstructions` throws it, with no landed signatures, for a missing signer. `onProgress` in `bulkSendTransactions` now counts only the transactions it sends in `totalTxs`, like `bulkSendRawTransactions`.
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`a9b1301`](https://github.com/helium/helium-program-library/commit/a9b13019bb52e8e9015f3fcfaabb4308c8aeddc6) Thanks [@bryzettler](https://github.com/bryzettler)! - Regenerate the bundled helium_entity_manager IDL that `fetchBackwardsCompatibleIdl` falls back to, so it matches the program (adds `serial` on `WifiInfoV0`), and add an `update-hem-idl` script that rebuilds it from the program.
+
+- Updated dependencies [[`9f99b45`](https://github.com/helium/helium-program-library/commit/9f99b458c442cd11909e7fccb4db33f373c33c8b), [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0), [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283)]:
+  - @helium/account-fetch-cache@0.11.17
+  - @helium/anchor-resolvers@0.12.0
+
+## 0.13.5
+
+### Patch Changes
+
+- [#1340](https://github.com/helium/helium-program-library/pull/1340) [`6382fde`](https://github.com/helium/helium-program-library/commit/6382fde9a155564851b6096a2bc698759b4c4977) Thanks [@madninja](https://github.com/madninja)! - Add `close_carrier_v0` and `close_incentive_program_v0` to `mobile-entity-manager`, and fix `swap_carrier_stake` to record the escrow it moves the stake to.
+
+  A carrier had no way to release its stake. `revoke_carrier_v0` only sets `approved = false`, and `swap_carrier_stake` is a collateral migration rather than a release: it returns the legacy DNT stake and posts `CARRIER_STAKE_AMOUNT` of HNT in the same instruction, so the collateral posted never falls.
+
+  `close_carrier_v0` transfers the escrow out, closes it, and closes the `CarrierV0`. It is signed by `sub_dao.authority`, matching approve and revoke, while `destination` is constrained to a token account owned by `carrier.update_authority`, so retiring a carrier cannot move its stake anywhere the carrier does not control. `!carrier.approved` is required. Close every `IncentiveEscrowProgramV0` under a carrier before the carrier itself: they are reached through the `CarrierV0` and cannot be closed once it is gone.
+
+  `close_incentive_program_v0` retires an incentive escrow program whose window has passed, signed by `issuing_authority`.
+
+  `swap_carrier_stake` previously left `carrier.escrow` naming the account it had just closed, which put the new stake beyond the reach of any instruction that resolves the escrow through that field. It now records the new escrow.
+
+## 0.13.4
+
+### Patch Changes
+
+- [#1332](https://github.com/helium/helium-program-library/pull/1332) [`d5f9a16`](https://github.com/helium/helium-program-library/commit/d5f9a167e99ee6797c31e0b91359d7993cb06305) Thanks [@madninja](https://github.com/madninja)! - Run a DCA's swap through tuktuk-dca rather than as an instruction `run_task_v0` invokes directly. `run_task_v0` reads the return data slot after each instruction it invokes and, when the program it invoked is the one that set it, requires the bytes to be a `RunTaskReturnV0`; a Jupiter route sets its own eight-byte out-amount, so a route invoked directly fails the run with `BorshIoError` after the swap has already executed. The new `swap_v0` CPIs a callee pinned by address, which makes the swap program a child whose return data `run_task_v0` ignores, leaving `check_repay_v0` as the only return the run makes. Adds the `swap_v0` instruction.
+
 ## 0.13.3
 
 ### Patch Changes

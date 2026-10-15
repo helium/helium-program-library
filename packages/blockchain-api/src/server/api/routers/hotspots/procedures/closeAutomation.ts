@@ -1,5 +1,5 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { cronJobKey, init as initCron } from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,
@@ -87,18 +87,21 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
     );
 
     // Build and serialize transactions
-    const vtxs = (
-      await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-        addressLookupTableAddresses: [
-          process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
-            ? HELIUM_COMMON_LUT_DEVNET
-            : HELIUM_COMMON_LUT,
-        ],
-        commitment: "finalized",
-        // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-        deriveLoadedAccountsDataSizeLimit: false,
-      })
-    ).map((tx) => toVersionedTx(tx));
+    const vtxs = await Promise.all(
+      (
+        await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+          addressLookupTableAddresses: [
+            process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
+              ? HELIUM_COMMON_LUT_DEVNET
+              : HELIUM_COMMON_LUT,
+          ],
+          commitment: "finalized",
+          version: 0,
+          // Wallet-signed: guard ixs may be appended (see withPriorityFees).
+          deriveLoadedAccountsDataSizeLimit: false,
+        })
+      ).map((tx) => toVersionedTx(tx)),
+    );
 
     // Add Jito tip if needed for mainnet bundles
     const useJito = shouldUseJitoBundle(vtxs.length, getCluster());

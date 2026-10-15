@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { carrierKey, init as initMem } from "@helium/mobile-entity-manager-sdk";
 import { subDaoKey, init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { Keypair, PublicKey, TransactionInstruction } from "@solana/web3.js";

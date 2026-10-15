@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { delegatedDataCreditsKey } from "@helium/data-credits-sdk";
 import {
   autoTopOffKey,
@@ -6,6 +6,7 @@ import {
 } from "@helium/dc-auto-top-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { DC_MINT, HNT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
@@ -14,6 +15,7 @@ import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
+import { resolveTaskRentRefund } from "./mini-fanout-utils";
 import { sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
@@ -65,6 +67,7 @@ export async function run(args: any = process.argv) {
 
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dcAutoTopoffProgram = await initDcAutoTopoff(provider);
+  const tuktukProgram = await initTuktuk(provider);
 
   let multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
   let authority = multisigPda
@@ -80,6 +83,9 @@ export async function run(args: any = process.argv) {
     authority,
     dcMint
   );
+  const autoTopOffAcc = await dcAutoTopoffProgram.account.autoTopOffV0.fetch(
+    autoTopOff
+  );
   const closeIx = await dcAutoTopoffProgram.methods
     .closeAutoTopOffV0()
     .accountsPartial({
@@ -87,6 +93,14 @@ export async function run(args: any = process.argv) {
       rentRefund: authority,
       authority,
     })
+    .remainingAccounts(
+      await resolveTaskRentRefund(
+        tuktukProgram,
+        [autoTopOffAcc.nextTask, autoTopOffAcc.nextHntTask],
+        autoTopOff,
+        dcAutoTopoffProgram.programId
+      )
+    )
     .instruction();
 
   await sendInstructionsOrSquadsV4({

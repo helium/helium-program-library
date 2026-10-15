@@ -47,19 +47,21 @@ pub mod mini_fanout {
     instructions::schedule_task_v0::handler(ctx, args)
   }
 
-  pub fn update_mini_fanout_v0(
-    ctx: Context<UpdateMiniFanoutV0>,
+  pub fn update_mini_fanout_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateMiniFanoutV0<'info>>,
     args: UpdateMiniFanoutArgsV0,
   ) -> Result<()> {
     instructions::update_mini_fanout_v0::handler(ctx, args)
   }
 
-  pub fn close_mini_fanout_v0(ctx: Context<CloseMiniFanoutV0>) -> Result<()> {
+  pub fn close_mini_fanout_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, CloseMiniFanoutV0<'info>>,
+  ) -> Result<()> {
     instructions::close_mini_fanout_v0::handler(ctx)
   }
 
-  pub fn update_wallet_delegate_v0(
-    ctx: Context<UpdateWalletDelegateV0>,
+  pub fn update_wallet_delegate_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateWalletDelegateV0<'info>>,
     args: UpdateWalletDelegateArgsV0,
   ) -> Result<()> {
     instructions::update_wallet_delegate_v0::handler(ctx, args)

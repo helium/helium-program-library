@@ -15,7 +15,8 @@ import { TASK_QUEUE, useDelegationClaimBot } from "@helium/automation-hooks";
 import { useMemo } from "react";
 import { delegationClaimBotKey } from "@helium/hpl-crons-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { init as initHplCrons } from "@helium/hpl-crons-sdk";
+import { init as initHplCrons, taskRentRefund } from "@helium/hpl-crons-sdk";
+import { init as initTuktuk } from "@helium/tuktuk-sdk";
 
 export const useUndelegatePosition = ({
   position,
@@ -88,6 +89,12 @@ export const useUndelegatePosition = ({
                       true
                     ),
                   })
+                  .remainingAccounts(
+                    await taskRentRefund(
+                      await initTuktuk(provider as any),
+                      delegationClaimBot.nextTask
+                    )
+                  )
                   .instruction(),
               ]
             : []),
@@ -112,6 +119,7 @@ export const useUndelegatePosition = ({
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
+            version: 0,
           });
         }
       }

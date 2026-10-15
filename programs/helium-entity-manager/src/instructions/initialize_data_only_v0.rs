@@ -23,6 +23,8 @@ pub struct InitializeDataOnlyArgsV0 {
   pub new_tree_depth: u32,
   pub new_tree_buffer_size: u32,
   pub new_tree_space: u64,
+  /// Dead: stored on `DataOnlyConfigV0` but never read; the issue fee is derived from rent.
+  /// Kept so the instruction layout does not change.
   pub new_tree_fee_lamports: u64,
   pub name: String,
   pub metadata_url: String,

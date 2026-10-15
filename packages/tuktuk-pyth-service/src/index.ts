@@ -1,5 +1,5 @@
-import { AnchorProvider, BN, Program, Wallet } from "@coral-xyz/anchor";
-import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
+import { AnchorProvider, BN, Program, Wallet } from "@anchor-lang/core";
+import { convertIdlToCamelCase } from "@anchor-lang/core/dist/cjs/idl";
 import cors from "@fastify/cors";
 import { init as initHplCrons } from "@helium/hpl-crons-sdk";
 import { truthy } from "@helium/spl-utils";
