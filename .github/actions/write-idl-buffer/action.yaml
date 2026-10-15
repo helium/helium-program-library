@@ -11,11 +11,14 @@
 # - Upstream skips every step when `anchor idl fetch` fails, and the output is then empty.
 #   `helium/squads-program-upgrade` needs an IDL buffer and an IDL account, so here that
 #   failure stops the action. The `buffer != ''` conditions on the later steps are gone with it.
-# - A failure before the buffer authority transfer closes the IDL buffer.
+# - The IDL buffer authority transfer is not here. `set-idl-buffer-authority` does it, and
+#   the caller runs it right before the proposal, so the deployer key owns the buffer until then.
+# - A failure closes the IDL buffer.
+# - `reused-idl-buffer` skips the write. The steps around it still run on the reused buffer.
 #
 # The caller installs the Solana and Anchor CLIs first (`setup-anchor` does it).
 name: "Write IDL Buffer"
-description: "Writes the program IDL to an Anchor IDL buffer and hands the buffer to the buffer authority"
+description: "Writes the program IDL to an Anchor IDL buffer the deployer key owns"
 inputs:
   network:
     description: "Solana RPC URL"
@@ -30,13 +33,17 @@ inputs:
     description: "The keypair to use for buffer creation"
     required: true
   buffer-authority:
-    description: "The address that receives the IDL buffer authority (the Squads vault)"
+    description: "The address that receives the program IDL authority (the Squads vault)"
     required: true
+  reused-idl-buffer:
+    description: "The vault IDL buffer `find-vault-idl-buffer` found. Empty writes a new IDL buffer."
+    required: false
+    default: ""
 
 outputs:
   idl-buffer:
-    description: "The idl buffer address."
-    value: ${{ steps.write-buffer.outputs.buffer }}
+    description: "The idl buffer address, reused or new."
+    value: ${{ inputs.reused-idl-buffer || steps.write-buffer.outputs.buffer }}
 
 runs:
   using: "composite"
@@ -60,8 +67,7 @@ runs:
         NETWORK: ${{ inputs.network }}
 
     # The later "Set Program IDL Authority" step needs the deployer key or the vault to hold
-    # the program IDL authority. Once the buffer moves to the vault, a failure there leaves it
-    # for a multisig proposal to close, so a wrong authority stops the run before a buffer exists.
+    # the program IDL authority. A wrong authority stops the run before it pays for a buffer.
     - name: Require a program IDL authority this run can use
       uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
       with:
@@ -85,6 +91,7 @@ runs:
 
     - name: Write IDL buffer
       id: write-buffer
+      if: inputs.reused-idl-buffer == ''
       uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
       with:
         timeout_minutes: 5
@@ -149,10 +156,10 @@ runs:
             exit 1
           fi
 
-          CURRENT=$(solana balance "$IDL_ADDR" -u "$NETWORK" --lamports 2>/dev/null | awk '{print $1}' || true)
-          CURRENT=${CURRENT:-0}
+          CURRENT=$(solana balance "$IDL_ADDR" -u "$NETWORK" --lamports | awk '{print $1}')
           if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
-            CURRENT=0
+            echo "::error::Could not read the balance of $IDL_ADDR (got: $CURRENT)"
+            exit 1
           fi
           SHORTFALL=$((REQUIRED - CURRENT))
 
@@ -174,32 +181,7 @@ runs:
       env:
         PROGRAM_ID: ${{ inputs.program-id }}
         NETWORK: ${{ inputs.network }}
-        IDL_BUFFER: ${{ steps.write-buffer.outputs.buffer }}
-
-    - name: Set Buffer Authority
-      id: set-buffer-authority
-      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
-      with:
-        timeout_minutes: 5
-        max_attempts: 3
-        shell: bash
-        command: |
-          if anchor idl authority "$IDL_BUFFER" --provider.cluster "$NETWORK" | grep -q "$AUTHORITY"; then
-            echo "IDL buffer authority is already $AUTHORITY"
-            exit 0
-          fi
-          echo "Setting buffer authority..."
-          anchor idl set-authority "$IDL_BUFFER" \
-            --program-id "$PROGRAM_ID" \
-            --new-authority "$AUTHORITY" \
-            --provider.cluster "$NETWORK" \
-            --priority-fee 100000 \
-            --provider.wallet ./deploy-keypair.json
-      env:
-        PROGRAM_ID: ${{ inputs.program-id }}
-        NETWORK: ${{ inputs.network }}
-        AUTHORITY: ${{ inputs.buffer-authority }}
-        IDL_BUFFER: ${{ steps.write-buffer.outputs.buffer }}
+        IDL_BUFFER: ${{ inputs.reused-idl-buffer || steps.write-buffer.outputs.buffer }}
 
     - name: Set Program IDL Authority
       uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
@@ -224,12 +206,11 @@ runs:
         NETWORK: ${{ inputs.network }}
         AUTHORITY: ${{ inputs.buffer-authority }}
 
-    # Until the authority transfer the deployer key owns the IDL buffer and can take the rent
-    # back. The address is the one this run made; parallel runs share the deployer key. After
-    # the transfer only a multisig proposal can close it. A failed close warns and leaves the
-    # run's own failure as the result.
+    # The deployer key owns the IDL buffer until `set-idl-buffer-authority`, so it can take the
+    # rent back here. The address is the one this run made; parallel runs share the deployer
+    # key. A failed close warns and leaves the run's own failure as the result.
     - name: Close this run's IDL buffer after a failure
-      if: (failure() || cancelled()) && steps.write-buffer.outputs.buffer != '' && steps.set-buffer-authority.outcome != 'success'
+      if: (failure() || cancelled()) && steps.write-buffer.outputs.buffer != ''
       shell: bash
       run: |
         set +e

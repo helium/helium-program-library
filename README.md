@@ -204,7 +204,7 @@ The binary a cluster runs is never a local build. `release-program.yaml` builds 
 `program-*` tag via `.github/actions/build-verified`, which compiles in a container that
 receives neither variable; `deploy-buffers` (with `write-program-buffer` and `write-idl-buffer`)
 uploads that artifact with the Squads vault as its buffer authority, and the upgrade is a
-multisig proposal. The guard's job is therefore the build that is *meant* to be deployable
+multisig proposal. The guard's job is therefore the build that is _meant_ to be deployable
 picking up `TESTING` on its own.
 
 ## Repo layout
@@ -228,15 +228,15 @@ Every leaf under `programs/`, `packages/`, and `utils/` has its own README that 
 
 Everything this repo publishes to the world runs through one of seven GitHub Actions workflows:
 
-| What changes | Triggered by | Workflow |
-| --- | --- | --- |
-| npm packages under `packages/*` | Merge to `develop` with a changeset | [`npm-publish.yaml`](.github/workflows/npm-publish.yaml) |
-| Docker images for services | Git tag `docker-<env>-<service>-<version>` | [`docker-push.yaml`](.github/workflows/docker-push.yaml) |
-| Solana programs on **mainnet** | Git tag `program-<name>-<version>` | [`release-program.yaml`](.github/workflows/release-program.yaml) |
-| Solana programs on **devnet** | Merge to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate it depends on, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
-| Any program on devnet, manually | GitHub UI ("Run workflow") | [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml) |
-| Compares each program's on-chain hash with its release hashes | Daily schedule, or GitHub UI ("Run workflow") | [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) |
-| Closes program and IDL buffers the deployer key still owns | Weekly schedule, or GitHub UI ("Run workflow") | [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) |
+| What changes                                                  | Triggered by                                                                                                                                        | Workflow                                                                         |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| npm packages under `packages/*`                               | Merge to `develop` with a changeset                                                                                                                 | [`npm-publish.yaml`](.github/workflows/npm-publish.yaml)                         |
+| Docker images for services                                    | Git tag `docker-<env>-<service>-<version>`                                                                                                          | [`docker-push.yaml`](.github/workflows/docker-push.yaml)                         |
+| Solana programs on **mainnet**                                | Git tag `program-<name>-<version>`                                                                                                                  | [`release-program.yaml`](.github/workflows/release-program.yaml)                 |
+| Solana programs on **devnet**                                 | Merge to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate it depends on, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
+| Any program on devnet, manually                               | GitHub UI ("Run workflow")                                                                                                                          | [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml)       |
+| Compares each program's on-chain hash with its release hashes | Daily schedule, or GitHub UI ("Run workflow")                                                                                                       | [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml)           |
+| Closes program and IDL buffers the deployer key still owns    | Weekly schedule, or GitHub UI ("Run workflow")                                                                                                      | [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml)   |
 
 Each is described in more detail below.
 
@@ -271,9 +271,9 @@ Docker deployments are **decoupled from npm publishing** — you don't need to w
 
 ```jsonc
 {
-  "web":    { "blockchain-api": "./packages/blockchain-api", /* ... */ },
+  "web": { "blockchain-api": "./packages/blockchain-api" /* ... */ },
   "oracle": { "distributor-oracle": "./packages/distributor-oracle" },
-  "data":   { "active-hotspot-oracle": "./utils/active-hotspot-oracle" }
+  "data": { "active-hotspot-oracle": "./utils/active-hotspot-oracle" },
 }
 ```
 
@@ -318,7 +318,7 @@ Mainnet program upgrades go through Squads (multisig) — this repo only builds 
    - builds the IDL with `anchor idl build`,
    - runs a **verifiable** Solana build (`solana-verify`) so the on-chain hash is reproducible,
    - publishes the GitHub release with the IDL and the release hash, only after that build succeeds, from a job that runs no build scripts,
-   - deploys the `.so` and IDL to a buffer account owned by the multisig vault,
+   - deploys the `.so` to a buffer account owned by the multisig vault, and the IDL to a buffer the vault takes right before the proposal,
    - opens a Squads proposal to upgrade the program to the new buffer.
 4. Sign and execute the Squads proposal.
 
@@ -326,7 +326,11 @@ A re-run skips a program only when both its on-chain hash and its on-chain IDL m
 
 In the release workflow, the deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key. The weekly sweep also holds the key.
 
-A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. A runner that dies there leaves the buffers with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
+A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. A runner that dies there leaves the buffers with the deployer key. The vault takes the IDL buffer only right before the proposal, so a run that stops earlier also leaves the IDL buffer with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
+
+After a failed run, "Re-run failed jobs" and "Re-run all jobs" are both safe. A re-run reuses the program buffer and the IDL buffer the vault took in the failed attempt, so it pays no rent twice. One case fails loudly: when the sweep closed the failed run's IDL buffer, "Re-run failed jobs" stops at the IDL buffer hand-off and makes no proposal. Use "Re-run all jobs" there; it writes a new IDL buffer. Each executed upgrade leaves its IDL buffer with the vault, because setting the IDL copies the buffer and does not close it. A release that is abandoned or replaced by a new version also leaves its buffers with the vault. `helium-admin close-buffers` closes vault program buffers only; a vault IDL buffer needs a Squads proposal with an Anchor IDL Close instruction.
+
+The proposal job does not install Anchor. It downloads the Anchor CLI the buffer job built and checks its sha256 against the hash that job recorded.
 
 [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) runs each day and compares each program's on-chain hash with its release hashes. Each program reads as deployed, pending, unknown binary, rolled back, or error when a lookup fails. A program with no `.so.sha256` release asset is skipped and named in the summary. A pending program gets a warning when its newest tag is more than 3 days old. An unknown binary, a rollback, or a lookup error fails the run. To quiet a rejected proposal, delete that release's `.so.sha256` asset.
 
@@ -368,7 +372,9 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `build-verified/` — verifiable build via `solana-verify` that produces a deterministic `.so`.
 - `install-solana-verify/` — the one `solana-verify` pin. The release hash, the deploy skip and the daily hash check use it.
 - `plan-deploy/` — the re-run rules: skip a deploy the chain already has, reuse a matching vault buffer, stop on a pending proposal for it. It takes no keypair.
-- `deploy-buffers/`, `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` and IDL to buffer accounts owned by the multisig.
+- `find-vault-buffer/`, `find-vault-idl-buffer/` — find a vault-owned program buffer or IDL buffer that holds the build, so a re-run reuses it.
+- `deploy-buffers/`, `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` to a buffer account owned by the multisig, and the IDL to a buffer account the deployer key owns.
+- `set-idl-buffer-authority/` — hands the IDL buffer to the multisig, right before the proposal.
 
 If you're adding a new program / service, you shouldn't need to change the workflows themselves — just add the program to `Anchor.toml` / `docker-info.json` and the tag pattern above will pick it up.
 
@@ -387,7 +393,7 @@ tuktuk -u <URL> task list --task-queue-name hpl-crons --active
 
 ### 2. Reproduce the failure
 
-To see *why* a task is failing, run it yourself with preflight disabled so the RPC returns a signature even though execution fails:
+To see _why_ a task is failing, run it yourself with preflight disabled so the RPC returns a signature even though execution fails:
 
 ```sh
 tuktuk -u <URL> task run --task-queue-name hpl-crons --id <ID> --skip-preflight

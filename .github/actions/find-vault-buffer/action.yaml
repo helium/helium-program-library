@@ -1,0 +1,62 @@
+# The vault buffer reuse lookup, shared by `plan-deploy` and `deploy-buffers`, so the two
+# cannot drift apart. It runs only the Solana CLI, so `deploy-buffers` runs it next to the key.
+#
+# A run that failed after the authority transfer leaves a vault-owned buffer that only a
+# Squads proposal can close. A re-run takes it back instead of paying rent for a second.
+#
+# The caller installs the Solana CLI first (`setup-anchor` does it).
+name: "Find Vault Buffer"
+description: "Finds a buffer the buffer authority owns whose bytes match the build"
+inputs:
+  network:
+    description: "Solana RPC URL"
+    required: true
+  program:
+    description: "Program name (snake_case). The binary is ./target/deploy/<program>.so"
+    required: true
+  buffer-authority:
+    description: "The Squads vault. Its buffers are the reuse candidates"
+    required: true
+
+outputs:
+  buffer:
+    description: "The vault buffer that matches the build. Empty when there is none."
+    value: ${{ steps.find.outputs.buffer }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Reuse a vault buffer that matches the build
+      id: find
+      shell: bash
+      run: |
+        set +e
+        BUFFERS_OUT=$(solana program show --buffers --buffer-authority "$AUTHORITY" -u "$NETWORK" --output json 2>&1)
+        EXIT_CODE=$?
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          echo "${BUFFERS_OUT//"$NETWORK"/<rpc-url>}"
+          echo "::error::Could not list the buffers of $AUTHORITY"
+          exit 1
+        fi
+
+        # A parse failure must stop the run, not read as "no buffers".
+        CANDIDATES=$(echo "$BUFFERS_OUT" | jq -r '.buffers[].address')
+
+        DUMPED_BUFFER=$(mktemp ./buffer-dump.XXXXXX.so)
+        trap 'rm -f "$DUMPED_BUFFER"' EXIT
+        for CANDIDATE in $CANDIDATES; do
+          if solana program dump "$CANDIDATE" "$DUMPED_BUFFER" -u "$NETWORK" > /dev/null 2>&1 \
+            && cmp -s "./target/deploy/$PROGRAM.so" "$DUMPED_BUFFER"; then
+            echo "Buffer $CANDIDATE matches the build"
+            echo "buffer=$CANDIDATE" >> "$GITHUB_OUTPUT"
+            echo "- \`$PROGRAM\`: reused buffer \`$CANDIDATE\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Buffer $CANDIDATE does not match the build"
+        done
+        echo "No vault-owned buffer matches the build"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        NETWORK: ${{ inputs.network }}

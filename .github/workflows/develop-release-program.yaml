@@ -32,7 +32,8 @@ jobs:
       - name: List changed programs
         id: list_changed_programs
         # A program changes when its own sources or a workspace crate it depends on
-        # do. `shared-utils` is such a crate, so a change there deploys its dependents;
+        # do, or when a dependency it resolves in `Cargo.lock` does. `shared-utils`
+        # is such a crate, so a change there deploys its dependents;
         # the hash-match skip in `plan-deploy` stops the legs whose binary is the same.
         env:
           # `github.event.after` is empty on a pull_request, so the head is explicit.
@@ -205,6 +206,16 @@ jobs:
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           reused-buffer: ${{ steps.plan.outputs.buffer }}
+      # Right before the proposal, as in the mainnet release.
+      - uses: ./.github/actions/set-idl-buffer-authority/
+        if: steps.plan.outputs.skip != 'true'
+        with:
+          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
       - name: Squads program upgrade
         # A skipped run has no buffers. The Squads action exits 1 on an empty address.
         if: steps.plan.outputs.skip != 'true'

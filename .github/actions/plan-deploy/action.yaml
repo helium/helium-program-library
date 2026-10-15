@@ -112,7 +112,12 @@ runs:
           exit 1
         fi
         # A parse failure must stop the run, not read as a match.
-        IDL_MATCH=$(echo "$IDL_OUT" | jq -er '.match')
+        IDL_MATCH=$(echo "$IDL_OUT" | jq -r '.match' 2>/dev/null || echo parse-error)
+        if [ "$IDL_MATCH" != "true" ] && [ "$IDL_MATCH" != "false" ]; then
+          echo "$IDL_OUT"
+          echo "::error::Could not parse the IDL match of $PROGRAM_ID (got: $IDL_MATCH)"
+          exit 1
+        fi
 
         if [ "$IDL_MATCH" = "true" ]; then
           echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -127,45 +132,15 @@ runs:
         PROGRAM_ID: ${{ inputs.program-id }}
         NETWORK: ${{ inputs.network }}
 
-    # A run that failed after the authority transfer leaves a vault-owned buffer that only a
-    # Squads proposal can close. A re-run that runs this step again takes it back instead of
-    # paying rent for a second. In the mainnet release that is "Re-run all jobs": "Re-run failed
-    # jobs" keeps the plan job's old empty `reused-buffer` output and writes a second buffer.
-    - name: Reuse a vault buffer that matches the build
+    # "Re-run failed jobs" in the mainnet release keeps this job's old empty output, so
+    # `deploy-buffers` runs the same lookup again when it gets no buffer.
+    - uses: ./.github/actions/find-vault-buffer/
       id: reuse
       if: steps.hash-match.outputs.skip != 'true'
-      shell: bash
-      run: |
-        set +e
-        BUFFERS_OUT=$(solana program show --buffers --buffer-authority "$AUTHORITY" -u "$NETWORK" --output json 2>&1)
-        EXIT_CODE=$?
-        set -e
-        if [ "$EXIT_CODE" -ne 0 ]; then
-          echo "${BUFFERS_OUT//"$NETWORK"/<rpc-url>}"
-          echo "::error::Could not list the buffers of $AUTHORITY"
-          exit 1
-        fi
-
-        # A parse failure must stop the run, not read as "no buffers".
-        CANDIDATES=$(echo "$BUFFERS_OUT" | jq -r '.buffers[].address')
-
-        DUMPED_BUFFER=$(mktemp ./buffer-dump.XXXXXX.so)
-        trap 'rm -f "$DUMPED_BUFFER"' EXIT
-        for CANDIDATE in $CANDIDATES; do
-          if solana program dump "$CANDIDATE" "$DUMPED_BUFFER" -u "$NETWORK" > /dev/null 2>&1 \
-            && cmp -s "./target/deploy/$PROGRAM.so" "$DUMPED_BUFFER"; then
-            echo "Buffer $CANDIDATE matches the build"
-            echo "buffer=$CANDIDATE" >> "$GITHUB_OUTPUT"
-            echo "- \`$PROGRAM\`: reused buffer \`$CANDIDATE\`" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          echo "Buffer $CANDIDATE does not match the build"
-        done
-        echo "No vault-owned buffer matches the build"
-      env:
-        PROGRAM: ${{ inputs.program }}
-        AUTHORITY: ${{ inputs.buffer-authority }}
-        NETWORK: ${{ inputs.network }}
+      with:
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        buffer-authority: ${{ inputs.buffer-authority }}
 
     # The proposal read needs `@sqds/multisig` from the workspace. Every action here is
     # pinned to a commit and the install takes the lockfile as is, with no install scripts.

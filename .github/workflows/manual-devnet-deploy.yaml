@@ -19,6 +19,14 @@ on:
 permissions:
   contents: read
 
+# One manual deploy at a time. GitHub keeps one pending run per group, so a third
+# dispatch cancels the pending one; the cancel shows in the run list, and the
+# dispatcher runs it again. develop-release-program has no group: a push run that
+# a later push cancels would never deploy its programs.
+concurrency:
+  group: manual-devnet-deploy
+  cancel-in-progress: false
+
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
@@ -109,6 +117,17 @@ jobs:
           program-id: ${{ env.PROGRAM_ID }}
           buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
           reused-buffer: ${{ steps.plan.outputs.buffer }}
+
+      # Right before the proposal, as in the mainnet release.
+      - uses: ./.github/actions/set-idl-buffer-authority/
+        if: steps.plan.outputs.skip != 'true'
+        with:
+          network: ${{ secrets.DEVNET_SOLANA_DEPLOY_URL }}
+          program: ${{ env.PROGRAM_NAME }}
+          program-id: ${{ env.PROGRAM_ID }}
+          keypair: ${{ secrets.DEVNET_DEPLOYER_KEYPAIR }}
+          buffer-authority: ${{ secrets.DEVNET_MULTISIG_VAULT }}
+          idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
 
       - name: Squads program upgrade
         # A skipped run has no buffers. The Squads action exits 1 on an empty address.
