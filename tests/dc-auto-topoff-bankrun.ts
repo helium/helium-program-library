@@ -401,8 +401,12 @@ describe("dc-auto-topoff under bankrun", () => {
   }
 
   // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
-  // queue_task_v0 created and the queue itself for one a run returned. A leg that was already
-  // dequeued has no task to read, and the instructions that dequeue skip it, so any address does.
+  // queue_task_v0 created. For a task that a run returned, it is the rent refund of the task that
+  // ran when that task paid all of its rent. The rent_amount of the task that ran caps the rent of
+  // all the tasks that one run returns, so a task past the cap refunds to the task queue
+  // (helium/tuktuk#115).
+  // A leg that was already dequeued has no task to read, and the instructions that dequeue skip
+  // it, so any address does.
   // Read through banksClient: anchor's fetchNullable goes through BankrunConnectionProxy,
   // which throws on a missing account rather than returning null.
   const refundFor = async (task: PublicKey) => {
@@ -1537,7 +1541,7 @@ describe("dc-auto-topoff under bankrun", () => {
       );
     });
 
-    it("refunds a task that a run returned to the task queue", async () => {
+    it("refunds a task that a run returned to the payer of the task that ran", async () => {
       const payer = Keypair.generate();
       const autoTopOff = await closableAutoTopOff(payer);
       const due = await program.account.autoTopOffV0.fetch(autoTopOff);
@@ -1549,8 +1553,8 @@ describe("dc-auto-topoff under bankrun", () => {
       const taskRentRefund = await refundFor(nextTask);
       const hntTaskRentRefund = await refundFor(nextHntTask);
       expect(taskRentRefund.toBase58()).to.equal(
-        taskQueue.toBase58(),
-        "the run should have returned a DC task that refunds to the task queue"
+        payer.publicKey.toBase58(),
+        "the run should have returned a DC task that refunds to the payer of the task that ran"
       );
       expect(hntTaskRentRefund.toBase58()).to.equal(
         payer.publicKey.toBase58()
@@ -1567,9 +1571,9 @@ describe("dc-auto-topoff under bankrun", () => {
       expect(await readAccount(ctx, nextTask)).to.equal(null);
       expect(await readAccount(ctx, nextHntTask)).to.equal(null);
       expect(await readAccount(ctx, autoTopOff)).to.equal(null);
-      expect(await lamportsOf(taskQueue)).to.equal(queueBefore + taskLamports);
+      expect(await lamportsOf(taskQueue)).to.equal(queueBefore);
       expect(await lamportsOf(payer.publicKey)).to.equal(
-        payerBefore + hntTaskLamports
+        payerBefore + taskLamports + hntTaskLamports
       );
     });
 

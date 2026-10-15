@@ -643,8 +643,10 @@ describe("hpl-crons", () => {
 
   // Start and close dequeue the bot's next task, and tuktuk closes a task only to the rent
   // refund the task itself names. A task that start queued names start's payer; a task that a
-  // run returned names the task queue. A rent refund that is no account of the instruction is
-  // passed as a writable remaining account.
+  // run returned names the rent refund of the task that ran, when that task paid all of its
+  // rent. The rent_amount of the task that ran caps the rent of all the tasks that one run
+  // returns, so a task past the cap names the task queue (helium/tuktuk#115). A rent refund that
+  // is no account of the instruction is passed as a writable remaining account.
   describe("delegation claim bot", () => {
     const [queueAuthority] = queueAuthorityKey();
 
@@ -908,8 +910,17 @@ describe("hpl-crons", () => {
       return { bot, payer, task };
     };
 
-    /** Runs the bot's task, which leaves the bot on a task that the run returned. */
-    const returnedTask = async ({ delegationClaimBot }: Bot, task: PublicKey) => {
+    /**
+     * Runs the bot's task, which leaves the bot on a task that the run returned. The bot's task
+     * pays all of the rent of that task, within the rent_amount cap of the run, so it refunds to
+     * `payer`, the rent refund of the task that ran. Past the cap, it would refund to the task
+     * queue (helium/tuktuk#115).
+     */
+    const returnedTask = async (
+      { delegationClaimBot }: Bot,
+      task: PublicKey,
+      payer: PublicKey
+    ) => {
       await sendInstructions(provider, [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
         ...(await runTask({
@@ -923,7 +934,7 @@ describe("hpl-crons", () => {
       );
       expect(nextTask.toBase58()).to.not.equal(task.toBase58());
       const nextTaskAcc = await tuktukProgram.account.taskV0.fetch(nextTask);
-      expect(nextTaskAcc.rentRefund.toBase58()).to.equal(taskQueue.toBase58());
+      expect(nextTaskAcc.rentRefund.toBase58()).to.equal(payer.toBase58());
       // A task that a run queues names the bot.
       expect(
         nextTaskAcc.transaction.compiledV0![0].accounts.map((a) => a.toBase58())
@@ -977,11 +988,19 @@ describe("hpl-crons", () => {
       ];
 
       expect(await resolve(task)).to.deep.equal(writable(payer.publicKey));
-      expect(await resolve(await returnedTask(bot, task))).to.deep.equal(
-        writable(taskQueue)
-      );
-      // The run closed the task. A bot that never started stores the default key.
+      // A second payer starts the task that runs, so the returned task names a key that differs
+      // from the key of the first task.
+      const runPayer = await fundedKeypair();
+      const runTask = await start(bot, runPayer, [
+        rentRefundMeta(payer.publicKey),
+      ]);
+      expect(
+        await resolve(await returnedTask(bot, runTask, runPayer.publicKey))
+      ).to.deep.equal(writable(runPayer.publicKey));
+      // Start closed the first task and the run closed the second. A bot that never started
+      // stores the default key.
       expect(await resolve(task)).to.deep.equal([]);
+      expect(await resolve(runTask)).to.deep.equal([]);
       expect(await resolve(PublicKey.default)).to.deep.equal([]);
     });
 
@@ -1049,20 +1068,24 @@ describe("hpl-crons", () => {
         expect(nextTask.toBase58()).to.equal(newTask.toBase58());
       });
 
-      it("refunds a task that a run returned to the task queue", async () => {
-        const { bot, task } = await startedBot();
-        const returned = await returnedTask(bot, task);
+      it("refunds a task that a run returned to the payer of the task that ran", async () => {
+        const { bot, payer, task } = await startedBot();
+        const returned = await returnedTask(bot, task, payer.publicKey);
         const newPayer = await fundedKeypair();
         const taskLamports = await lamportsHeldBy(returned);
         expect(await lamportsOf(returned)).to.equal(taskLamports);
-        const before = await lamportsOf(taskQueue);
+        const before = await lamportsOf(payer.publicKey);
 
-        const newTask = await start(bot, newPayer);
+        const newTask = await start(bot, newPayer, [
+          rentRefundMeta(payer.publicKey),
+        ]);
 
         expect(
           await provider.connection.getAccountInfo(returned, "confirmed")
         ).to.equal(null);
-        expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
+        expect(await lamportsOf(payer.publicKey)).to.equal(
+          before + taskLamports
+        );
         const { nextTask } = await program.account.delegationClaimBotV0.fetch(
           bot.delegationClaimBot
         );
@@ -1223,19 +1246,21 @@ describe("hpl-crons", () => {
         ).to.equal(null);
       });
 
-      it("refunds a task that a run returned to the task queue", async () => {
-        const { bot, task } = await startedBot();
-        const returned = await returnedTask(bot, task);
+      it("refunds a task that a run returned to the payer of the task that ran", async () => {
+        const { bot, payer, task } = await startedBot();
+        const returned = await returnedTask(bot, task, payer.publicKey);
         const taskLamports = await lamportsHeldBy(returned);
         expect(await lamportsOf(returned)).to.equal(taskLamports);
-        const before = await lamportsOf(taskQueue);
+        const before = await lamportsOf(payer.publicKey);
 
-        await close(bot, returned);
+        await close(bot, returned, [rentRefundMeta(payer.publicKey)]);
 
         expect(
           await provider.connection.getAccountInfo(returned, "confirmed")
         ).to.equal(null);
-        expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
+        expect(await lamportsOf(payer.publicKey)).to.equal(
+          before + taskLamports
+        );
         expect(
           await program.account.delegationClaimBotV0.fetchNullable(
             bot.delegationClaimBot
