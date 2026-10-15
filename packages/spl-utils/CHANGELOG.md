@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.14.3
+
+### Patch Changes
+
+- [#1360](https://github.com/helium/helium-program-library/pull/1360) [`ce2c2e5`](https://github.com/helium/helium-program-library/commit/ce2c2e5ad0907999fb5b5ffd2ae89e2a67c5743b) Thanks [@bryzettler](https://github.com/bryzettler)! - Point `HELIUM_COMMON_LUT` at `Gfnhg9cf97YGLxvHK785zuK5GKEuBw8Y1W1YPo1i3QjL`. It holds the 53 addresses of `43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt` at the same indexes, plus the hpl-crons `queue_authority` PDA at index 53.
+
 ## 0.14.2
 
 ### Patch Changes
