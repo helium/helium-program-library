@@ -56,6 +56,8 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        # The prefix restore above can bring back the output of a removed program.
+        rm -rf target/idl target/types packages/idls/lib
         mkdir -p target/idl target/types
         # Extract program names (snake_case) from [programs.localnet] in Anchor.toml
         programs=$(awk '/^\[programs\.localnet\]/{flag=1;next} /^\[/{flag=0} flag && /=/{print $1}' Anchor.toml)

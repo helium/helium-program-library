@@ -68,7 +68,7 @@ jobs:
 
   backstop:
     name: Release Declaration
-    # The backstop behind the changeset bot. It reads the bot's own rule
+    # The backstop behind the changeset bot that part 2 adds later. It reads the bot's own rule
     # (`scripts/missing-changesets.mjs`) and does not care who wrote the file,
     # so it runs on drafts and on forks, where the bot cannot: a fork's token
     # is read-only, so its author reads the fix from this failure.
