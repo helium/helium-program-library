@@ -994,12 +994,16 @@ describe("hpl-crons", () => {
       const runTask = await start(bot, runPayer, [
         rentRefundMeta(payer.publicKey),
       ]);
-      expect(
-        await resolve(await returnedTask(bot, runTask, runPayer.publicKey))
-      ).to.deep.equal(writable(runPayer.publicKey));
-      // Start closed the first task and the run closed the second. A bot that never started
-      // stores the default key.
-      expect(await resolve(task)).to.deep.equal([]);
+      const returned = await returnedTask(bot, runTask, runPayer.publicKey);
+      expect(await resolve(returned)).to.deep.equal(
+        writable(runPayer.publicKey)
+      );
+      // Start closed the first task and the run closed the second. The run can queue the
+      // returned task on the freed id of the first task, so check the first task only when
+      // its address differs. A bot that never started stores the default key.
+      if (!returned.equals(task)) {
+        expect(await resolve(task)).to.deep.equal([]);
+      }
       expect(await resolve(runTask)).to.deep.equal([]);
       expect(await resolve(PublicKey.default)).to.deep.equal([]);
     });
