@@ -8,7 +8,8 @@ it names the release level and holds the text the Squads signer reads.
 IDL gets one file in each directory.
 
 This `README.md` keeps the directory in git when the last program changeset is
-consumed. The version script skips it, and skips `skipped.json`.
+consumed. The version script that part 2 adds later skips it, and skips
+`skipped.json`.
 
 ## The file format
 
@@ -25,7 +26,7 @@ Bind the oracle signature to the running task.
 ```
 
 The program names are Cargo package names, which are the `programs/*`
-directory names. An unknown name fails the version step.
+directory names. An unknown name fails the version step that part 2 adds later.
 
 One file may name several programs, and several files may name the same
 program. The highest level per program wins, and every text lands under that
@@ -46,20 +47,25 @@ Plain semver arithmetic, with no 0.x special case:
 | `none`  | `0.1.8`         |
 
 Use `minor` for a new instruction or account, `patch` otherwise. `major` is a
-hand decision; the changeset bot never writes it.
+hand decision; the changeset bot that part 2 adds later never writes it.
 
 ## `none`
 
 `none` means "this change ships nothing on chain". No version bump and no
-changelog entry. The version script records the program and the commit it was
-reviewed up to in `skipped.json`, so the missing-bump check asks for a bump only
-when the program changed since both its tag and that commit. The program's next
-real release clears the entry.
+changelog entry. The version script that part 2 adds later records the program
+and the commit it was reviewed up to in `skipped.json`, so the missing-bump
+check asks for a bump only when the program changed since both its tag and that
+commit. The program's next real release clears the entry.
 
-The changeset bot writes `none` only for a **dependent program** — one marked
-changed only through a workspace dependency, where the change cannot reach the
-binary. It never writes `none` for a program whose own `src/` changed. A person
-may write `none` anywhere.
+A program is marked changed by its own source, by the source of a workspace
+crate it depends on, by a `Cargo.lock` change to a dependency it resolves, or by
+a change to the `[profile.*]` tables of the root `Cargo.toml`, which marks every
+program.
+
+The changeset bot that part 2 adds later never writes `none`. It writes `patch`
+for every program marked through a workspace dependency, `Cargo.lock`, or a
+`Cargo.toml` profile, and a person may lower it to `none` with a reason. A
+person may write `none` anywhere.
 
 ## Releasing
 
