@@ -1,22 +1,22 @@
 /**
  * Which npm packages changed between two refs.
  *
- * The changeset bot and the backstop check need the same set changesets itself
- * would name, so the skip rule is changesets': a package named in
- * `.changeset/config.json` `ignore`, a private package when
+ * The backstop check, and the changeset bot that part 2 adds later, need the
+ * same set changesets itself would name, so the skip rule is changesets': a
+ * package named in `.changeset/config.json` `ignore`, a private package when
  * `privatePackages.version` is off, and a `package.json` with no `version`
- * never release. The directory name is not the npm name (`packages/blockchain-api`
- * publishes `@helium/blockchain-api-service`), so every name is read from disk.
+ * never release. The directory name is not the npm name
+ * (`packages/blockchain-api` publishes `@helium/blockchain-api-service`), so
+ * every name is read from disk.
  *
  * On top of that, the no-release path filter from `changed-programs.mjs`
  * applies: a PR that only touches a package's docs or tests changes no package.
  */
-import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isNoReleasePath } from "./changed-programs.mjs";
+import { changedFiles, isNoReleasePath } from "./changed-programs.mjs";
 
 const USAGE = "Usage: node scripts/changed-packages.mjs <base> [head]";
 
@@ -81,27 +81,11 @@ const readConfig = () => {
   return { ignore: json.ignore ?? [], privatePackages };
 };
 
-const run = (command, args) =>
-  execFileSync(command, args, {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
-
 const main = (argv) => {
   const [base, head = "HEAD"] = argv;
   if (!base) throw new Error(USAGE);
-  const files = run("git", [
-    "diff",
-    "--name-only",
-    "-z",
-    "--no-renames",
-    base,
-    head,
-  ])
-    .split("\0")
-    .filter(Boolean);
   const changed = changedPackages({
-    files,
+    files: changedFiles(base, head),
     manifests: readManifests(),
     config: readConfig(),
   });

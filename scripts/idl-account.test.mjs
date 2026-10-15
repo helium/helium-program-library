@@ -60,3 +60,7 @@ test("a missing or undecodable IDL account does not match", () => {
   );
   assert.equal(idlMatches(Buffer.alloc(44), IDL), false);
 });
+
+test("an empty IDL account does not match", () => {
+  assert.equal(idlMatches(Buffer.alloc(0), IDL), false);
+});

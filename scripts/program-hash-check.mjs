@@ -13,10 +13,8 @@ import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const USAGE =
-  "Usage: [GITHUB_TOKEN=<token>] [SOLANA_URL=<rpc>] node scripts/program-hash-check.mjs";
+  "Usage: [GITHUB_TOKEN=<token>] SOLANA_URL=<rpc> node scripts/program-hash-check.mjs";
 
-// The check is mainnet only, and this RPC needs no key.
-const DEFAULT_RPC = "https://solana-rpc.web.helium.io";
 const REPO = process.env.GITHUB_REPOSITORY ?? "helium/helium-program-library";
 // A `program-<name>-<x.y.z>` tag and nothing else: the tag list holds a
 // `v`-prefixed tag, a `-test` suffixed one, and a misspelled program name, and a
@@ -182,11 +180,18 @@ const releaseHash = async (release, key) => {
   return (await response.text()).trim();
 };
 
-/** What the chain holds. `solana-verify` downloads the program and hashes it. */
-const onChainHash = (programId, url) =>
-  execFileSync("solana-verify", ["get-program-hash", "--url", url, programId], {
+/**
+ * What the chain holds. `solana-verify` downloads the program and hashes it.
+ * It prints a line per RPC retry before the hash, so the hash is the last line.
+ */
+export const onChainHash = (programId, url, exec = execFileSync) =>
+  exec("solana-verify", ["get-program-hash", "--url", url, programId], {
     encoding: "utf8",
-  }).trim();
+  })
+    .trim()
+    .split("\n")
+    .at(-1)
+    .trim();
 
 /** One JSON-RPC call. The workflow installs no packages, so no web3.js. */
 const rpc = async (url, method, params) => {
@@ -377,7 +382,9 @@ export const checkProgram = async (
 };
 
 const main = async () => {
-  const url = process.env.SOLANA_URL || DEFAULT_RPC;
+  const url = process.env.SOLANA_URL;
+  // The catch prints USAGE after the message.
+  if (!url) throw new Error("SOLANA_URL is not set");
   const now = new Date();
   const releases = await releasesByTag();
   const tags = programTags();

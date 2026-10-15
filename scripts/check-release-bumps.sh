@@ -23,8 +23,30 @@ changed() { git diff --name-only --diff-filter=ACMRD "$MERGE_BASE" HEAD -- "$@";
 # A program source change bumps that program's crate version, so the deployed
 # binary can be traced to a release. Changes to shared crates under utils/
 # (e.g. shared-utils) are not checked; bump the programs that ship the change by hand.
+# A program that a .changeset-programs/*.md added or edited in this PR declares
+# `none` ships nothing on chain, so it keeps its version. The front matter is
+# read by the backstop's own parser; a program another of those files names
+# with a level still needs the bump.
+none_programs=$(git diff --name-only --diff-filter=AM "$MERGE_BASE" HEAD -- '.changeset-programs/*.md' \
+  | grep -v '/README\.md$' \
+  | node --input-type=module -e '
+    import { readFileSync } from "node:fs";
+    import { parseChangeset } from "./scripts/missing-changesets.mjs";
+    const levels = {};
+    for (const file of readFileSync(0, "utf8").split("\n").filter(Boolean)) {
+      for (const [name, level] of Object.entries(parseChangeset(readFileSync(file, "utf8")).releases)) {
+        (levels[name] ??= []).push(level);
+      }
+    }
+    for (const [name, list] of Object.entries(levels)) {
+      if (list.every((level) => level === "none")) console.log(name);
+    }
+  ')
 for p in $(changed 'programs/*/src/*' | cut -d/ -f2 | sort -u); do
   [ -f "programs/$p/Cargo.toml" ] || continue
+  if grep -qxF "$p" <<<"$none_programs"; then
+    continue
+  fi
   if ! git diff "$MERGE_BASE" HEAD -- "programs/$p/Cargo.toml" | grep -q '^+version'; then
     error "programs/$p/src changed but programs/$p/Cargo.toml version did not"
   fi

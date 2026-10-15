@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   missingBumpCheck,
   packageVersion,
+  showFile,
   taggedVersions,
 } from "./missing-bump-check.mjs";
 
@@ -213,16 +214,38 @@ test("a tests-only change since the tag passes", () => {
         tagCommit: "fanout-tag",
       },
     ],
-    changedFiles: () => [
-      "tests/fanout.ts",
-      "programs/fanout/README.md",
-      "Cargo.lock",
-    ],
+    changedFiles: () => ["tests/fanout.ts", "programs/fanout/README.md"],
   });
 
   assert.equal(ok, true);
   assert.equal(results[0].status, "clean");
   assert.equal(results[0].base, "fanout-tag");
+});
+
+test("a failing program's files leave out its no-release files", () => {
+  const { failing } = missingBumpCheck({
+    metadata,
+    programs: [
+      {
+        name: "fanout",
+        version: "0.1.3",
+        tags: ["0.1.3"],
+        tagCommit: "fanout-tag",
+      },
+    ],
+    changedFiles: () => [
+      "programs/fanout/src/lib.rs",
+      // Inside `src/`, so only the no-release rule keeps it out.
+      "programs/fanout/src/NOTES.md",
+    ],
+  });
+
+  assert.deepEqual(failing[0].files, ["programs/fanout/src/lib.rs"]);
+});
+
+test("showFile reads a missing path as null and throws on a bad ref", () => {
+  assert.equal(showFile("HEAD", "no/such/file.toml"), null);
+  assert.throws(() => showFile("no-such-ref-for-this-test", "Anchor.toml"));
 });
 
 test("only exact program-<name>-<x.y.z> tags of the program name its versions", () => {
@@ -253,4 +276,47 @@ test("the package version is the literal version, and a workspace-inherited one 
       ),
     /programs\/fanout\/Cargo.toml has no literal version/,
   );
+});
+
+test("a Cargo.lock change since the tag fails a program whose resolution moved", () => {
+  const lock = (checksum) => `version = 4
+
+[[package]]
+name = "anchor-lang"
+version = "0.31.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "${checksum}"
+
+[[package]]
+name = "price-oracle"
+version = "0.2.2"
+dependencies = [
+ "anchor-lang",
+]
+`;
+  const { ok, failing } = missingBumpCheck({
+    metadata,
+    programs: [
+      {
+        name: "price-oracle",
+        version: "0.2.2",
+        tags: ["0.2.2"],
+        tagCommit: "price-oracle-tag",
+      },
+    ],
+    changedFiles: () => ["Cargo.lock"],
+    lockfilesFor: () => ({ base: lock("aaaa"), head: lock("bbbb") }),
+  });
+
+  assert.equal(ok, false);
+  assert.deepEqual(failing, [
+    {
+      name: "price-oracle",
+      version: "0.2.2",
+      status: "missing-bump",
+      base: "price-oracle-tag",
+      via: ["Cargo.lock"],
+      files: ["Cargo.lock"],
+    },
+  ]);
 });

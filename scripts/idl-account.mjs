@@ -31,7 +31,8 @@ export const decodeIdlAccount = (data) => {
   );
 };
 
-const canonical = (value) =>
+/** `value` with every object's keys sorted, so key order does not count. */
+export const canonical = (value) =>
   Array.isArray(value)
     ? value.map(canonical)
     : value && typeof value === "object"

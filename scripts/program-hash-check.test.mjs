@@ -7,6 +7,7 @@ import {
   isUpgradeTransaction,
   lastUpgradeTime,
   notice,
+  onChainHash,
   parseProgramTag,
 } from "./program-hash-check.mjs";
 
@@ -603,4 +604,10 @@ test("the chain runs the newest release and older tags are unhashed: deployed, n
     },
   );
   assert.equal(lookedUp, false);
+});
+
+test("the on-chain hash is the last line, after any RPC retry lines", () => {
+  const exec = () =>
+    "RPC call failed (attempt 1/3) - retrying in 500 ms...\nabc123\n";
+  assert.equal(onChainHash("fan", "http://rpc", exec), "abc123");
 });

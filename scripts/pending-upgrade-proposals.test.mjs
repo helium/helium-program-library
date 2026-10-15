@@ -190,6 +190,15 @@ test("an Active proposal at or below the stale index is not pending", async () =
   );
 });
 
+test("an Active proposal at exactly the stale index is not pending", async () => {
+  // The recorded multisig's stale transaction index is 160.
+  const pending = await withProposal(160, "Active")(LAZY_TRANSACTIONS);
+  assert.deepEqual(
+    pending.map((p) => p.index),
+    [163],
+  );
+});
+
 test("a proposal that is exactly this workflow's upgrade is the same-buffer proposal", async () => {
   assert.deepEqual(
     classifyPending(await read(LAZY_TRANSACTIONS), PENDING_BUFFER),
@@ -480,4 +489,155 @@ test("an IDL Close to the vault ahead of the SetBuffer does not change the IDL b
     sameBuffer: 163,
     older: [],
   });
+});
+
+test("an IDL Close to the vault after the SetBuffer makes the proposal not exact", async () => {
+  // The Close would close the IDL account the SetBuffer just set.
+  const pending = await readWithIdl(idlAccountData(BUILD_IDL), (message) => {
+    const setBuffer = message.instructions.find((ix) =>
+      Buffer.from(ix.data).subarray(0, 8).equals(IDL_IX_TAG),
+    );
+    const [, idl, vault] = setBuffer.accountIndexes;
+    const close = {
+      ...withIdlVariant(5)(setBuffer),
+      accountIndexes: new Uint8Array([idl, vault, vault]),
+    };
+    return {
+      ...message,
+      instructions: message.instructions.flatMap((ix) =>
+        ix === setBuffer ? [ix, close] : [ix],
+      ),
+    };
+  });
+  assert.deepEqual(classifyPending(pending, PENDING_BUFFER), {
+    sameBuffer: null,
+    older: [163],
+  });
+});
+
+// Recorded message account indexes: 0 the vault, 1 the program, 2 the IDL
+// buffer, 3 the IDL account, 6 the spill. `before` and `after` build IDL
+// instructions around the recorded SetBuffer.
+const aroundSetBuffer =
+  (before, after = () => []) =>
+  (message) => ({
+    ...message,
+    instructions: message.instructions.flatMap((ix) =>
+      Buffer.from(ix.data).subarray(0, 8).equals(IDL_IX_TAG)
+        ? [...before(ix), ix, ...after(ix)]
+        : [ix],
+    ),
+  });
+const idlIx = (setBuffer, variant, accountIndexes) => ({
+  ...withIdlVariant(variant)(setBuffer),
+  accountIndexes: new Uint8Array(accountIndexes),
+});
+const exactAt150 = async (edit) =>
+  (await withProposal(150, "Approved", edit)(LAZY_TRANSACTIONS)).map((p) => [
+    p.index,
+    p.exact,
+  ]);
+
+test("the full IDL sequence Close, Create, Resize, SetBuffer, Upgrade is exact", async () => {
+  // Create's accounts are (from, to, base, system_program, program).
+  assert.deepEqual(
+    await exactAt150(
+      aroundSetBuffer((setBuffer) => [
+        idlIx(setBuffer, 5, [3, 0, 0]),
+        idlIx(setBuffer, 0, [0, 3, 0, 0, 1]),
+        idlIx(setBuffer, 6, [3, 0, 0, 0]),
+      ]),
+    ),
+    [
+      [150, true],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL Resize of the IDL account before the SetBuffer is exact", async () => {
+  assert.deepEqual(
+    await exactAt150(
+      aroundSetBuffer((setBuffer) => [idlIx(setBuffer, 6, [3, 0, 0, 0])]),
+    ),
+    [
+      [150, true],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL Close of an account other than the SetBuffer's IDL account is not exact", async () => {
+  assert.deepEqual(
+    await exactAt150(
+      aroundSetBuffer((setBuffer) => [idlIx(setBuffer, 5, [2, 0, 0])]),
+    ),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL Create of an account other than the SetBuffer's IDL account is not exact", async () => {
+  // Create's account 1 is the account it creates; 2 is the IDL buffer.
+  assert.deepEqual(
+    await exactAt150(
+      aroundSetBuffer((setBuffer) => [idlIx(setBuffer, 0, [0, 2, 0, 0, 1])]),
+    ),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL Close with no SetBuffer is not exact", async () => {
+  assert.deepEqual(
+    await exactAt150(onIdl((setBuffer) => idlIx(setBuffer, 5, [3, 0, 0]))),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL Write after the SetBuffer is not exact", async () => {
+  assert.deepEqual(
+    await exactAt150(
+      aroundSetBuffer(
+        () => [],
+        (setBuffer) => [idlIx(setBuffer, 2, [3, 0])],
+      ),
+    ),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an IDL CreateBuffer is not exact", async () => {
+  assert.deepEqual(
+    await exactAt150(
+      aroundSetBuffer((setBuffer) => [idlIx(setBuffer, 1, [2, 0])]),
+    ),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
+test("an inserted IDL Close to a destination that is not the vault is not exact", async () => {
+  // The SetBuffer stays, so only the Close's destination fails.
+  assert.deepEqual(
+    await exactAt150(
+      aroundSetBuffer((setBuffer) => [idlIx(setBuffer, 5, [3, 0, 6])]),
+    ),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
 });

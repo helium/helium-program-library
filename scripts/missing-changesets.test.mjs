@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
-import { missingChangesets, parseChangeset } from "./missing-changesets.mjs";
+import {
+  addedChangesets,
+  missingChangesets,
+  parseChangeset,
+} from "./missing-changesets.mjs";
 
 const changed = {
   packages: ["@helium/idls", "@helium/spl-utils"],
@@ -172,4 +180,51 @@ test("parseChangeset reads a file with CRLF line ends", () => {
       summary: "Text here.",
     },
   );
+});
+
+test("addedChangesets reads only added changesets, and never README.md", () => {
+  const repo = mkdtempSync(path.join(tmpdir(), "missing-changesets-"));
+  const cwd = process.cwd();
+  const git = (...args) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
+      { cwd: repo, encoding: "utf8" },
+    ).trim();
+  const write = (file, text) =>
+    writeFileSync(path.join(repo, ".changeset", file), text);
+  const patch = (name) => `---\n"${name}": patch\n---\n\nA change.\n`;
+  try {
+    git("init", "-q");
+    mkdirSync(path.join(repo, ".changeset"));
+    write("old.md", patch("@helium/old"));
+    git("add", ".");
+    git("commit", "-q", "-m", "base");
+    const base = git("rev-parse", "HEAD");
+    write("old.md", patch("@helium/modified"));
+    write("new.md", patch("@helium/new"));
+    // A README has no front matter, so reading it as a changeset would throw.
+    write("README.md", "# Changesets\n");
+    git("add", ".");
+    git("commit", "-q", "-m", "head");
+
+    process.chdir(repo);
+    const added = addedChangesets(base, "HEAD", ".changeset");
+
+    assert.deepEqual(
+      added.map(({ file }) => file),
+      [".changeset/new.md"],
+    );
+  } finally {
+    process.chdir(cwd);
+    rmSync(repo, { recursive: true, force: true });
+  }
 });

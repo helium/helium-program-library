@@ -13,17 +13,15 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildGraph,
+  changedFiles as diffFiles,
   changedProgramsForBases,
   crateFor,
   isNoReleasePath,
+  lockfileAt,
+  manifestAt,
+  run,
 } from "./changed-programs.mjs";
 import { parseProgramTag } from "./program-hash-check.mjs";
-
-const run = (command, args) =>
-  execFileSync(command, args, {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
 
 const git = (...args) => run("git", args);
 
@@ -33,12 +31,13 @@ const NO_BASE = Symbol("no base");
 
 /**
  * The files that mark one program as changed, for the failure text: its own
- * source, plus the source of the crates in its `via`.
+ * source, plus the source of the crates in its `via`, plus `Cargo.lock` when
+ * its `via` names it.
  */
 const markingFiles = ({ crateDirs }, { name, via }, files) =>
   files.filter((file) => {
     if (isNoReleasePath(file)) return false;
-    const crate = crateFor(crateDirs, file);
+    const crate = crateFor(crateDirs, file) ?? file;
     return crate === name || via.includes(crate);
   });
 
@@ -57,13 +56,23 @@ const markingFiles = ({ crateDirs }, { name, via }, files) =>
  *   metadata: object,
  *   programs: { name: string, version: string, tags: string[], tagCommit?: string, skippedSha?: string }[],
  *   changedFiles: (base: string) => string[],
+ *   lockfilesFor?: (base: string) => { base: string, head: string },
+ *   manifestsFor?: (base: string) => { base: string, head: string },
  * }} input `programs` carries each program's current version, the versions its
  *   `program-<name>-*` tags name, the commit of the tag for the current version
  *   and the program's `skipped.json` SHA. `changedFiles` gives the paths a base
- *   changed against HEAD.
+ *   changed against HEAD. `lockfilesFor` gives `Cargo.lock` at a base and at
+ *   HEAD, for a base whose changed paths include it, and `manifestsFor` the root
+ *   `Cargo.toml` the same way.
  * @returns {{ ok: boolean, results: object[], failing: object[] }}
  */
-export const missingBumpCheck = ({ metadata, programs, changedFiles }) => {
+export const missingBumpCheck = ({
+  metadata,
+  programs,
+  changedFiles,
+  lockfilesFor,
+  manifestsFor,
+}) => {
   const graph = buildGraph(metadata);
 
   const bases = {};
@@ -91,6 +100,8 @@ export const missingBumpCheck = ({ metadata, programs, changedFiles }) => {
       defaultBase: NO_BASE,
       filesByBase,
       programBases,
+      lockfilesFor,
+      manifestsFor,
     });
   const changedSinceTag = changedFrom(bases);
 
@@ -170,15 +181,22 @@ const USAGE =
 
 const PACKAGE_VERSION = /^version = "(\d+\.\d+\.\d+)"$/m;
 
-/** The file's content at `head`, or null when it is not in that tree. */
-const showFile = (head, file) => {
+// What `git show` prints when the ref exists and the path is not in its tree.
+const NOT_IN_TREE = /does not exist in|exists on disk, but not in/;
+
+/**
+ * The file's content at `head`, or null when it is not in that tree. Any other
+ * failure, such as a bad ref, throws.
+ */
+export const showFile = (head, file) => {
   try {
     return execFileSync("git", ["show", `${head}:${file}`], {
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
-  } catch {
-    return null;
+  } catch (err) {
+    if (NOT_IN_TREE.test(String(err.stderr ?? err.message))) return null;
+    throw err;
   }
 };
 
@@ -263,10 +281,15 @@ const main = (argv) => {
   const result = missingBumpCheck({
     metadata,
     programs: readPrograms(head, skipped),
-    changedFiles: (base) =>
-      git("diff", "--name-only", "-z", "--no-renames", base, head)
-        .split("\0")
-        .filter(Boolean),
+    changedFiles: (base) => diffFiles(base, head),
+    lockfilesFor: (base) => ({
+      base: lockfileAt(base),
+      head: lockfileAt(head),
+    }),
+    manifestsFor: (base) => ({
+      base: manifestAt(base),
+      head: manifestAt(head),
+    }),
   });
 
   const text = report(result);

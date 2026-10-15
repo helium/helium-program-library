@@ -99,6 +99,22 @@ test("docs and tests inside a package are no-release paths", () => {
   );
 });
 
+test("a package.json with no version names nothing", () => {
+  assert.deepEqual(
+    changedPackages({
+      files: ["packages/unversioned/src/index.ts"],
+      manifests: [
+        {
+          dir: "packages/unversioned",
+          packageJson: { name: "@helium/unversioned" },
+        },
+      ],
+      config,
+    }),
+    [],
+  );
+});
+
 test("a file outside packages/ names nothing", () => {
   assert.deepEqual(
     changedPackages({
