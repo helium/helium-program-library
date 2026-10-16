@@ -880,7 +880,7 @@ describe("lazy-distributor", () => {
 
         expectRejectedWith(
           await replayUnderOwnTask(signed, null),
-          "InvalidRemoteTask"
+          "TaskMismatch"
         );
         const recipientAcc =
           await program.account.recipientV0.fetch(recipientB);

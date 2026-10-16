@@ -44,7 +44,13 @@ pub fn handler<'info>(
     merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
     owner: ctx.accounts.owner.key(),
     delegate: ctx.accounts.owner.key(),
-    proof_accounts: ctx.remaining_accounts.to_vec(),
+    // Only the first depth minus canopy depth accounts are proof nodes; ignore any after them.
+    proof_accounts: ctx
+      .remaining_accounts
+      .iter()
+      .take(crate::compression::proof_len(&ctx.accounts.merkle_tree)?)
+      .cloned()
+      .collect(),
   })?;
 
   ctx.accounts.recipient.destination = ctx.accounts.destination.key();
