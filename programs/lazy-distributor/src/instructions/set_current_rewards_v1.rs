@@ -8,7 +8,9 @@ use anchor_lang::{
   Discriminator,
 };
 use shared_utils::resize_to_fit;
-use tuktuk_program::{verify_running_remote_task, TaskV0};
+use tuktuk_program::{
+  client::args::RunTaskV0, tuktuk, verify_running_remote_task, TaskV0, VerifyRunningRemoteTaskError,
+};
 
 use crate::{ed25519::*, error::ErrorCode, state::*, SetCurrentRewardsArgsV0};
 
@@ -206,15 +208,19 @@ fn running_remote_task<'a, 'info>(
 ) -> Result<(&'a AccountInfo<'info>, TaskV0)> {
   let index = load_current_index_checked(sysvar_instructions)?;
   let run_task_ix = load_instruction_at_checked(index as usize, sysvar_instructions)?;
+  require!(
+    run_task_ix.program_id == tuktuk::ID && run_task_ix.data.starts_with(RunTaskV0::DISCRIMINATOR),
+    VerifyRunningRemoteTaskError::NotRunningAsTask
+  );
   let running_task = run_task_ix
     .accounts
     .get(RUN_TASK_TASK_ACCOUNT)
-    .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?
+    .ok_or_else(|| error!(VerifyRunningRemoteTaskError::NotRunningAsTask))?
     .pubkey;
   let task_info = remaining_accounts
     .iter()
     .find(|account| account.key() == running_task)
-    .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?;
+    .ok_or_else(|| error!(VerifyRunningRemoteTaskError::TaskMismatch))?;
   let task = verify_running_remote_task(sysvar_instructions, task_info, signer)?;
   Ok((task_info, task))
 }
@@ -566,18 +572,14 @@ mod tests {
     assert_eq!(metas.len(), RUN_TASK_HEADER_ACCOUNTS);
   }
 
-  // run_task_v0 hands each CPI the task's free-task accounts after the instruction's own, so the
-  // running task is not the last remaining account when the task has free tasks.
-  #[test]
-  fn finds_the_running_task_ahead_of_free_task_accounts() {
-    use tuktuk_program::{client::args::RunTaskV0, tuktuk, TransactionSourceV0, TriggerV0};
+  const FREE_TASKS: usize = 6;
 
-    const FREE_TASKS: usize = 6;
-    let task_key = Pubkey::new_unique();
-    let signer = Pubkey::new_unique();
-    let run_task = Instruction {
-      program_id: tuktuk::ID,
-      accounts: (0..6)
+  // A top-level instruction whose account 3 is `task_key`: tuktuk run_task_v0 unless the program
+  // or data say otherwise.
+  fn top_level_ix(program_id: Pubkey, data: &[u8], task_key: Pubkey) -> Instruction {
+    Instruction {
+      program_id,
+      accounts: (0..RUN_TASK_HEADER_ACCOUNTS)
         .map(|i| {
           AccountMeta::new_readonly(
             if i == RUN_TASK_TASK_ACCOUNT {
@@ -589,9 +591,20 @@ mod tests {
           )
         })
         .collect(),
-      data: RunTaskV0::DISCRIMINATOR.to_vec(),
-    };
-    let mut sysvar_data = sysvar_holding(&run_task);
+      data: data.to_vec(),
+    }
+  }
+
+  // Runs `running_remote_task` with `top_level` as the current instruction and remaining accounts
+  // laid out as set_current_rewards_wrapper_v2 passes them: [approver, task, free_0..free_5].
+  fn find_running_task(
+    top_level: &Instruction,
+    task_key: Pubkey,
+    signer: Pubkey,
+  ) -> Result<(Pubkey, TaskV0)> {
+    use tuktuk_program::{TransactionSourceV0, TriggerV0};
+
+    let mut sysvar_data = sysvar_holding(top_level);
     let mut sysvar_lamports = 0u64;
     let sysvar_owner = Pubkey::default();
     let sysvar = AccountInfo::new(
@@ -627,7 +640,6 @@ mod tests {
 
     let tuktuk_id = tuktuk::ID;
     let system_id = Pubkey::default();
-    // [approver, task, free_0..free_5]: the layout set_current_rewards_wrapper_v2 passes.
     let keys: Vec<Pubkey> = (0..2 + FREE_TASKS).map(|_| Pubkey::new_unique()).collect();
     let mut lamports = vec![0u64; keys.len()];
     let mut datas: Vec<Vec<u8>> = (0..keys.len()).map(|_| Vec::new()).collect();
@@ -647,9 +659,37 @@ mod tests {
       })
       .collect();
 
-    let (task_info, task) =
-      running_remote_task(&sysvar, &remaining, &signer).expect("finds the running task");
-    assert_eq!(task_info.key(), task_key);
-    assert_eq!(task.free_tasks, 6);
+    running_remote_task(&sysvar, &remaining, &signer).map(|(info, task)| (info.key(), task))
+  }
+
+  // run_task_v0 hands each CPI the task's free-task accounts after the instruction's own, so the
+  // running task is not the last remaining account when the task has free tasks.
+  #[test]
+  fn finds_the_running_task_ahead_of_free_task_accounts() {
+    let task_key = Pubkey::new_unique();
+    let run_task = top_level_ix(tuktuk::ID, RunTaskV0::DISCRIMINATOR, task_key);
+    let (found, task) = find_running_task(&run_task, task_key, Pubkey::new_unique())
+      .unwrap_or_else(|err| panic!("finds the running task: {err:?}"));
+    assert_eq!(found, task_key);
+    assert_eq!(task.free_tasks as usize, FREE_TASKS);
+  }
+
+  #[test]
+  fn rejects_a_top_level_instruction_that_is_not_run_task_v0() {
+    use tuktuk_program::client::args::QueueTaskV0;
+
+    // Account 3 of the top-level instruction is not among the remaining accounts, so the shape
+    // check has to come before the task lookup.
+    for top_level in [
+      top_level_ix(Pubkey::new_unique(), &[0u8; 8], Pubkey::new_unique()),
+      top_level_ix(tuktuk::ID, QueueTaskV0::DISCRIMINATOR, Pubkey::new_unique()),
+    ] {
+      let err =
+        find_running_task(&top_level, Pubkey::new_unique(), Pubkey::new_unique()).unwrap_err();
+      assert_eq!(
+        err,
+        Error::from(VerifyRunningRemoteTaskError::NotRunningAsTask)
+      );
+    }
   }
 }
