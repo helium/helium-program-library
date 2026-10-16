@@ -94,7 +94,7 @@ export class DatabaseMock implements Database {
   readonly hemProgram: Program<HeliumEntityManager>;
   readonly getAssetFn: (
     url: string,
-    asset: PublicKey
+    asset: PublicKey,
   ) => Promise<Asset | undefined>;
   inMemHash: {
     totalClicks: number;
@@ -111,9 +111,9 @@ export class DatabaseMock implements Database {
     hemProgram: Program<HeliumEntityManager>,
     getAssetFn: (
       url: string,
-      asset: PublicKey
+      asset: PublicKey,
     ) => Promise<Asset | undefined> = getAsset,
-    dao: PublicKey
+    dao: PublicKey,
   ) {
     this.hemProgram = hemProgram;
     this.getAssetFn = getAssetFn;
@@ -127,7 +127,7 @@ export class DatabaseMock implements Database {
   getRewardableEntitiesByDestination(
     destination: PublicKey,
     limit: number,
-    batchNumber?: number
+    batchNumber?: number,
   ): Promise<{
     entities: Pick<RewardableEntity, "keyToAsset">[];
     nextBatchNumber: number;
@@ -135,12 +135,12 @@ export class DatabaseMock implements Database {
     throw new Error("Method not implemented.");
   }
   async getRewardsByOwner(
-    owner: string
+    owner: string,
   ): Promise<{ lifetime: string; pending: string }> {
     return { lifetime: "0", pending: "0" };
   }
   async getRewardsByDestination(
-    destination: string
+    destination: string,
   ): Promise<{ lifetime: string; pending: string }> {
     return { lifetime: "0", pending: "0" };
   }
@@ -148,7 +148,7 @@ export class DatabaseMock implements Database {
   getRewardableEntities(
     wallet: anchor.web3.PublicKey,
     limit: number,
-    batchNumber?: number
+    batchNumber?: number,
   ): Promise<{ entities: RewardableEntity[]; nextBatchNumber: number }> {
     throw new Error("Method not implemented.");
   }
@@ -161,7 +161,7 @@ export class DatabaseMock implements Database {
     const pubkey = Address.fromB58(entityKey);
     return Math.floor(
       (this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
-        Math.pow(10, 8)
+        Math.pow(10, 8),
     ).toString();
   }
 
@@ -176,11 +176,11 @@ export class DatabaseMock implements Database {
         const pubkey = Address.fromB58(key);
         acc[key] = Math.floor(
           (_this.inMemHash.byHotspot[pubkey.b58]?.lifetimeRewards || 0) *
-            Math.pow(10, 8)
+            Math.pow(10, 8),
         ).toString();
         return acc;
       },
-      {}
+      {},
     );
 
     return res;
@@ -198,7 +198,7 @@ export class DatabaseMock implements Database {
     const asset = await this.getAssetFn(
       // @ts-ignore
       this.hemProgram.provider.connection._rpcEndpoint,
-      assetId
+      assetId,
     );
     if (!asset) {
       console.error("No asset found", assetId.toBase58());
@@ -208,12 +208,12 @@ export class DatabaseMock implements Database {
     const ktaAcc = await this.hemProgram.account.keyToAssetV0.fetch(kta);
     const eccCompact = decodeEntityKey(
       ktaAcc.entityKey,
-      ktaAcc.keySerialization
+      ktaAcc.keySerialization,
     )!;
     try {
       return Math.floor(
         (this.inMemHash.byHotspot[eccCompact]?.lifetimeRewards || 0) *
-          Math.pow(10, 8)
+          Math.pow(10, 8),
       ).toString();
     } catch (err) {
       console.error("Mint with error: ", asset.toString());
@@ -273,7 +273,7 @@ export class DatabaseMock implements Database {
 
 function loadKeypair(keypair: string): Keypair {
   return Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString()))
+    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString())),
   );
 }
 
@@ -307,17 +307,17 @@ describe("distributor-oracle", () => {
     ldProgram = await initLazy(
       provider,
       LD_PID,
-      anchor.workspace.LazyDistributor.idl
+      anchor.workspace.LazyDistributor.idl,
     );
     rewardsProgram = await initRewards(
       provider,
       REWARDS_PID,
-      anchor.workspace.RewardsOracle.idl
+      anchor.workspace.RewardsOracle.idl,
     );
     hemProgram = await initHeliumEntityManager(
       provider,
       HEM_PID,
-      anchor.workspace.HeliumEntityManager.idl
+      anchor.workspace.HeliumEntityManager.idl,
     );
 
     rewardsMint = await createMint(provider, 6, me, me);
@@ -351,23 +351,23 @@ describe("distributor-oracle", () => {
       provider,
       pubkeys.rewardsMint!,
       1000000000000,
-      pubkeys.lazyDistributor
+      pubkeys.lazyDistributor,
     );
 
     const hsdProgram = await initHeliumSubDaos(
       provider,
       HSD_PID,
-      anchor.workspace.HeliumSubDaos.idl
+      anchor.workspace.HeliumSubDaos.idl,
     );
     const dcProgram = await initDataCredits(
       provider,
       DC_PID,
-      anchor.workspace.DataCredits.idl
+      anchor.workspace.DataCredits.idl,
     );
     const vsrProgram = await vsrInit(
       provider,
       VSR_PID,
-      anchor.workspace.VoterStakeRegistry.idl
+      anchor.workspace.VoterStakeRegistry.idl,
     );
     const nftProxyProgram = await initNftProxy(provider);
     const { registrar } = await initVsr(
@@ -378,7 +378,7 @@ describe("distributor-oracle", () => {
       hntMint,
       daoKey(hntMint)[0],
       1,
-      3
+      3,
     );
 
     const {
@@ -394,7 +394,7 @@ describe("distributor-oracle", () => {
       1,
       1,
       registrar,
-      hntMint
+      hntMint,
     );
     daoK = dao;
     const eccVerifier = loadKeypair(__dirname + "/keypairs/verifier-test.json");
@@ -451,7 +451,7 @@ describe("distributor-oracle", () => {
       oracle,
       db,
       lazyDistributor,
-      dao
+      dao,
     );
     await oracleServer.start();
 
@@ -481,7 +481,7 @@ describe("distributor-oracle", () => {
         keyToAsset,
         oracle: oracle.publicKey,
         lazyDistributorProgram: new PublicKey(
-          "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w"
+          "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w",
         ),
       })
       .signers([oracle])
@@ -504,7 +504,7 @@ describe("distributor-oracle", () => {
     assert.typeOf(res.body, "object");
     assert.equal(
       res.body.currentRewards,
-      await oracleServer.db.getCurrentRewards(asset)
+      await oracleServer.db.getCurrentRewards(asset),
     );
   });
 
@@ -538,7 +538,7 @@ describe("distributor-oracle", () => {
     console.log(res.body);
     assert.hasAllKeys(res.body, ["transactions", "success"]);
     const signedTx = VersionedTransaction.deserialize(
-      res.body.transactions[0].data
+      res.body.transactions[0].data,
     );
     await sendAndConfirmWithRetry(
       provider.connection,
@@ -546,13 +546,13 @@ describe("distributor-oracle", () => {
       {
         skipPreflight: true,
       },
-      "confirmed"
+      "confirmed",
     );
 
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
     assert.equal(
       recipientAcc.totalRewards.toNumber(),
-      Number(await oracleServer.db.getCurrentRewards(asset))
+      Number(await oracleServer.db.getCurrentRewards(asset)),
     );
   });
 
@@ -583,7 +583,7 @@ describe("distributor-oracle", () => {
 
     assert.hasAllKeys(res.body, ["transaction", "success"]);
     const signedTx = VersionedTransaction.deserialize(
-      res.body.transaction.data
+      res.body.transaction.data,
     );
     await sendAndConfirmWithRetry(
       provider.connection,
@@ -591,13 +591,13 @@ describe("distributor-oracle", () => {
       {
         skipPreflight: true,
       },
-      "confirmed"
+      "confirmed",
     );
 
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
     assert.equal(
       recipientAcc.totalRewards.toNumber(),
-      Number(await oracleServer.db.getCurrentRewards(asset))
+      Number(await oracleServer.db.getCurrentRewards(asset)),
     );
   });
 
@@ -620,7 +620,7 @@ describe("distributor-oracle", () => {
         recipient,
         keyToAsset,
         lazyDistributorProgram: new PublicKey(
-          "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w"
+          "1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w",
         ),
       })
       .preInstructions([
@@ -635,7 +635,7 @@ describe("distributor-oracle", () => {
     const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
     assert.equal(
       recipientAcc.currentRewards[0]?.toNumber(),
-      Number(await oracleServer.db.getCurrentRewards(asset))
+      Number(await oracleServer.db.getCurrentRewards(asset)),
     );
   });
 
@@ -668,7 +668,7 @@ describe("distributor-oracle", () => {
           taskQueue,
           taskQueueNameMapping: taskQueueNameMappingKey(
             tuktukConfig,
-            taskQueueName
+            taskQueueName,
           )[0],
         })
         .rpc();
@@ -691,82 +691,90 @@ describe("distributor-oracle", () => {
       ]);
     });
 
-    it("sets rewards through the wrapper with the running task", async () => {
-      const keyToAsset = keyToAssetKey(daoK, ecc)[0];
-      const task = taskKey(taskQueue, 0)[0];
-      await tuktukProgram.methods
-        .queueTaskV0({
-          id: 0,
-          trigger: { now: {} },
-          crankReward: null,
-          freeTasks: 0,
-          transaction: {
-            remoteV0: {
-              url: "https://example.com/rewards",
-              signer: oracle.publicKey,
+    // tuktuk passes a task's free-task accounts to the wrapper after the task, so the lazy
+    // distributor has to find the running task among them.
+    for (const freeTasks of [0, 6]) {
+      it(`sets rewards through the wrapper with the running task and ${freeTasks} free tasks`, async () => {
+        const keyToAsset = keyToAssetKey(daoK, ecc)[0];
+        const task = taskKey(taskQueue, 0)[0];
+        await tuktukProgram.methods
+          .queueTaskV0({
+            id: 0,
+            trigger: { now: {} },
+            crankReward: null,
+            freeTasks,
+            transaction: {
+              remoteV0: {
+                url: "https://example.com/rewards",
+                signer: oracle.publicKey,
+              },
             },
-          },
-          description: "set current rewards",
-        })
-        .accountsPartial({ task, taskQueue })
-        .rpc({ skipPreflight: true });
-      const { queuedAt } = await tuktukProgram.account.taskV0.fetch(task);
+            description: "set current rewards",
+          })
+          .accountsPartial({ task, taskQueue })
+          .rpc({ skipPreflight: true });
+        const { queuedAt } = await tuktukProgram.account.taskV0.fetch(task);
 
-      const currentRewards = new anchor.BN(
-        await oracleServer.db.getCurrentRewards(asset)
-      );
-      const ix = await rewardsProgram.methods
-        .setCurrentRewardsWrapperV2({ currentRewards, oracleIndex: 0 })
-        .accountsPartial({
-          lazyDistributor,
-          recipient,
-          keyToAsset,
-          payer: taskPayer,
-          lazyDistributorProgram: LD_PID,
-        })
-        .remainingAccounts([
-          { pubkey: task, isSigner: false, isWritable: false },
-        ])
-        .instruction();
-      const { transaction, remainingAccounts } = compileTransaction(
-        [ix],
-        [taskPayerSeeds]
-      );
-      const remoteTaskTransaction = await RemoteTaskTransactionV0.serialize(
-        tuktukProgram.coder.accounts,
-        new RemoteTaskTransactionV0({
-          task,
-          taskQueuedAt: queuedAt,
-          transaction: {
-            ...transaction,
-            accounts: remainingAccounts.map((acc) => acc.pubkey),
-          },
-        })
-      );
-      const signature = Buffer.from(
-        sign.detached(Uint8Array.from(remoteTaskTransaction), oracle.secretKey)
-      );
-
-      await sendInstructions(provider, [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
-        ...(await runTask({
-          program: tuktukProgram,
-          task,
-          crankTurner: me,
-          fetcher: async () => ({
-            remoteTaskTransaction,
-            remainingAccounts,
-            signature,
+        const currentRewards = new anchor.BN(
+          await oracleServer.db.getCurrentRewards(asset),
+        );
+        const ix = await rewardsProgram.methods
+          .setCurrentRewardsWrapperV2({ currentRewards, oracleIndex: 0 })
+          .accountsPartial({
+            lazyDistributor,
+            recipient,
+            keyToAsset,
+            payer: taskPayer,
+            lazyDistributorProgram: LD_PID,
+          })
+          .remainingAccounts([
+            { pubkey: task, isSigner: false, isWritable: false },
+          ])
+          .instruction();
+        const { transaction, remainingAccounts } = compileTransaction(
+          [ix],
+          [taskPayerSeeds],
+        );
+        const remoteTaskTransaction = await RemoteTaskTransactionV0.serialize(
+          tuktukProgram.coder.accounts,
+          new RemoteTaskTransactionV0({
+            task,
+            taskQueuedAt: queuedAt,
+            transaction: {
+              ...transaction,
+              accounts: remainingAccounts.map((acc) => acc.pubkey),
+            },
           }),
-        })),
-      ]);
+        );
+        const signature = Buffer.from(
+          sign.detached(
+            Uint8Array.from(remoteTaskTransaction),
+            oracle.secretKey,
+          ),
+        );
 
-      const recipientAcc = await ldProgram.account.recipientV0.fetch(recipient);
-      assert.equal(
-        recipientAcc.currentRewards[0]?.toNumber(),
-        currentRewards.toNumber()
-      );
-    });
+        await sendInstructions(provider, [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+          ...(await runTask({
+            program: tuktukProgram,
+            task,
+            crankTurner: me,
+            fetcher: async () => ({
+              remoteTaskTransaction,
+              remainingAccounts,
+              signature,
+            }),
+          })),
+        ]);
+
+        const recipientAcc =
+          await ldProgram.account.recipientV0.fetch(recipient);
+        assert.equal(
+          recipientAcc.currentRewards[0]?.toNumber(),
+          currentRewards.toNumber(),
+        );
+      });
+    }
   });
 
   describe("Transaction validation tests", () => {
@@ -774,7 +782,7 @@ describe("distributor-oracle", () => {
       const ix = await ldProgram.methods
         .setCurrentRewardsV0({
           currentRewards: new BN(
-            (await oracleServer.db.getCurrentRewards(asset)) + 1000
+            (await oracleServer.db.getCurrentRewards(asset)) + 1000,
           ),
           oracleIndex: 0,
         })
@@ -809,7 +817,7 @@ describe("distributor-oracle", () => {
       const ix = await ldProgram.methods
         .setCurrentRewardsV0({
           currentRewards: new BN(
-            await oracleServer.db.getCurrentRewards(asset)
+            await oracleServer.db.getCurrentRewards(asset),
           ),
           oracleIndex: 0,
         })
@@ -826,7 +834,7 @@ describe("distributor-oracle", () => {
           fromPubkey: oracle.publicKey,
           toPubkey: me,
           lamports: 100000000,
-        })
+        }),
       );
       tx.recentBlockhash = (
         await provider.connection.getLatestBlockhash()
@@ -851,7 +859,7 @@ describe("distributor-oracle", () => {
       const ix = await ldProgram.methods
         .setCurrentRewardsV0({
           currentRewards: new BN(
-            await oracleServer.db.getCurrentRewards(asset)
+            await oracleServer.db.getCurrentRewards(asset),
           ),
           oracleIndex: 0,
         })
