@@ -15,4 +15,4 @@ Image: `public.ecr.aws/v0j6k5v6/asset-ownership-service`
 | oracle-cluster / prod | [manifests/oracle-cluster/prod/helium/asset-ownership-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/oracle-cluster/prod/helium/asset-ownership-service.yaml) |
 | oracle-cluster / sdlc | [manifests/oracle-cluster/sdlc/helium/asset-ownership.service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/oracle-cluster/sdlc/helium/asset-ownership.service.yaml) |
 
-Deploy: push a `docker-web-asset-ownership-service-<version>` git tag.
+Image release: push a `docker-web-asset-ownership-service-<version>` tag by hand (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.

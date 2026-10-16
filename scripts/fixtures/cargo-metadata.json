@@ -1,0 +1,1127 @@
+{
+  "_source": "cargo metadata --format-version 1 --no-deps, trimmed to the fields scripts/changed-programs.mjs reads; the absolute workspace root was rewritten to /repo",
+  "workspace_root": "/repo",
+  "packages": [
+    {
+      "name": "circuit-breaker",
+      "manifest_path": "/repo/programs/circuit-breaker/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "shared-utils",
+      "manifest_path": "/repo/utils/shared-utils/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "account-compression-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bubblegum-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "mpl-token-metadata",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "uint",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "data-credits",
+      "manifest_path": "/repo/programs/data-credits/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "circuit-breaker",
+          "path": "/repo/programs/circuit-breaker",
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "helium-sub-daos",
+          "path": "/repo/programs/helium-sub-daos",
+          "kind": null
+        },
+        {
+          "name": "lazy-transactions",
+          "path": "/repo/programs/lazy-transactions",
+          "kind": null
+        },
+        {
+          "name": "pyth-solana-receiver-sdk",
+          "path": "/repo/utils/pyth_solana_receiver_sdk",
+          "kind": null
+        },
+        {
+          "name": "pythnet-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "helium-sub-daos",
+      "manifest_path": "/repo/programs/helium-sub-daos/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "circuit-breaker",
+          "path": "/repo/programs/circuit-breaker",
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "modular-governance",
+          "path": "/repo/utils/modular-governance",
+          "kind": null
+        },
+        {
+          "name": "mpl-token-metadata",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "no-emit",
+          "path": "/repo/programs/no-emit",
+          "kind": null
+        },
+        {
+          "name": "pyth-solana-receiver-sdk",
+          "path": "/repo/utils/pyth_solana_receiver_sdk",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-program",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "time",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "treasury-management",
+          "path": "/repo/programs/treasury-management",
+          "kind": null
+        },
+        {
+          "name": "voter-stake-registry",
+          "path": "/repo/programs/voter-stake-registry",
+          "kind": null
+        },
+        {
+          "name": "rust_decimal",
+          "path": null,
+          "kind": "dev"
+        }
+      ]
+    },
+    {
+      "name": "modular-governance",
+      "manifest_path": "/repo/utils/modular-governance/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "no-emit",
+      "manifest_path": "/repo/programs/no-emit/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "treasury-management",
+      "manifest_path": "/repo/programs/treasury-management/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "circuit-breaker",
+          "path": "/repo/programs/circuit-breaker",
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "voter-stake-registry",
+      "manifest_path": "/repo/programs/voter-stake-registry/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bytemuck",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "itertools",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "modular-governance",
+          "path": "/repo/utils/modular-governance",
+          "kind": null
+        },
+        {
+          "name": "mpl-token-metadata",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-program",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "static_assertions",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "lazy-transactions",
+      "manifest_path": "/repo/programs/lazy-transactions/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bytemuck",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "spl-concurrent-merkle-tree",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "dc-auto-top",
+      "manifest_path": "/repo/programs/dc-auto-top/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bytemuck",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "chrono",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "circuit-breaker",
+          "path": "/repo/programs/circuit-breaker",
+          "kind": null
+        },
+        {
+          "name": "clockwork-cron",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "data-credits",
+          "path": "/repo/programs/data-credits",
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "helium-sub-daos",
+          "path": "/repo/programs/helium-sub-daos",
+          "kind": null
+        },
+        {
+          "name": "lazy-transactions",
+          "path": "/repo/programs/lazy-transactions",
+          "kind": null
+        },
+        {
+          "name": "pyth-solana-receiver-sdk",
+          "path": "/repo/utils/pyth_solana_receiver_sdk",
+          "kind": null
+        },
+        {
+          "name": "pythnet-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "tuktuk-dca",
+          "path": "/repo/programs/tuktuk-dca",
+          "kind": null
+        },
+        {
+          "name": "tuktuk-program",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "tuktuk-dca",
+      "manifest_path": "/repo/programs/tuktuk-dca/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bytemuck",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "pyth-solana-receiver-sdk",
+          "path": "/repo/utils/pyth_solana_receiver_sdk",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "tuktuk-program",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "fanout",
+      "manifest_path": "/repo/programs/fanout/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "mpl-token-metadata",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "helium-entity-manager",
+      "manifest_path": "/repo/programs/helium-entity-manager/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "account-compression-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "angry-purple-tiger",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bs58",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bubblegum-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bytemuck",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "data-credits",
+          "path": "/repo/programs/data-credits",
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "helium-sub-daos",
+          "path": "/repo/programs/helium-sub-daos",
+          "kind": null
+        },
+        {
+          "name": "mpl-token-metadata",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "no-emit",
+          "path": "/repo/programs/no-emit",
+          "kind": null
+        },
+        {
+          "name": "pyth-solana-receiver-sdk",
+          "path": "/repo/utils/pyth_solana_receiver_sdk",
+          "kind": null
+        },
+        {
+          "name": "pythnet-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "hexboosting",
+      "manifest_path": "/repo/programs/hexboosting/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bytemuck",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "data-credits",
+          "path": "/repo/programs/data-credits",
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "helium-sub-daos",
+          "path": "/repo/programs/helium-sub-daos",
+          "kind": null
+        },
+        {
+          "name": "mobile-entity-manager",
+          "path": "/repo/programs/mobile-entity-manager",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "mobile-entity-manager",
+      "manifest_path": "/repo/programs/mobile-entity-manager/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "account-compression-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "angry-purple-tiger",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bs58",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bubblegum-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bytemuck",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "helium-entity-manager",
+          "path": "/repo/programs/helium-entity-manager",
+          "kind": null
+        },
+        {
+          "name": "helium-sub-daos",
+          "path": "/repo/programs/helium-sub-daos",
+          "kind": null
+        },
+        {
+          "name": "mpl-token-metadata",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "hpl-crons",
+      "manifest_path": "/repo/programs/hpl-crons/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "helium-entity-manager",
+          "path": "/repo/programs/helium-entity-manager",
+          "kind": null
+        },
+        {
+          "name": "helium-sub-daos",
+          "path": "/repo/programs/helium-sub-daos",
+          "kind": null
+        },
+        {
+          "name": "modular-governance",
+          "path": "/repo/utils/modular-governance",
+          "kind": null
+        },
+        {
+          "name": "no-emit",
+          "path": "/repo/programs/no-emit",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "spl-associated-token-account",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "spl-token",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "tuktuk-program",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "voter-stake-registry",
+          "path": "/repo/programs/voter-stake-registry",
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "lazy-distributor",
+      "manifest_path": "/repo/programs/lazy-distributor/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "account-compression-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bubblegum-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "circuit-breaker",
+          "path": "/repo/programs/circuit-breaker",
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "mpl-token-metadata",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-program",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "tuktuk-program",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "mini-fanout",
+      "manifest_path": "/repo/programs/mini-fanout/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "chrono",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "clockwork-cron",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "solana-zk-sdk",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "tuktuk-program",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "price-oracle",
+      "manifest_path": "/repo/programs/price-oracle/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "rewards-oracle",
+      "manifest_path": "/repo/programs/rewards-oracle/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "helium-entity-manager",
+          "path": "/repo/programs/helium-entity-manager",
+          "kind": null
+        },
+        {
+          "name": "lazy-distributor",
+          "path": "/repo/programs/lazy-distributor",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "name": "welcome-pack",
+      "manifest_path": "/repo/programs/welcome-pack/Cargo.toml",
+      "dependencies": [
+        {
+          "name": "account-compression-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-lang",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "anchor-spl",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "brine-ed25519",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "bubblegum-cpi",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "circuit-breaker",
+          "path": "/repo/programs/circuit-breaker",
+          "kind": null
+        },
+        {
+          "name": "clockwork-cron",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "default-env",
+          "path": "/repo/utils/default-env",
+          "kind": null
+        },
+        {
+          "name": "lazy-distributor",
+          "path": "/repo/programs/lazy-distributor",
+          "kind": null
+        },
+        {
+          "name": "mini-fanout",
+          "path": "/repo/programs/mini-fanout",
+          "kind": null
+        },
+        {
+          "name": "shared-utils",
+          "path": "/repo/utils/shared-utils",
+          "kind": null
+        },
+        {
+          "name": "solana-security-txt",
+          "path": null,
+          "kind": null
+        },
+        {
+          "name": "tuktuk-program",
+          "path": null,
+          "kind": null
+        }
+      ]
+    }
+  ]
+}
