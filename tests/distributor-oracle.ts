@@ -20,6 +20,7 @@ import {
   createAtaAndMint,
   createMint,
   getAsset,
+  sleep,
   sendAndConfirmWithRetry,
   sendInstructions,
 } from "@helium/spl-utils";
@@ -35,6 +36,7 @@ import {
   tuktukConfigKey,
 } from "@helium/tuktuk-sdk";
 import {
+  AddressLookupTableProgram,
   ComputeBudgetProgram,
   Ed25519Program,
   Keypair,
@@ -42,6 +44,7 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
+  TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import chai, { assert, expect } from "chai";
@@ -62,6 +65,7 @@ import {
   keyToAssetKey,
 } from "../packages/helium-entity-manager-sdk/src";
 import {
+  distributeCompressionRewards,
   initializeCompressionRecipient,
   init as initLazy,
   PROGRAM_ID as LD_PID,
@@ -694,7 +698,7 @@ describe("distributor-oracle", () => {
     // tuktuk passes a task's free-task accounts to the wrapper after the task, so the lazy
     // distributor has to find the running task among them.
     for (const freeTasks of [0, 6]) {
-      it(`sets rewards through the wrapper with the running task and ${freeTasks} free tasks`, async () => {
+      it(`sets and distributes rewards through the wrapper with the running task and ${freeTasks} free tasks`, async () => {
         const keyToAsset = keyToAssetKey(daoK, ecc)[0];
         const task = taskKey(taskQueue, 0)[0];
         await tuktukProgram.methods
@@ -731,8 +735,19 @@ describe("distributor-oracle", () => {
             { pubkey: task, isSigner: false, isWritable: false },
           ])
           .instruction();
+        // The oracle's KTA task distributes in the same task for compressed hotspots.
+        const distributeIx = await (
+          await distributeCompressionRewards({
+            program: ldProgram,
+            assetId: asset,
+            lazyDistributor,
+            payer: taskPayer,
+            getAssetFn,
+            getAssetProofFn,
+          })
+        ).instruction();
         const { transaction, remainingAccounts } = compileTransaction(
-          [ix],
+          [ix, distributeIx],
           [taskPayerSeeds],
         );
         const remoteTaskTransaction = await RemoteTaskTransactionV0.serialize(
@@ -753,8 +768,8 @@ describe("distributor-oracle", () => {
           ),
         );
 
-        await sendInstructions(provider, [
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 400000 }),
+        const runTaskIxs = [
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
           ...(await runTask({
             program: tuktukProgram,
             task,
@@ -765,14 +780,64 @@ describe("distributor-oracle", () => {
               signature,
             }),
           })),
-        ]);
+        ];
+        // Set and distribute together do not fit in a transaction without a lookup table.
+        const lutAddresses = [
+          ...new Map(
+            runTaskIxs
+              .flatMap((runIx) => [
+                runIx.programId,
+                ...runIx.keys.filter((k) => !k.isSigner).map((k) => k.pubkey),
+              ])
+              .map((key) => [key.toBase58(), key]),
+          ).values(),
+        ];
+        const [createLutIx, lut] = AddressLookupTableProgram.createLookupTable({
+          authority: me,
+          payer: me,
+          recentSlot: await provider.connection.getSlot("finalized"),
+        });
+        await sendInstructions(provider, [createLutIx]);
+        for (let i = 0; i < lutAddresses.length; i += 20) {
+          await sendInstructions(provider, [
+            AddressLookupTableProgram.extendLookupTable({
+              lookupTable: lut,
+              authority: me,
+              payer: me,
+              addresses: lutAddresses.slice(i, i + 20),
+            }),
+          ]);
+        }
+        // Wait for the lookup table to activate
+        await sleep(1000);
+        const lutAccount = (
+          await provider.connection.getAddressLookupTable(lut)
+        ).value!;
+        const runTaskTx = await provider.wallet.signTransaction(
+          new VersionedTransaction(
+            new TransactionMessage({
+              payerKey: me,
+              recentBlockhash: (await provider.connection.getLatestBlockhash())
+                .blockhash,
+              instructions: runTaskIxs,
+            }).compileToV0Message([lutAccount]),
+          ),
+        );
+        await sendAndConfirmWithRetry(
+          provider.connection,
+          Buffer.from(runTaskTx.serialize()),
+          { skipPreflight: true, maxRetries: 0 },
+          "confirmed",
+        );
 
+        // Distributing clears current rewards and moves the median into total rewards.
         const recipientAcc =
           await ldProgram.account.recipientV0.fetch(recipient);
         assert.equal(
-          recipientAcc.currentRewards[0]?.toNumber(),
+          recipientAcc.totalRewards.toNumber(),
           currentRewards.toNumber(),
         );
+        assert.isTrue(recipientAcc.currentRewards.every((r) => r === null));
       });
     }
   });

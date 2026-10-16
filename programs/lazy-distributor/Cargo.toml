@@ -33,3 +33,6 @@ solana-security-txt = { workspace = true }
 solana-program = { workspace = true }
 default-env = { workspace = true }
 tuktuk-program = { workspace = true }
+
+[dev-dependencies]
+spl-concurrent-merkle-tree = "0.4.0"
