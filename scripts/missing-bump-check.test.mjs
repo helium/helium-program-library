@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -7,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import {
   missingBumpCheck,
   packageVersion,
+  reviewedShas,
   showFile,
   taggedVersions,
 } from "./missing-bump-check.mjs";
@@ -108,10 +117,10 @@ const PRICE_ORACLE_SKIPPED = {
   version: "0.2.2",
   tags: ["0.2.2"],
   tagCommit: "price-oracle-tag",
-  skippedSha: "reviewed-sha",
+  reviewedSha: "reviewed-sha",
 };
 
-test("a change since the tag but not since the skipped.json SHA passes", () => {
+test("a change since the tag but not since the reviewed SHA passes", () => {
   const { ok, results } = missingBumpCheck({
     metadata,
     programs: [PRICE_ORACLE_SKIPPED],
@@ -123,7 +132,7 @@ test("a change since the tag but not since the skipped.json SHA passes", () => {
   assert.equal(results[0].status, "clean");
 });
 
-test("a change since both the tag and the skipped.json SHA fails", () => {
+test("a change since both the tag and the reviewed SHA fails", () => {
   const { ok, failing } = missingBumpCheck({
     metadata,
     programs: [PRICE_ORACLE_SKIPPED],
@@ -150,7 +159,7 @@ test("a change since both the tag and the skipped.json SHA fails", () => {
   ]);
 });
 
-test("a change since the tag and a different change since the skipped.json SHA passes", () => {
+test("a change since the tag and a different change since the reviewed SHA passes", () => {
   const { ok, results } = missingBumpCheck({
     metadata,
     programs: [PRICE_ORACLE_SKIPPED],
@@ -165,10 +174,10 @@ test("a change since the tag and a different change since the skipped.json SHA p
   assert.equal(results[0].status, "clean");
 });
 
-test("a change since the tag with no skipped.json SHA fails on the tag diff alone", () => {
+test("a change since the tag with no reviewed SHA fails on the tag diff alone", () => {
   const { ok, failing } = missingBumpCheck({
     metadata,
-    programs: [{ ...PRICE_ORACLE_SKIPPED, skippedSha: undefined }],
+    programs: [{ ...PRICE_ORACLE_SKIPPED, reviewedSha: undefined }],
     changedFiles: (base) =>
       base === "price-oracle-tag" ? ["programs/price-oracle/src/lib.rs"] : [],
   });
@@ -319,4 +328,65 @@ dependencies = [
       files: ["Cargo.lock"],
     },
   ]);
+});
+
+test("reviewedShas keys each program to the newest commit that declared it none", () => {
+  const repo = mkdtempSync(path.join(tmpdir(), "missing-bump-check-"));
+  const cwd = process.cwd();
+  const git = (...args) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
+      { cwd: repo, encoding: "utf8" },
+    ).trim();
+  const commit = (file, text) => {
+    writeFileSync(path.join(repo, ".changeset-programs", file), text);
+    git("add", ".");
+    git("commit", "-q", "-m", file);
+    return git("rev-parse", "HEAD");
+  };
+  try {
+    git("init", "-q");
+    mkdirSync(path.join(repo, ".changeset-programs"));
+    commit("README.md", "fanout: none\n");
+    const fanout = commit(
+      "a.md",
+      "---\nfanout: none\nno-emit: patch\n---\n\nA.\n",
+    );
+    // `mini-fanout: none` contains `fanout: none`, and must not move fanout.
+    const miniFanout = commit("b.md", "---\nmini-fanout: none\n---\n\nB.\n");
+    // A text edit and a rewrite of the same declaration review nothing new.
+    commit("a.md", "---\nfanout:  none\nno-emit: patch\n---\n\nA, reworded.\n");
+    // Lowering a level to none is a new review.
+    const noEmit = commit(
+      "a.md",
+      "---\nfanout:  none\nno-emit: none\n---\n\nA.\n",
+    );
+    // Raising it back is not, so the older review stands.
+    commit("a.md", "---\nfanout:  none\nno-emit: patch\n---\n\nA.\n");
+    // The version step consumes changesets; the review stays in history.
+    git("rm", "-q", ".changeset-programs/a.md", ".changeset-programs/b.md");
+    git("commit", "-q", "-m", "consume");
+
+    process.chdir(repo);
+    assert.deepEqual(
+      { ...reviewedShas("HEAD") },
+      {
+        fanout,
+        "mini-fanout": miniFanout,
+        "no-emit": noEmit,
+      },
+    );
+  } finally {
+    process.chdir(cwd);
+    rmSync(repo, { recursive: true, force: true });
+  }
 });

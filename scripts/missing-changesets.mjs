@@ -20,7 +20,8 @@ const USAGE =
 export const IDLS_PACKAGE = "@helium/idls";
 
 const FRONT_MATTER = /^---\n([\s\S]*?)---\n?([\s\S]*)$/;
-const ENTRY = /^(["']?)([^"':]+)\1:\s*(\w+)\s*$/;
+// One `name: level` front matter line.
+export const ENTRY = /^(["']?)([^"':]+)\1:\s*(\w+)\s*$/;
 const LEVELS = ["major", "minor", "patch", "none"];
 // An npm package name or a program directory name. A name like `__proto__`
 // fails it, so it cannot reach the releases object as a key.

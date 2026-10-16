@@ -21,6 +21,7 @@ import {
   manifestAt,
   run,
 } from "./changed-programs.mjs";
+import { ENTRY } from "./missing-changesets.mjs";
 import { parseProgramTag } from "./program-hash-check.mjs";
 
 const git = (...args) => run("git", args);
@@ -49,18 +50,18 @@ const markingFiles = ({ crateDirs }, { name, via }, files) =>
  * - `bumped`: no tag for the current version. The next tag bot run tags it.
  * - `clean`: the current version is tagged and nothing has changed since.
  * - `missing-bump`: the current version is tagged and the source moved. Fails.
- *   A program with a `skipped.json` SHA fails only when its source moved since
- *   the tag and also since that SHA.
+ *   A program with a reviewed SHA fails only when its source moved since the tag
+ *   and also since that SHA.
  *
  * @param {{
  *   metadata: object,
- *   programs: { name: string, version: string, tags: string[], tagCommit?: string, skippedSha?: string }[],
+ *   programs: { name: string, version: string, tags: string[], tagCommit?: string, reviewedSha?: string }[],
  *   changedFiles: (base: string) => string[],
  *   lockfilesFor?: (base: string) => { base: string, head: string },
  *   manifestsFor?: (base: string) => { base: string, head: string },
  * }} input `programs` carries each program's current version, the versions its
  *   `program-<name>-*` tags name, the commit of the tag for the current version
- *   and the program's `skipped.json` SHA. `changedFiles` gives the paths a base
+ *   and the program's reviewed SHA. `changedFiles` gives the paths a base
  *   changed against HEAD. `lockfilesFor` gives `Cargo.lock` at a base and at
  *   HEAD, for a base whose changed paths include it, and `manifestsFor` the root
  *   `Cargo.toml` the same way.
@@ -76,20 +77,20 @@ export const missingBumpCheck = ({
   const graph = buildGraph(metadata);
 
   const bases = {};
-  const skippedBases = {};
-  for (const { name, version, tags, tagCommit, skippedSha } of programs) {
+  const reviewedBases = {};
+  for (const { name, version, tags, tagCommit, reviewedSha } of programs) {
     if (!tags.includes(version)) continue;
     bases[name] = tagCommit;
-    // A `none` level reviewed the program up to the SHA in `skipped.json`. Tags
-    // sit on master merge commits that develop never contains, so neither
+    // A `none` level reviewed the program up to its reviewed SHA. Tags sit on
+    // master merge commits that develop never contains, so neither
     // commit is reliably the later one, and a change must show against both.
-    if (skippedSha) skippedBases[name] = skippedSha;
+    if (reviewedSha) reviewedBases[name] = reviewedSha;
   }
 
   const filesByBase = {};
   for (const base of new Set([
     ...Object.values(bases),
-    ...Object.values(skippedBases),
+    ...Object.values(reviewedBases),
   ])) {
     filesByBase[base] = changedFiles(base);
   }
@@ -120,15 +121,15 @@ export const missingBumpCheck = ({
       };
     }
     const base = bases[name];
-    const skippedBase = skippedBases[name];
+    const reviewedBase = reviewedBases[name];
     const tagEntry = changedSinceTag.find((program) => program.name === name);
-    // A skipped SHA clears a file only when the file has not changed since it.
+    // A reviewed SHA clears a file only when the file has not changed since it.
     const files = tagEntry
       ? markingFiles(graph, tagEntry, filesByBase[base]).filter(
-          (file) => !skippedBase || filesByBase[skippedBase].includes(file),
+          (file) => !reviewedBase || filesByBase[reviewedBase].includes(file),
         )
       : [];
-    const failing = tagEntry && (!skippedBase || files.length > 0);
+    const failing = tagEntry && (!reviewedBase || files.length > 0);
     return {
       name,
       version,
@@ -222,6 +223,60 @@ export const taggedVersions = (name, tags) =>
     .filter((parsed) => parsed?.name === name)
     .map(({ version }) => version);
 
+const PROGRAM_CHANGESETS = ".changeset-programs/*.md";
+const NOT_README = ":!.changeset-programs/README.md";
+
+/**
+ * Each program's reviewed SHA: the newest commit reachable from `head` that
+ * declares the program `none` in a program changeset. The `none` reviews the
+ * program up to that commit. History keeps the commit after the version step
+ * consumes the changeset, and a squash merge keeps it as the squash commit.
+ *
+ * A commit declares a program when its diff adds a `<program>: none` line and
+ * removes none for that program, so a reworded changeset reviews nothing new.
+ */
+export const reviewedShas = (head) => {
+  // No prototype, so no program name reads an inherited key.
+  const shas = Object.create(null);
+  const commits = git(
+    "log",
+    "--topo-order",
+    "--no-merges",
+    "--format=%H",
+    head,
+    "--",
+    PROGRAM_CHANGESETS,
+    NOT_README,
+  )
+    .split("\n")
+    .filter(Boolean);
+  for (const sha of commits) {
+    const diff = git(
+      "show",
+      "--format=",
+      "--unified=0",
+      "--no-ext-diff",
+      sha,
+      "--",
+      PROGRAM_CHANGESETS,
+      NOT_README,
+    ).split("\n");
+    const declaredNone = (sign) =>
+      new Set(
+        diff
+          .filter((line) => line.startsWith(sign))
+          .map((line) => line.slice(1).match(ENTRY))
+          .filter((entry) => entry?.[3] === "none")
+          .map((entry) => entry[2]),
+      );
+    const removed = declaredNone("-");
+    for (const name of declaredNone("+")) {
+      if (!removed.has(name) && !(name in shas)) shas[name] = sha;
+    }
+  }
+  return shas;
+};
+
 /**
  * Every `programs/*` directory with a `Cargo.toml`, with its version at `head`,
  * its tagged versions and the commit the tag for that version points at.
@@ -230,7 +285,7 @@ export const taggedVersions = (name, tags) =>
  * carries legacy `-v0.0.7` tags and a `-0.2.34-new` suffix that a looser
  * pattern would read as versions.
  */
-export const readPrograms = (head, skipped) =>
+export const readPrograms = (head, reviewed) =>
   git("ls-tree", "-d", "--name-only", `${head}:programs`)
     .split("\n")
     .filter(Boolean)
@@ -249,7 +304,7 @@ export const readPrograms = (head, skipped) =>
         tagCommit: tags.includes(version)
           ? git("rev-list", "-n1", `program-${name}-${version}`).trim()
           : undefined,
-        skippedSha: skipped[name],
+        reviewedSha: reviewed[name],
       };
     })
     .filter(Boolean);
@@ -275,12 +330,9 @@ const main = (argv) => {
   const metadata = JSON.parse(
     run("cargo", ["metadata", "--format-version", "1", "--no-deps"]),
   );
-  const skipped = JSON.parse(
-    showFile(head, ".changeset-programs/skipped.json") ?? "{}",
-  );
   const result = missingBumpCheck({
     metadata,
-    programs: readPrograms(head, skipped),
+    programs: readPrograms(head, reviewedShas(head)),
     changedFiles: (base) => diffFiles(base, head),
     lockfilesFor: (base) => ({
       base: lockfileAt(base),

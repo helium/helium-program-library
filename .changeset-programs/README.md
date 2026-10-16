@@ -8,8 +8,7 @@ it names the release level and holds the text the Squads signer reads.
 IDL gets one file in each directory.
 
 This `README.md` keeps the directory in git when the last program changeset is
-consumed. The version script that part 2 adds later skips it, and skips
-`skipped.json`.
+consumed. The version script that part 2 adds later skips it.
 
 ## The file format
 
@@ -52,10 +51,14 @@ hand decision; the changeset bot that part 2 adds later never writes it.
 ## `none`
 
 `none` means "this change ships nothing on chain". No version bump and no
-changelog entry. The version script that part 2 adds later records the program
-and the commit it was reviewed up to in `skipped.json`, so the missing-bump
-check asks for a bump only when the program changed since both its tag and that
-commit. The program's next real release clears the entry.
+changelog entry. The commit that adds the `<program>: none` line is the
+program's reviewed commit. The missing-bump check reads it from git history and
+asks for a bump only when the program changed since both its tag and that
+commit. Nobody records the commit by hand, and a squash merge keeps it as the
+squash commit.
+
+A `none` review covers the program only up to that commit. A later change to the
+program needs a new program changeset; rewording the old one reviews nothing.
 
 A program is marked changed by its own source, by the source of a workspace
 crate it depends on, by a `Cargo.lock` change to a dependency it resolves, or by
