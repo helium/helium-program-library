@@ -8,7 +8,6 @@ use sqlx::{
   PgPool, Row,
 };
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -31,7 +30,7 @@ pub struct ChangeRecord {
 
 #[derive(Debug)]
 pub struct DatabaseClient {
-  pool: Arc<RwLock<Arc<PgPool>>>,
+  pool: Arc<PgPool>,
   config: DatabaseConfig,
   polling_jobs: Vec<PollingJob>,
   dry_run: bool,
@@ -77,8 +76,8 @@ fn bound_by_sink_cursor(query_max_block: u64, sink_cursor: Option<&str>) -> Opti
 }
 
 impl DatabaseClient {
-  async fn get_pool(&self) -> Arc<PgPool> {
-    Arc::clone(&*self.pool.read().await)
+  fn get_pool(&self) -> Arc<PgPool> {
+    Arc::clone(&self.pool)
   }
 
   pub async fn new(
@@ -90,7 +89,7 @@ impl DatabaseClient {
     Self::validate_polling_jobs(&polling_jobs)?;
 
     let pool = Self::create_pool(config, dry_run).await?;
-    let pool = Arc::new(RwLock::new(Arc::new(pool)));
+    let pool = Arc::new(pool);
 
     Ok(Self {
       pool,
@@ -100,7 +99,8 @@ impl DatabaseClient {
     })
   }
 
-  async fn create_pool(config: &DatabaseConfig, dry_run: bool) -> Result<PgPool> {
+  /// Builds connect options, with a fresh IAM auth token when using IAM auth
+  async fn connect_options(config: &DatabaseConfig) -> Result<PgConnectOptions> {
     let is_rds = config.host.contains("rds.amazonaws.com");
     let password = if is_rds && config.password.is_empty() {
       info!("Detected AWS RDS connection, generating IAM auth token");
@@ -138,6 +138,13 @@ impl DatabaseClient {
         ("tcp_keepalives_count", "6"),
       ]);
 
+    Ok(connect_options)
+  }
+
+  async fn create_pool(config: &DatabaseConfig, dry_run: bool) -> Result<PgPool> {
+    let is_rds = config.host.contains("rds.amazonaws.com");
+    let connect_options = Self::connect_options(config).await?;
+
     // IAM auth tokens expire after 15 minutes, so force shorter connection lifetimes
     // to ensure connections are recycled before token expiration
     let (max_lifetime, idle_timeout) = if is_rds && config.password.is_empty() {
@@ -170,36 +177,25 @@ impl DatabaseClient {
       "Connected to database at {}:{}/{} (ssl_mode: {:?}, auth: {}, dry_run: {}, max_lifetime: {}s, idle_timeout: {}s, statement_timeout: {}s, lock_timeout: {}s, tcp_keepalive: 60s)",
       config.host, config.port, config.database_name, config.ssl_mode,
       if is_rds && config.password.is_empty() { "IAM" } else { "password" },
-      dry_run, max_lifetime, idle_timeout, config.statement_timeout_seconds, lock_timeout_ms / 1000
+      dry_run, max_lifetime, idle_timeout, config.statement_timeout_seconds, std::cmp::min(config.statement_timeout_seconds, 30)
     );
 
     Ok(pool)
   }
 
-  /// Recreates the database pool with a fresh IAM auth token (if using IAM auth)
+  /// Gives the pool a fresh IAM auth token (if using IAM auth) for the connections it opens
+  /// from now on. Open connections stay in use, so in-flight queries are not interrupted.
   pub async fn refresh_pool(&self) -> Result<()> {
     let is_rds = self.config.host.contains("rds.amazonaws.com");
     if is_rds && self.config.password.is_empty() {
       info!("Refreshing database pool with new IAM auth token");
 
-      // Retry pool refresh up to 3 times with exponential backoff
+      // Retry token generation up to 3 times with exponential backoff
       let mut last_error = None;
       for attempt in 1..=3 {
-        match Self::create_pool(&self.config, self.dry_run).await {
-          Ok(new_pool) => {
-            let new_pool_arc = Arc::new(new_pool);
-            let old_pool = {
-              let mut pool_write = self.pool.write().await;
-              let old = std::mem::replace(&mut *pool_write, new_pool_arc);
-              old
-            }; // Write lock dropped here
-
-            // Close old pool gracefully in background - don't block on it
-            tokio::spawn(async move {
-              old_pool.close().await;
-              debug!("Old database pool closed");
-            });
-
+        match Self::connect_options(&self.config).await {
+          Ok(connect_options) => {
+            self.pool.set_connect_options(connect_options);
             info!(
               "Database pool refreshed successfully on attempt {}",
               attempt
@@ -370,7 +366,7 @@ impl DatabaseClient {
   }
 
   pub async fn create_state_tables(&self) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let create_table_query = r#"
       CREATE TABLE IF NOT EXISTS atomic_data_polling_state (
         job_name VARCHAR(255) NOT NULL UNIQUE,
@@ -448,7 +444,7 @@ impl DatabaseClient {
   }
 
   pub async fn table_exists(&self, table_name: &str) -> Result<bool> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let query = r#"
       SELECT EXISTS (
         SELECT FROM information_schema.tables
@@ -472,7 +468,7 @@ impl DatabaseClient {
     query_name: &str,
     queue_position: i32,
   ) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let existing_state = sqlx::query(
       r#"
       SELECT
@@ -655,7 +651,7 @@ impl DatabaseClient {
     &self,
     job: &PollingJob,
   ) -> Result<(Option<i64>, u64), AtomicDataError> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let current_state_row = sqlx::query(
       r#"
       SELECT
@@ -731,7 +727,7 @@ impl DatabaseClient {
     query_name: &str,
     max_block: u64,
   ) -> Result<(), AtomicDataError> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     // last_max_block tracks the source data state, shared across both modes
     sqlx::query(
       r#"
@@ -761,7 +757,7 @@ impl DatabaseClient {
     last_processed_block: i64,
     target_block: u64,
   ) -> Result<Vec<sqlx::postgres::PgRow>, AtomicDataError> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
 
     crate::queries::AtomicHotspotQueries::validate_query_name(&job.query_name).map_err(|e| {
       AtomicDataError::QueryValidationError(format!(
@@ -961,7 +957,7 @@ impl DatabaseClient {
     query_name: &str,
     target_block: u64,
   ) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     // Update the appropriate block counter based on dry_run mode
     let update_query = if self.dry_run {
       r#"
@@ -1002,7 +998,7 @@ impl DatabaseClient {
   }
 
   async fn advance_block_for_active_job(&self, target_block: u64) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let active_job = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -1027,7 +1023,7 @@ impl DatabaseClient {
   }
 
   pub async fn health_check(&self) -> Result<(), sqlx::Error> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     // Test basic connectivity
     sqlx::query("SELECT 1").execute(&*pool).await?;
 
@@ -1045,7 +1041,7 @@ impl DatabaseClient {
   }
 
   pub async fn test_connection(&self) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     tokio::time::timeout(
       std::time::Duration::from_secs(5),
       sqlx::query("SELECT 1").execute(&*pool),
@@ -1060,7 +1056,7 @@ impl DatabaseClient {
     query_name: &str,
     parameters: &serde_json::Value,
   ) -> Result<Option<u64>> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let block = match query_name {
       "construct_atomic_hotspots" => {
         let hotspot_type = parameters
@@ -1170,7 +1166,7 @@ impl DatabaseClient {
     job: &PollingJob,
     after_block: u64,
   ) -> Result<Option<u64>> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let block = match job.query_name.as_str() {
       "construct_atomic_hotspots" => {
         let hotspot_type = job
@@ -1255,7 +1251,7 @@ impl DatabaseClient {
   }
 
   pub async fn any_job_running(&self) -> Result<bool> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let row = sqlx::query(
       r#"
       SELECT COUNT(*) as running_count
@@ -1277,7 +1273,7 @@ impl DatabaseClient {
   }
 
   pub async fn mark_job_running(&self, job_name: &str, query_name: &str) -> Result<bool> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let mut tx = pool.begin().await?;
     let existing = sqlx::query(
       r#"
@@ -1337,7 +1333,7 @@ impl DatabaseClient {
   }
 
   pub async fn mark_job_not_running(&self, job_name: &str, query_name: &str) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1361,7 +1357,7 @@ impl DatabaseClient {
   }
 
   async fn get_next_queue_job(&self) -> Result<Option<PollingJob>> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let row = sqlx::query(
       r#"
       SELECT job_name, query_name
@@ -1393,7 +1389,7 @@ impl DatabaseClient {
   }
 
   pub async fn mark_completed(&self, job_name: &str, query_name: &str) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1416,7 +1412,7 @@ impl DatabaseClient {
   }
 
   async fn reset_job_queue(&self) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1433,7 +1429,7 @@ impl DatabaseClient {
   }
 
   pub async fn cleanup_stale_jobs(&self) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
 
     // Adaptive stale job detection (backup safety net):
     // - If job is caught up (within 10% of max_block), use 10 min threshold (likely stuck)
@@ -1584,7 +1580,7 @@ impl DatabaseClient {
   }
 
   pub async fn cleanup_all_jobs(&self) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let result = sqlx::query(
       r#"
       UPDATE atomic_data_polling_state
@@ -1644,7 +1640,7 @@ impl DatabaseClient {
     error_type: &str,
     error_message: &str,
   ) -> Result<()> {
-    let pool = self.get_pool().await;
+    let pool = self.get_pool();
     let record_hash = Self::generate_record_hash(record);
 
     // Use INSERT ... ON CONFLICT to update failure count if already exists
@@ -1926,7 +1922,7 @@ mod tests {
       json!({"change_type": "entity_ownership"}),
     );
     let client = DatabaseClient {
-      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      pool: Arc::new(pool.clone()),
       config: valid_test_db_config(),
       polling_jobs: vec![job.clone()],
       dry_run: false,
@@ -1978,7 +1974,7 @@ mod tests {
       json!({"change_type": "entity_ownership"}),
     );
     let client = DatabaseClient {
-      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      pool: Arc::new(pool.clone()),
       config: valid_test_db_config(),
       polling_jobs: vec![job.clone()],
       dry_run: false,
@@ -2027,7 +2023,7 @@ mod tests {
       json!({"change_type": "mobile_hotspot", "hotspot_type": "mobile"}),
     );
     let client = DatabaseClient {
-      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      pool: Arc::new(pool.clone()),
       config: valid_test_db_config(),
       polling_jobs: vec![job.clone()],
       dry_run: false,
@@ -2063,7 +2059,7 @@ mod tests {
       json!({"change_type": "entity_ownership"}),
     );
     let client = DatabaseClient {
-      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      pool: Arc::new(pool.clone()),
       config: valid_test_db_config(),
       polling_jobs: vec![job.clone()],
       dry_run: false,
@@ -2121,7 +2117,7 @@ mod tests {
       json!({"change_type": "entity_reward_destination"}),
     );
     let client = DatabaseClient {
-      pool: Arc::new(RwLock::new(Arc::new(pool.clone()))),
+      pool: Arc::new(pool.clone()),
       config: valid_test_db_config(),
       polling_jobs: vec![job.clone()],
       dry_run: false,
