@@ -1093,7 +1093,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.3.11"
+version = "0.3.12"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
