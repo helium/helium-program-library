@@ -301,6 +301,8 @@ describe("distributor-oracle", () => {
   // Whether beforeEach creates the hotspot's recipient. A suite that needs a hotspot without one
   // clears it in its `before` hook.
   let initRecipient = true;
+  // Canopy depth of the maker tree that beforeEach mints the hotspot into.
+  let canopyDepth = 0;
 
   before(async () => {
     await ensureLDIdl();
@@ -401,6 +403,7 @@ describe("distributor-oracle", () => {
       1,
       registrar,
       hntMint,
+      canopyDepth,
     );
     daoK = dao;
     const eccVerifier = loadKeypair(__dirname + "/keypairs/verifier-test.json");
@@ -923,6 +926,32 @@ describe("distributor-oracle", () => {
           recipientAcc.lazyDistributor.toBase58(),
           lazyDistributor.toBase58(),
         );
+        assert.equal(
+          recipientAcc.totalRewards.toString(),
+          currentRewards.toString(),
+        );
+        assert.isTrue(recipientAcc.currentRewards.every((r) => r === null));
+      });
+    });
+
+    // The client sends max depth minus canopy depth proof nodes, so the lazy distributor has to
+    // read the canopy from the tree account to find where the proof ends.
+    describe("for a hotspot in a tree with a canopy", () => {
+      before(() => {
+        canopyDepth = 2;
+      });
+      after(() => {
+        canopyDepth = 0;
+      });
+
+      it("sets and distributes rewards with 6 free tasks", async () => {
+        const currentRewards = await runRewardsTask({
+          freeTasks: 6,
+          initializeRecipient: false,
+        });
+
+        const recipientAcc =
+          await ldProgram.account.recipientV0.fetch(recipient);
         assert.equal(
           recipientAcc.totalRewards.toString(),
           currentRewards.toString(),
