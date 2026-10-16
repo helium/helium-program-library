@@ -33,7 +33,7 @@ runs:
       with:
         path: |
           ./target/
-        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/**') }}-${{ inputs.program }}
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-${{ inputs.devnet }}-${{ inputs.testing }}-${{ hashFiles('./programs/**/**', 'Cargo.lock', 'Cargo.toml', 'utils/shared-utils/**', 'utils/default-env/**', 'utils/modular-governance/**', 'utils/pyth_solana_receiver_sdk/**') }}-${{ inputs.program }}
     # The programs refuse to compile when TESTING is set without HELIUM_TEST_BUILD, so a
     # test build carries both.
     - run: |
