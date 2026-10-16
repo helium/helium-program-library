@@ -80,10 +80,8 @@ jobs:
     # those skips also need a bot author. Only a GitHub App or the Actions token opens a PR as a
     # bot. `develop` and `master` already exist, so no one can open a new branch with that name.
     # The head IDLs come from `build`'s artifact, the same `anchor build` the develop seed saves
-    # the base IDLs from. Building them here again cost a cold anchor-cli install and IDL build,
-    # about 14 min, and saved a 1.3 GB `target/debug` under every PR ref. If `build` fails, this job
-    # is skipped and does not report. That is acceptable while it is not a required check; add a
-    # cold-build fallback before making it one.
+    # the base IDLs from. If `build` fails, this job is skipped and does not report. That is
+    # acceptable while it is not a required check; add a cold-build fallback before making it one.
     needs: build
     if: >-
       github.event_name == 'pull_request'
@@ -159,8 +157,10 @@ jobs:
         with:
           node-version-file: .node-version
       - name: Every changed program has a version bump
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          node scripts/missing-bump-check.mjs --json "$RUNNER_TEMP/missing-bump.json"
+          node scripts/missing-bump-check.mjs "$PR_HEAD" --json "$RUNNER_TEMP/missing-bump.json"
 
   # The release scripts decide what deploys to mainnet. No develop-seed skip: a push to develop
   # runs them too.

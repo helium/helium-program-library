@@ -46,8 +46,11 @@ runs:
         DUMPED_BUFFER=$(mktemp ./buffer-dump.XXXXXX.so)
         trap 'rm -f "$DUMPED_BUFFER"' EXIT
         for CANDIDATE in $CANDIDATES; do
-          if solana program dump "$CANDIDATE" "$DUMPED_BUFFER" -u "$NETWORK" > /dev/null 2>&1 \
-            && cmp -s "./target/deploy/$PROGRAM.so" "$DUMPED_BUFFER"; then
+          if ! solana program dump "$CANDIDATE" "$DUMPED_BUFFER" -u "$NETWORK" > /dev/null 2>&1; then
+            echo "::error::Could not dump the vault buffer $CANDIDATE"
+            exit 1
+          fi
+          if cmp -s "./target/deploy/$PROGRAM.so" "$DUMPED_BUFFER"; then
             echo "Buffer $CANDIDATE matches the build"
             echo "buffer=$CANDIDATE" >> "$GITHUB_OUTPUT"
             echo "- \`$PROGRAM\`: reused buffer \`$CANDIDATE\`" >> "$GITHUB_STEP_SUMMARY"

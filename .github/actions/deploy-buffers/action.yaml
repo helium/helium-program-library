@@ -90,6 +90,48 @@ runs:
         program: ${{ inputs.program }}
         buffer-authority: ${{ inputs.buffer-authority }}
 
+    # The program buffer is written before `write-idl-buffer` runs, so a missing IDL account
+    # stops the run here, before it pays for a program buffer.
+    - name: Require the IDL account
+      shell: bash
+      run: |
+        if ! anchor idl fetch "$PROGRAM_ID" --provider.cluster "$NETWORK" > /dev/null 2>&1; then
+          echo "::error title=$PROGRAM has no IDL account on the target cluster::anchor idl fetch failed for $PROGRAM_ID. The Squads step upgrades an IDL account that exists. Run anchor idl init once, then re-run."
+          exit 1
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+
+    # `write-idl-buffer` checks the program IDL authority too, but after the program buffer is
+    # written. A wrong authority stops the run here, before it pays for a program buffer.
+    - name: Require a program IDL authority this run can use
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        shell: bash
+        command: |
+          set -euo pipefail
+          KEYPAIR_FILE=$(mktemp ./deploy-keypair.XXXXXX.json)
+          trap 'rm -f "$KEYPAIR_FILE"' EXIT
+          chmod 600 "$KEYPAIR_FILE"
+          echo "$DEPLOY_KEYPAIR" > "$KEYPAIR_FILE"
+          CURRENT=$(anchor idl authority "$PROGRAM_ID" --provider.cluster "$NETWORK")
+          DEPLOYER=$(solana-keygen pubkey "$KEYPAIR_FILE")
+          if ! grep -qF "$AUTHORITY" <<<"$CURRENT" && ! grep -qF "$DEPLOYER" <<<"$CURRENT"; then
+            echo "::error title=$PROGRAM IDL authority::The program IDL authority is not the vault or the deployer key: $CURRENT"
+            exit 1
+          fi
+          echo "Program IDL authority: $CURRENT"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        DEPLOY_KEYPAIR: ${{ inputs.keypair }}
+
     # On a failure before the authority transfer, this action closes the buffer it made.
     - uses: ./.github/actions/write-program-buffer/
       id: write-program-buffer

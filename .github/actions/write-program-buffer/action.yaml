@@ -11,6 +11,7 @@
 # - Cleanup does not remove `./authority-keypair.json`. No step here makes that file.
 # - The buffer address is an output before the write starts, and a failure before the
 #   authority transfer closes that buffer.
+# - The program check also requires the buffer authority to be the program's upgrade authority.
 #
 # The caller installs the Solana CLI first (`setup-anchor` does it).
 name: "Write Program Buffer"
@@ -69,6 +70,7 @@ runs:
     # This action upgrades an existing program: it writes a buffer for the multisig to apply.
     # Creating a program at a new address needs that address's own keypair, which no workflow
     # here holds. Check that precondition before spending anything on a buffer.
+    # Also check that the buffer authority is the program's upgrade authority.
     - name: Require the program on the target cluster
       id: check-program
       shell: bash
@@ -89,12 +91,18 @@ runs:
           echo "::error::Could not read the data length of $PROGRAM_ID (got: $CURRENT_SIZE)"
           exit 1
         fi
+        UPGRADE_AUTHORITY=$(echo "$PROGRAM_INFO" | sed -nE 's/^Authority: ([1-9A-HJ-NP-Za-km-z]+)$/\1/p')
+        if [ -z "$BUFFER_AUTHORITY" ] || [ "$UPGRADE_AUTHORITY" != "$BUFFER_AUTHORITY" ]; then
+          echo "::error title=$PROGRAM upgrade authority is not the buffer authority::$PROGRAM_ID upgrade authority is ${UPGRADE_AUTHORITY:-unknown}, not the buffer authority, so the multisig cannot apply a buffer. Nothing was written."
+          exit 1
+        fi
         echo "Current program data length: $CURRENT_SIZE"
         echo "data_len=$CURRENT_SIZE" >> "$GITHUB_OUTPUT"
       env:
         PROGRAM: ${{ inputs.program }}
         PROGRAM_ID: ${{ inputs.program-id }}
         NETWORK: ${{ inputs.network }}
+        BUFFER_AUTHORITY: ${{ inputs.buffer-authority }}
 
     - name: Resize program if needed
       shell: bash

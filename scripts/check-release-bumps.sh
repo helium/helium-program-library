@@ -47,7 +47,9 @@ for p in $(changed 'programs/*/src/*' | cut -d/ -f2 | sort -u); do
   if grep -qxF "$p" <<<"$none_programs"; then
     continue
   fi
-  if ! git diff "$MERGE_BASE" HEAD -- "programs/$p/Cargo.toml" | grep -q '^+version'; then
+  old=$(git show "$MERGE_BASE:programs/$p/Cargo.toml" 2>/dev/null | grep -m1 '^version = "')
+  new=$(grep -m1 '^version = "' "programs/$p/Cargo.toml")
+  if [ "$old" = "$new" ]; then
     error "programs/$p/src changed but programs/$p/Cargo.toml version did not"
   fi
 done
@@ -62,7 +64,7 @@ for dir in $(changed 'packages/*/src/*' | cut -d/ -f1-2 | sort -u); do
   fi
   name=$(node -p "require('./$dir/package.json').name")
   # shellcheck disable=SC2086
-  if [ -z "$pr_changesets" ] || ! grep -q "\"$name\"" $pr_changesets; then
+  if [ -z "$pr_changesets" ] || ! grep -Eq "^[\"']?${name}[\"']?:" $pr_changesets; then
     error "$dir/src changed but no .changeset/*.md added or edited in this PR names \"$name\". Run: pnpm changeset"
   fi
 done

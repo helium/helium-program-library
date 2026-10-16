@@ -1337,7 +1337,7 @@ const describeVehntCase = (
  * fails at load when a case is in no shard, in two, or does not exist, so a new
  * vehntOptions entry cannot go unregistered.
  */
-export const VEHNT_SHARDS = {
+const VEHNT_SHARDS = {
   main: ["Case 1"],
   "cases-2-3": ["Case 2", "Case 3"],
   "cases-4-5": ["Case 4 (Cliff 100 4 years)", "Case 5 (Constant 100 4 years)"],

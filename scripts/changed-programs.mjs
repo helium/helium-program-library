@@ -105,7 +105,7 @@ export const crateFor = (crateDirs, file) => {
 };
 
 /** The `[[package]]` entries of a `Cargo.lock`. */
-export const parseLockfile = (text) =>
+const parseLockfile = (text) =>
   text
     .split(/^\[\[package\]\]$/m)
     .slice(1)
@@ -148,7 +148,7 @@ const stripLine = (line) => {
  * the one-line `key = value` form is read, which is all this repo's profile
  * tables use.
  */
-export const profileSettings = (text) => {
+const profileSettings = (text) => {
   const settings = [];
   let table = null;
   for (const raw of text.split("\n")) {
@@ -350,16 +350,20 @@ export const run = (command, args) =>
     maxBuffer: 64 * 1024 * 1024,
   });
 
-/** `file` at `ref`, or "" when the ref has none. */
+// What `git show` prints when the ref exists and the path is not in its tree.
+const NOT_IN_TREE = /does not exist in|exists on disk, but not in/;
+
+/** `file` at `ref`, or "" when the ref has none. Any other failure throws. */
 const fileAt = (ref, file) => {
   try {
     return execFileSync("git", ["show", `${ref}:${file}`], {
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
-  } catch {
-    return "";
+  } catch (err) {
+    if (NOT_IN_TREE.test(String(err.stderr ?? err.message))) return "";
+    throw err;
   }
 };
 

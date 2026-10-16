@@ -30,15 +30,16 @@ const git = (...args) => run("git", args);
 // ref that has no files, so one call answers for the candidates alone.
 const NO_BASE = Symbol("no base");
 
-/**
- * The files that mark one program as changed, for the failure text: its own
- * source, plus the source of the crates in its `via`, plus `Cargo.lock` when
- * its `via` names it.
- */
+// The root files that mark a program, and the `via` name each one marks it by.
+const MARKS = new Map([
+  ["Cargo.lock", "Cargo.lock"],
+  ["Cargo.toml", "Cargo.toml profile"],
+]);
+
 const markingFiles = ({ crateDirs }, { name, via }, files) =>
   files.filter((file) => {
     if (isNoReleasePath(file)) return false;
-    const crate = crateFor(crateDirs, file) ?? file;
+    const crate = crateFor(crateDirs, file) ?? MARKS.get(file) ?? file;
     return crate === name || via.includes(crate);
   });
 
@@ -105,6 +106,7 @@ export const missingBumpCheck = ({
       manifestsFor,
     });
   const changedSinceTag = changedFrom(bases);
+  const changedSinceReviewed = changedFrom(reviewedBases);
 
   const results = programs.map(({ name, version, tags }) => {
     if (!tags.length) {
@@ -123,10 +125,18 @@ export const missingBumpCheck = ({
     const base = bases[name];
     const reviewedBase = reviewedBases[name];
     const tagEntry = changedSinceTag.find((program) => program.name === name);
+    const reviewedEntry = changedSinceReviewed.find(
+      (program) => program.name === name,
+    );
     // A reviewed SHA clears a file only when the file has not changed since it.
+    // A root file counts as changed only when it marks the program since then.
     const files = tagEntry
       ? markingFiles(graph, tagEntry, filesByBase[base]).filter(
-          (file) => !reviewedBase || filesByBase[reviewedBase].includes(file),
+          (file) =>
+            !reviewedBase ||
+            (MARKS.has(file)
+              ? Boolean(reviewedEntry?.via.includes(MARKS.get(file)))
+              : filesByBase[reviewedBase].includes(file)),
         )
       : [];
     const failing = tagEntry && (!reviewedBase || files.length > 0);
@@ -231,17 +241,20 @@ const NOT_README = ":!.changeset-programs/README.md";
  * declares the program `none` in a program changeset. The `none` reviews the
  * program up to that commit. History keeps the commit after the version step
  * consumes the changeset, and a squash merge keeps it as the squash commit.
+ * The walk follows `--first-parent`, so a declaration made on a side branch
+ * keys to the merge commit that brought it in.
  *
  * A commit declares a program when its diff adds a `<program>: none` line and
  * removes none for that program, so a reworded changeset reviews nothing new.
+ * A commit that removes `<program>: none` and adds `<program>: <level>`
+ * retracts the review.
  */
 export const reviewedShas = (head) => {
   // No prototype, so no program name reads an inherited key.
   const shas = Object.create(null);
   const commits = git(
     "log",
-    "--topo-order",
-    "--no-merges",
+    "--first-parent",
     "--format=%H",
     head,
     "--",
@@ -256,22 +269,30 @@ export const reviewedShas = (head) => {
       "--format=",
       "--unified=0",
       "--no-ext-diff",
+      "--diff-merges=first-parent",
       sha,
       "--",
       PROGRAM_CHANGESETS,
       NOT_README,
     ).split("\n");
-    const declaredNone = (sign) =>
+    const entries = (sign) =>
+      diff
+        .filter((line) => line.startsWith(sign))
+        .map((line) => line.slice(1).match(ENTRY))
+        .filter(Boolean);
+    const declared = (sign, isNone) =>
       new Set(
-        diff
-          .filter((line) => line.startsWith(sign))
-          .map((line) => line.slice(1).match(ENTRY))
-          .filter((entry) => entry?.[3] === "none")
+        entries(sign)
+          .filter((entry) => (entry[3] === "none") === isNone)
           .map((entry) => entry[2]),
       );
-    const removed = declaredNone("-");
-    for (const name of declaredNone("+")) {
+    const removed = declared("-", true);
+    for (const name of declared("+", true)) {
       if (!removed.has(name) && !(name in shas)) shas[name] = sha;
+    }
+    // Raising a `none` to a release level retracts the older review.
+    for (const name of declared("+", false)) {
+      if (removed.has(name) && !(name in shas)) shas[name] = null;
     }
   }
   return shas;

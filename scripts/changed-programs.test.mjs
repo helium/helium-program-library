@@ -9,6 +9,7 @@ import {
   changedPrograms,
   changedProgramsForBases,
   isNoReleasePath,
+  lockfileAt,
 } from "./changed-programs.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -387,6 +388,48 @@ test("a changed Cargo.lock package marks the programs that resolve it", () => {
   ]);
 });
 
+test("a Cargo.lock entry with a source resolves the package from that source", () => {
+  const GIT = "git+https://github.com/example/syn#abc";
+  // Two syn 1.0.0 packages; anchor names the registry one by its source.
+  const lock = (checksum) => `version = 4
+
+[[package]]
+name = "alpha"
+version = "0.1.0"
+dependencies = [
+ "anchor",
+]
+
+[[package]]
+name = "anchor"
+version = "0.31.2"
+source = "${REGISTRY}"
+dependencies = [
+ "syn 1.0.0 (${REGISTRY})",
+]
+
+[[package]]
+name = "syn"
+version = "1.0.0"
+source = "${GIT}"
+
+[[package]]
+name = "syn"
+version = "1.0.0"
+source = "${REGISTRY}"
+checksum = "${checksum}"
+`;
+  const changed = changedPrograms({
+    metadata: lockWorkspace,
+    files: ["Cargo.lock"],
+    lockfiles: { base: lock("aaaa"), head: lock("bbbb") },
+  });
+
+  assert.deepEqual(changed, [
+    { name: "alpha", own: false, via: ["Cargo.lock"] },
+  ]);
+});
+
 test("a changed Cargo.lock package marks a program through a utils crate", () => {
   const changed = changedPrograms({
     metadata: lockWorkspace,
@@ -412,6 +455,13 @@ test("a dev or build dependency change in Cargo.lock marks nothing", () => {
   });
 
   assert.deepEqual(changed, []);
+});
+
+test("a Cargo.lock change without the lockfiles throws", () => {
+  assert.throws(
+    () => changedPrograms({ metadata: lockWorkspace, files: ["Cargo.lock"] }),
+    /a Cargo.lock change needs the Cargo.lock at base and head/,
+  );
 });
 
 test("a root Cargo.toml change that leaves the resolution unchanged marks nothing", () => {
@@ -448,6 +498,32 @@ test("a Cargo.lock change reads the lockfiles of that base only", () => {
   ]);
 });
 
+test("a root Cargo.toml change reads the manifests of that base only", () => {
+  const asked = [];
+  const changed = changedProgramsForBases({
+    metadata: lockWorkspace,
+    defaultBase: "develop",
+    filesByBase: {
+      develop: ["programs/beta/src/lib.rs"],
+      "program-alpha-0.1.0": ["Cargo.toml"],
+    },
+    programBases: { alpha: "program-alpha-0.1.0" },
+    manifestsFor: (base) => {
+      asked.push(base);
+      return {
+        base: manifest(),
+        head: manifest({ profile: 'opt-level = "z"\n' }),
+      };
+    },
+  });
+
+  assert.deepEqual(asked, ["program-alpha-0.1.0"]);
+  assert.deepEqual(changed, [
+    { name: "alpha", own: false, via: ["Cargo.toml profile"] },
+    { name: "beta", own: true, via: [] },
+  ]);
+});
+
 test("a workspace crate's version in Cargo.lock is left to its Cargo.toml", () => {
   const changed = changedPrograms({
     metadata: lockWorkspace,
@@ -480,6 +556,22 @@ test("a root Cargo.toml profile change marks every program", () => {
   ]);
 });
 
+test("a bare [profile] table change marks every program", () => {
+  const changed = changedPrograms({
+    metadata: lockWorkspace,
+    files: ["Cargo.toml"],
+    manifests: {
+      base: manifest(),
+      head: manifest({ profile: "[profile]\nrelease.lto = true\n" }),
+    },
+  });
+
+  assert.deepEqual(changed, [
+    { name: "alpha", own: false, via: ["Cargo.toml profile"] },
+    { name: "beta", own: false, via: ["Cargo.toml profile"] },
+  ]);
+});
+
 test("a root Cargo.toml change outside the profiles marks nothing", () => {
   const changed = changedPrograms({
     metadata: lockWorkspace,
@@ -491,6 +583,13 @@ test("a root Cargo.toml change outside the profiles marks nothing", () => {
   });
 
   assert.deepEqual(changed, []);
+});
+
+test("a root Cargo.toml change without the manifests throws", () => {
+  assert.throws(
+    () => changedPrograms({ metadata: lockWorkspace, files: ["Cargo.toml"] }),
+    /a root Cargo.toml change needs the Cargo.toml at base and head/,
+  );
 });
 
 test("a profile change in whitespace or comments only marks nothing", () => {
@@ -507,4 +606,10 @@ test("a profile change in whitespace or comments only marks nothing", () => {
   });
 
   assert.deepEqual(changed, []);
+});
+
+test("lockfileAt reads a ref without Cargo.lock as empty and throws on a bad ref", () => {
+  // The empty tree has no Cargo.lock.
+  assert.equal(lockfileAt("4b825dc642cb6eb9a060e54bf8d69288fbee4904"), "");
+  assert.throws(() => lockfileAt("no-such-ref-for-this-test"));
 });

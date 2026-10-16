@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import {
   missingBumpCheck,
   packageVersion,
+  readPrograms,
   reviewedShas,
   showFile,
   taggedVersions,
@@ -257,6 +258,14 @@ test("showFile reads a missing path as null and throws on a bad ref", () => {
   assert.throws(() => showFile("no-such-ref-for-this-test", "Anchor.toml"));
 });
 
+test("showFile reads a path that is on disk but not in the tree as null", () => {
+  // The empty tree. Cargo.lock is on disk, so git words the miss differently.
+  assert.equal(
+    showFile("4b825dc642cb6eb9a060e54bf8d69288fbee4904", "Cargo.lock"),
+    null,
+  );
+});
+
 test("only exact program-<name>-<x.y.z> tags of the program name its versions", () => {
   assert.deepEqual(
     taggedVersions("fanout", [
@@ -330,6 +339,80 @@ dependencies = [
   ]);
 });
 
+test("a Cargo.lock change made before the reviewed SHA passes", () => {
+  const lock = (checksum) => `version = 4
+
+[[package]]
+name = "anchor-lang"
+version = "0.31.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "${checksum}"
+
+[[package]]
+name = "price-oracle"
+version = "0.2.2"
+dependencies = [
+ "anchor-lang",
+]
+`;
+  const { ok, results } = missingBumpCheck({
+    metadata,
+    programs: [PRICE_ORACLE_SKIPPED],
+    // Cargo.lock changed since the reviewed SHA, but not for price-oracle.
+    changedFiles: () => ["Cargo.lock"],
+    lockfilesFor: (base) => ({
+      base: lock(base === "price-oracle-tag" ? "aaaa" : "bbbb"),
+      head: lock("bbbb"),
+    }),
+  });
+
+  assert.equal(ok, true);
+  assert.equal(results[0].status, "clean");
+});
+
+const profileManifest = (optLevel) =>
+  `[workspace]\nmembers = ["programs/*"]\n\n[profile.release]\nopt-level = ${optLevel}\n`;
+
+test("a root Cargo.toml profile change after the reviewed SHA fails a reviewed program", () => {
+  const { ok, failing } = missingBumpCheck({
+    metadata,
+    programs: [PRICE_ORACLE_SKIPPED],
+    changedFiles: () => ["Cargo.toml"],
+    manifestsFor: () => ({
+      base: profileManifest(3),
+      head: profileManifest(2),
+    }),
+  });
+
+  assert.equal(ok, false);
+  assert.deepEqual(failing, [
+    {
+      name: "price-oracle",
+      version: "0.2.2",
+      status: "missing-bump",
+      base: "price-oracle-tag",
+      via: ["Cargo.toml profile"],
+      files: ["Cargo.toml"],
+    },
+  ]);
+});
+
+test("a root Cargo.toml profile change made before the reviewed SHA passes", () => {
+  const { ok, results } = missingBumpCheck({
+    metadata,
+    programs: [PRICE_ORACLE_SKIPPED],
+    // Cargo.toml changed since the reviewed SHA, but not in its profiles.
+    changedFiles: () => ["Cargo.toml"],
+    manifestsFor: (base) => ({
+      base: profileManifest(base === "price-oracle-tag" ? 3 : 2),
+      head: profileManifest(2),
+    }),
+  });
+
+  assert.equal(ok, true);
+  assert.equal(results[0].status, "clean");
+});
+
 test("reviewedShas keys each program to the newest commit that declared it none", () => {
   const repo = mkdtempSync(path.join(tmpdir(), "missing-bump-check-"));
   const cwd = process.cwd();
@@ -366,11 +449,8 @@ test("reviewedShas keys each program to the newest commit that declared it none"
     // A text edit and a rewrite of the same declaration review nothing new.
     commit("a.md", "---\nfanout:  none\nno-emit: patch\n---\n\nA, reworded.\n");
     // Lowering a level to none is a new review.
-    const noEmit = commit(
-      "a.md",
-      "---\nfanout:  none\nno-emit: none\n---\n\nA.\n",
-    );
-    // Raising it back is not, so the older review stands.
+    commit("a.md", "---\nfanout:  none\nno-emit: none\n---\n\nA.\n");
+    // Raising it back retracts the older review.
     commit("a.md", "---\nfanout:  none\nno-emit: patch\n---\n\nA.\n");
     // The version step consumes changesets; the review stays in history.
     git("rm", "-q", ".changeset-programs/a.md", ".changeset-programs/b.md");
@@ -382,11 +462,161 @@ test("reviewedShas keys each program to the newest commit that declared it none"
       {
         fanout,
         "mini-fanout": miniFanout,
-        "no-emit": noEmit,
+        "no-emit": null,
       },
     );
   } finally {
     process.chdir(cwd);
     rmSync(repo, { recursive: true, force: true });
   }
+});
+
+// Runs `body` in a new repo on `main`; the module's git calls use the cwd.
+const inRepo = (body) => {
+  const repo = mkdtempSync(path.join(tmpdir(), "missing-bump-check-"));
+  const cwd = process.cwd();
+  const git = (...args) =>
+    execFileSync(
+      "git",
+      [
+        "-c",
+        "user.name=test",
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "-c",
+        "tag.gpgsign=false",
+        ...args,
+      ],
+      { cwd: repo, encoding: "utf8" },
+    ).trim();
+  const commit = (files) => {
+    for (const [file, text] of Object.entries(files)) {
+      mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
+      writeFileSync(path.join(repo, file), text);
+    }
+    git("add", ".");
+    git("commit", "-q", "-m", Object.keys(files).join(" "));
+    return git("rev-parse", "HEAD");
+  };
+  try {
+    git("init", "-q", "-b", "main");
+    process.chdir(repo);
+    body({ repo, git, commit });
+  } finally {
+    process.chdir(cwd);
+    rmSync(repo, { recursive: true, force: true });
+  }
+};
+
+// Program x at 0.1.0, tagged, then a source change after the tag.
+const taggedX = ({ git, commit }) => {
+  commit({
+    "programs/x/Cargo.toml": '[package]\nname = "x"\nversion = "0.1.0"\n',
+    "programs/x/src/lib.rs": "// 1\n",
+  });
+  git("tag", "program-x-0.1.0");
+  commit({ "programs/x/src/lib.rs": "// 2\n" });
+};
+
+const checkX = ({ repo, git }) => {
+  const programs = readPrograms("HEAD", reviewedShas("HEAD"));
+  const result = missingBumpCheck({
+    metadata: {
+      workspace_root: repo,
+      packages: [
+        {
+          name: "x",
+          manifest_path: path.join(repo, "programs/x/Cargo.toml"),
+          dependencies: [],
+        },
+      ],
+    },
+    programs,
+    changedFiles: (base) =>
+      git("diff", "--name-only", base, "HEAD").split("\n").filter(Boolean),
+  });
+  return { programs, result };
+};
+
+test("readPrograms carries the reviewed SHA, which clears a change before it", () => {
+  inRepo((repo) => {
+    taggedX(repo);
+    const reviewed = repo.commit({
+      ".changeset-programs/a.md": "---\nx: none\n---\n\nA.\n",
+    });
+
+    const { programs, result } = checkX(repo);
+    assert.equal(programs[0].reviewedSha, reviewed);
+    assert.equal(result.results[0].status, "clean");
+  });
+});
+
+test("raising a none back to a release level retracts the review", () => {
+  inRepo((repo) => {
+    taggedX(repo);
+    repo.commit({ ".changeset-programs/a.md": "---\nx: none\n---\n\nA.\n" });
+    repo.commit({ ".changeset-programs/a.md": "---\nx: patch\n---\n\nA.\n" });
+
+    const { programs, result } = checkX(repo);
+    assert.equal(programs[0].reviewedSha, null);
+    assert.deepEqual(
+      result.failing.map(({ name, files }) => [name, files]),
+      [["x", ["programs/x/src/lib.rs"]]],
+    );
+  });
+});
+
+test("adding a release level in a new changeset keeps the none it does not remove", () => {
+  inRepo((repo) => {
+    taggedX(repo);
+    const reviewed = repo.commit({
+      ".changeset-programs/a.md": "---\nx: none\n---\n\nA.\n",
+    });
+    repo.commit({ ".changeset-programs/b.md": "---\nx: patch\n---\n\nB.\n" });
+
+    assert.equal(reviewedShas("HEAD").x, reviewed);
+  });
+});
+
+test("the newest of two none declarations is the reviewed SHA", () => {
+  inRepo(({ commit }) => {
+    commit({ ".changeset-programs/a.md": "---\nx: none\n---\n\nA.\n" });
+    const newest = commit({
+      ".changeset-programs/b.md": "---\nx: none\n---\n\nB.\n",
+    });
+
+    assert.equal(reviewedShas("HEAD").x, newest);
+  });
+});
+
+test("a none removed and re-added on a merged branch does not move the review", () => {
+  inRepo(({ git, commit }) => {
+    const reviewed = commit({
+      ".changeset-programs/a.md": "---\nx: none\n---\n\nA.\n",
+      "programs/x/src/lib.rs": "// 1\n",
+    });
+    git("checkout", "-q", "-b", "pr");
+    commit({ "programs/x/src/lib.rs": "// 2\n" });
+    commit({ ".changeset-programs/a.md": "---\n---\n\nA.\n" });
+    commit({ ".changeset-programs/a.md": "---\nx: none\n---\n\nA, again.\n" });
+    git("checkout", "-q", "main");
+    git("merge", "-q", "--no-ff", "-m", "merge", "pr");
+
+    // The branch's lib.rs change is after the reviewed SHA, so it still shows.
+    assert.equal(reviewedShas("HEAD").x, reviewed);
+  });
+});
+
+test("a none added on a merged branch reviews up to the merge commit", () => {
+  inRepo(({ git, commit }) => {
+    commit({ "programs/x/src/lib.rs": "// 1\n" });
+    git("checkout", "-q", "-b", "pr");
+    commit({ ".changeset-programs/a.md": "---\nx: none\n---\n\nA.\n" });
+    git("checkout", "-q", "main");
+    git("merge", "-q", "--no-ff", "-m", "merge", "pr");
+
+    assert.equal(reviewedShas("HEAD").x, git("rev-parse", "HEAD"));
+  });
 });

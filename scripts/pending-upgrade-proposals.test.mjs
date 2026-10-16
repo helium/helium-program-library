@@ -602,6 +602,16 @@ test("an IDL Close with no SetBuffer is not exact", async () => {
   );
 });
 
+test("an IDL Resize with no SetBuffer is not exact", async () => {
+  assert.deepEqual(
+    await exactAt150(onIdl((setBuffer) => idlIx(setBuffer, 6, [3, 0, 0, 0]))),
+    [
+      [150, false],
+      [163, true],
+    ],
+  );
+});
+
 test("an IDL Write after the SetBuffer is not exact", async () => {
   assert.deepEqual(
     await exactAt150(

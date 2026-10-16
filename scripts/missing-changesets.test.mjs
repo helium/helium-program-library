@@ -169,6 +169,13 @@ test("parseChangeset reads a single-quoted name", () => {
   assert.deepEqual({ ...parsed.releases }, { "@helium/idls": "minor" });
 });
 
+test("parseChangeset rejects a name whose quotes do not match", () => {
+  assert.throws(
+    () => parseChangeset("---\n\"@helium/idls': minor\n---\n"),
+    /bad front matter line/,
+  );
+});
+
 test("parseChangeset reads a file with CRLF line ends", () => {
   const parsed = parseChangeset(
     '---\r\n"@helium/idls": minor\r\nlazy-distributor: none\r\n---\r\n\r\nText here.\r\n',

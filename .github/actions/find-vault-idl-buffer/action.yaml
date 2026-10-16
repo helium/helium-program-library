@@ -79,9 +79,11 @@ runs:
           if [ "$CANDIDATE" = "$IDL_ACCOUNT" ]; then
             continue
           fi
-          # A candidate that cannot be read is skipped, not a failure.
-          if anchor idl fetch "$CANDIDATE" --provider.cluster "$NETWORK" > "$FETCHED_IDL" 2> /dev/null \
-            && [ "$(jq -S . "$FETCHED_IDL" 2> /dev/null)" = "$BUILD_IDL" ]; then
+          if ! anchor idl fetch "$CANDIDATE" --provider.cluster "$NETWORK" > "$FETCHED_IDL" 2> /dev/null; then
+            echo "::error::Could not fetch the vault IDL buffer $CANDIDATE"
+            exit 1
+          fi
+          if [ "$(jq -S . "$FETCHED_IDL" 2> /dev/null)" = "$BUILD_IDL" ]; then
             echo "IDL buffer $CANDIDATE holds the build IDL"
             echo "idl-buffer=$CANDIDATE" >> "$GITHUB_OUTPUT"
             echo "- \`$PROGRAM\`: reused IDL buffer \`$CANDIDATE\`" >> "$GITHUB_STEP_SUMMARY"

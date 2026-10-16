@@ -150,9 +150,25 @@ runs:
             exit 1
           fi
 
-          REQUIRED=$(solana rent "$BUFFER_LEN" --lamports -u "$NETWORK" | grep -oE '[0-9]+' | head -1)
+          IDL_SPACE=$(solana account "$IDL_ADDR" -u "$NETWORK" --output json | jq -r '.account.space')
+          if ! [[ "$IDL_SPACE" =~ ^[0-9]+$ ]]; then
+            echo "Error: could not read IDL account size for $IDL_ADDR (got: $IDL_SPACE)"
+            exit 1
+          fi
+          # Squads keeps the IDL account when its space less 200 bytes holds the buffer. Otherwise
+          # it closes the account and creates it again at 44 + 2 * buffer bytes, at most 10000.
+          if [ $((IDL_SPACE - 200)) -ge "$BUFFER_LEN" ]; then
+            echo "IDL account $IDL_ADDR ($IDL_SPACE bytes) holds the $BUFFER_LEN-byte buffer; skipping prefund"
+            exit 0
+          fi
+          TARGET=$((44 + 2 * BUFFER_LEN))
+          if [ "$TARGET" -gt 10000 ]; then
+            TARGET=10000
+          fi
+
+          REQUIRED=$(solana rent "$TARGET" --lamports -u "$NETWORK" | grep -oE '[0-9]+' | head -1)
           if ! [[ "$REQUIRED" =~ ^[0-9]+$ ]]; then
-            echo "Error: could not calculate rent for $BUFFER_LEN bytes (got: $REQUIRED)"
+            echo "Error: could not calculate rent for $TARGET bytes (got: $REQUIRED)"
             exit 1
           fi
 
@@ -164,7 +180,7 @@ runs:
           SHORTFALL=$((REQUIRED - CURRENT))
 
           echo "IDL account: $IDL_ADDR"
-          echo "Target size: $BUFFER_LEN bytes, required: $REQUIRED, current: $CURRENT, shortfall: $SHORTFALL"
+          echo "Target size: $TARGET bytes, required: $REQUIRED, current: $CURRENT, shortfall: $SHORTFALL"
 
           if [ "$SHORTFALL" -le 0 ]; then
             echo "Account already has enough lamports; skipping transfer"
