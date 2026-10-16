@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
 
-use crate::state::*;
+use crate::{compression::proof_len, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeCompressionRecipientArgsV0 {
@@ -64,7 +64,14 @@ pub fn handler<'info>(
     merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
     owner: ctx.accounts.owner.key(),
     delegate: ctx.accounts.delegate.key(),
-    proof_accounts: ctx.remaining_accounts.to_vec(),
+    // Under a tuktuk task, run_task_v0 appends the task's free-task accounts after the proof.
+    // Pass on only the proof nodes the tree does not hold in its canopy.
+    proof_accounts: ctx
+      .remaining_accounts
+      .iter()
+      .take(proof_len(&ctx.accounts.merkle_tree)?)
+      .cloned()
+      .collect(),
   })?;
 
   let asset_id = get_asset_id(&ctx.accounts.merkle_tree.key(), args.index as u64);

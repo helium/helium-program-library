@@ -20,7 +20,6 @@ import {
   createAtaAndMint,
   createMint,
   getAsset,
-  sleep,
   sendAndConfirmWithRetry,
   sendInstructions,
 } from "@helium/spl-utils";
@@ -299,6 +298,9 @@ describe("distributor-oracle", () => {
   let ecc: string;
   let getAssetFn: () => Promise<Asset | undefined>;
   let getAssetProofFn: () => Promise<AssetProof | undefined>;
+  // Whether beforeEach creates the hotspot's recipient. A suite that needs a hotspot without one
+  // clears it in its `before` hook.
+  let initRecipient = true;
 
   before(async () => {
     await ensureLDIdl();
@@ -441,7 +443,9 @@ describe("distributor-oracle", () => {
       getAssetProofFn,
     });
 
-    await recipientMethod.rpc({ skipPreflight: true });
+    if (initRecipient) {
+      await recipientMethod.rpc({ skipPreflight: true });
+    }
     recipient = (await recipientMethod.pubkeys()).recipient!;
 
     let db = new DatabaseMock(hemProgram, getAssetFn, dao);
@@ -695,151 +699,237 @@ describe("distributor-oracle", () => {
       ]);
     });
 
+    // A lookup table serves its addresses only in a slot after the one that extended it.
+    const activeLookupTable = async (
+      lut: PublicKey,
+      addressCount: number,
+      lastExtendSlot: number,
+    ) => {
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const lutAccount = (
+          await provider.connection.getAddressLookupTable(lut)
+        ).value;
+        if (
+          lutAccount?.state.addresses.length === addressCount &&
+          (await provider.connection.getSlot()) > lastExtendSlot
+        ) {
+          return lutAccount;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+      throw new Error(`Lookup table ${lut.toBase58()} did not activate`);
+    };
+
+    // Runs the oracle's KTA task for the compressed hotspot under tuktuk: set current rewards, then
+    // distribute, after initializing the recipient when `initializeRecipient` is set. Returns the
+    // rewards the task set.
+    const runRewardsTask = async ({
+      freeTasks,
+      initializeRecipient,
+    }: {
+      freeTasks: number;
+      initializeRecipient: boolean;
+    }): Promise<anchor.BN> => {
+      const keyToAsset = keyToAssetKey(daoK, ecc)[0];
+      const task = taskKey(taskQueue, 0)[0];
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id: 0,
+          trigger: { now: {} },
+          crankReward: null,
+          freeTasks,
+          transaction: {
+            remoteV0: {
+              url: "https://example.com/rewards",
+              signer: oracle.publicKey,
+            },
+          },
+          description: "set current rewards",
+        })
+        .accountsPartial({ task, taskQueue })
+        .rpc({ skipPreflight: true });
+      const { queuedAt } = await tuktukProgram.account.taskV0.fetch(task);
+
+      const currentRewards = new anchor.BN(
+        await oracleServer.db.getCurrentRewards(asset),
+      );
+      const ix = await rewardsProgram.methods
+        .setCurrentRewardsWrapperV2({ currentRewards, oracleIndex: 0 })
+        .accountsPartial({
+          lazyDistributor,
+          recipient,
+          keyToAsset,
+          payer: taskPayer,
+          lazyDistributorProgram: LD_PID,
+        })
+        .remainingAccounts([
+          { pubkey: task, isSigner: false, isWritable: false },
+        ])
+        .instruction();
+      // The oracle's KTA task distributes in the same task for compressed hotspots.
+      const distributeIx = await (
+        await distributeCompressionRewards({
+          program: ldProgram,
+          assetId: asset,
+          lazyDistributor,
+          payer: taskPayer,
+          getAssetFn,
+          getAssetProofFn,
+        })
+      ).instruction();
+      const initializeRecipientIxs = initializeRecipient
+        ? [
+            await (
+              await initializeCompressionRecipient({
+                program: ldProgram,
+                assetId: asset,
+                lazyDistributor,
+                payer: taskPayer,
+                getAssetFn,
+                getAssetProofFn,
+              })
+            ).instruction(),
+          ]
+        : [];
+      const { transaction, remainingAccounts } = compileTransaction(
+        [...initializeRecipientIxs, ix, distributeIx],
+        [taskPayerSeeds],
+      );
+      const remoteTaskTransaction = await RemoteTaskTransactionV0.serialize(
+        tuktukProgram.coder.accounts,
+        new RemoteTaskTransactionV0({
+          task,
+          taskQueuedAt: queuedAt,
+          transaction: {
+            ...transaction,
+            accounts: remainingAccounts.map((acc) => acc.pubkey),
+          },
+        }),
+      );
+      const signature = Buffer.from(
+        sign.detached(Uint8Array.from(remoteTaskTransaction), oracle.secretKey),
+      );
+
+      const runTaskIxs = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
+        ...(await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: me,
+          fetcher: async () => ({
+            remoteTaskTransaction,
+            remainingAccounts,
+            signature,
+          }),
+        })),
+      ];
+      // Set and distribute together do not fit in a transaction without a lookup table.
+      const lutAddresses = [
+        ...new Map(
+          runTaskIxs
+            .flatMap((runIx) => [
+              runIx.programId,
+              ...runIx.keys.filter((k) => !k.isSigner).map((k) => k.pubkey),
+            ])
+            .map((key) => [key.toBase58(), key]),
+        ).values(),
+      ];
+      const [createLutIx, lut] = AddressLookupTableProgram.createLookupTable({
+        authority: me,
+        payer: me,
+        recentSlot: await provider.connection.getSlot("finalized"),
+      });
+      await sendInstructions(provider, [createLutIx]);
+      let lastExtendSignature = "";
+      for (let i = 0; i < lutAddresses.length; i += 20) {
+        lastExtendSignature = await sendInstructions(provider, [
+          AddressLookupTableProgram.extendLookupTable({
+            lookupTable: lut,
+            authority: me,
+            payer: me,
+            addresses: lutAddresses.slice(i, i + 20),
+          }),
+        ]);
+      }
+      const lastExtendSlot = (
+        await provider.connection.getSignatureStatus(lastExtendSignature)
+      ).value!.slot;
+      const lutAccount = await activeLookupTable(
+        lut,
+        lutAddresses.length,
+        lastExtendSlot,
+      );
+      const runTaskTx = await provider.wallet.signTransaction(
+        new VersionedTransaction(
+          new TransactionMessage({
+            payerKey: me,
+            recentBlockhash: (await provider.connection.getLatestBlockhash())
+              .blockhash,
+            instructions: runTaskIxs,
+          }).compileToV0Message([lutAccount]),
+        ),
+      );
+      await sendAndConfirmWithRetry(
+        provider.connection,
+        Buffer.from(runTaskTx.serialize()),
+        { skipPreflight: true, maxRetries: 0 },
+        "confirmed",
+      );
+      return currentRewards;
+    };
+
     // tuktuk passes a task's free-task accounts to the wrapper after the task, so the lazy
     // distributor has to find the running task among them.
     for (const freeTasks of [0, 6]) {
       it(`sets and distributes rewards through the wrapper with the running task and ${freeTasks} free tasks`, async () => {
-        const keyToAsset = keyToAssetKey(daoK, ecc)[0];
-        const task = taskKey(taskQueue, 0)[0];
-        await tuktukProgram.methods
-          .queueTaskV0({
-            id: 0,
-            trigger: { now: {} },
-            crankReward: null,
-            freeTasks,
-            transaction: {
-              remoteV0: {
-                url: "https://example.com/rewards",
-                signer: oracle.publicKey,
-              },
-            },
-            description: "set current rewards",
-          })
-          .accountsPartial({ task, taskQueue })
-          .rpc({ skipPreflight: true });
-        const { queuedAt } = await tuktukProgram.account.taskV0.fetch(task);
-
-        const currentRewards = new anchor.BN(
-          await oracleServer.db.getCurrentRewards(asset),
-        );
-        const ix = await rewardsProgram.methods
-          .setCurrentRewardsWrapperV2({ currentRewards, oracleIndex: 0 })
-          .accountsPartial({
-            lazyDistributor,
-            recipient,
-            keyToAsset,
-            payer: taskPayer,
-            lazyDistributorProgram: LD_PID,
-          })
-          .remainingAccounts([
-            { pubkey: task, isSigner: false, isWritable: false },
-          ])
-          .instruction();
-        // The oracle's KTA task distributes in the same task for compressed hotspots.
-        const distributeIx = await (
-          await distributeCompressionRewards({
-            program: ldProgram,
-            assetId: asset,
-            lazyDistributor,
-            payer: taskPayer,
-            getAssetFn,
-            getAssetProofFn,
-          })
-        ).instruction();
-        const { transaction, remainingAccounts } = compileTransaction(
-          [ix, distributeIx],
-          [taskPayerSeeds],
-        );
-        const remoteTaskTransaction = await RemoteTaskTransactionV0.serialize(
-          tuktukProgram.coder.accounts,
-          new RemoteTaskTransactionV0({
-            task,
-            taskQueuedAt: queuedAt,
-            transaction: {
-              ...transaction,
-              accounts: remainingAccounts.map((acc) => acc.pubkey),
-            },
-          }),
-        );
-        const signature = Buffer.from(
-          sign.detached(
-            Uint8Array.from(remoteTaskTransaction),
-            oracle.secretKey,
-          ),
-        );
-
-        const runTaskIxs = [
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
-          ...(await runTask({
-            program: tuktukProgram,
-            task,
-            crankTurner: me,
-            fetcher: async () => ({
-              remoteTaskTransaction,
-              remainingAccounts,
-              signature,
-            }),
-          })),
-        ];
-        // Set and distribute together do not fit in a transaction without a lookup table.
-        const lutAddresses = [
-          ...new Map(
-            runTaskIxs
-              .flatMap((runIx) => [
-                runIx.programId,
-                ...runIx.keys.filter((k) => !k.isSigner).map((k) => k.pubkey),
-              ])
-              .map((key) => [key.toBase58(), key]),
-          ).values(),
-        ];
-        const [createLutIx, lut] = AddressLookupTableProgram.createLookupTable({
-          authority: me,
-          payer: me,
-          recentSlot: await provider.connection.getSlot("finalized"),
+        const currentRewards = await runRewardsTask({
+          freeTasks,
+          initializeRecipient: false,
         });
-        await sendInstructions(provider, [createLutIx]);
-        for (let i = 0; i < lutAddresses.length; i += 20) {
-          await sendInstructions(provider, [
-            AddressLookupTableProgram.extendLookupTable({
-              lookupTable: lut,
-              authority: me,
-              payer: me,
-              addresses: lutAddresses.slice(i, i + 20),
-            }),
-          ]);
-        }
-        // Wait for the lookup table to activate
-        await sleep(1000);
-        const lutAccount = (
-          await provider.connection.getAddressLookupTable(lut)
-        ).value!;
-        const runTaskTx = await provider.wallet.signTransaction(
-          new VersionedTransaction(
-            new TransactionMessage({
-              payerKey: me,
-              recentBlockhash: (await provider.connection.getLatestBlockhash())
-                .blockhash,
-              instructions: runTaskIxs,
-            }).compileToV0Message([lutAccount]),
-          ),
-        );
-        await sendAndConfirmWithRetry(
-          provider.connection,
-          Buffer.from(runTaskTx.serialize()),
-          { skipPreflight: true, maxRetries: 0 },
-          "confirmed",
-        );
 
         // Distributing clears current rewards and moves the median into total rewards.
         const recipientAcc =
           await ldProgram.account.recipientV0.fetch(recipient);
         assert.equal(
-          recipientAcc.totalRewards.toNumber(),
-          currentRewards.toNumber(),
+          recipientAcc.totalRewards.toString(),
+          currentRewards.toString(),
         );
         assert.isTrue(recipientAcc.currentRewards.every((r) => r === null));
       });
     }
+
+    // tuktuk also appends the free-task accounts after the proof that
+    // initialize_compression_recipient_v0 verifies.
+    describe("for a compressed hotspot without a recipient", () => {
+      before(() => {
+        initRecipient = false;
+      });
+      after(() => {
+        initRecipient = true;
+      });
+
+      it("initializes the recipient, then sets and distributes rewards with 6 free tasks", async () => {
+        assert.isNull(await provider.connection.getAccountInfo(recipient));
+
+        const currentRewards = await runRewardsTask({
+          freeTasks: 6,
+          initializeRecipient: true,
+        });
+
+        const recipientAcc =
+          await ldProgram.account.recipientV0.fetch(recipient);
+        assert.equal(recipientAcc.asset.toBase58(), asset.toBase58());
+        assert.equal(
+          recipientAcc.lazyDistributor.toBase58(),
+          lazyDistributor.toBase58(),
+        );
+        assert.equal(
+          recipientAcc.totalRewards.toString(),
+          currentRewards.toString(),
+        );
+        assert.isTrue(recipientAcc.currentRewards.every((r) => r === null));
+      });
+    });
   });
 
   describe("Transaction validation tests", () => {

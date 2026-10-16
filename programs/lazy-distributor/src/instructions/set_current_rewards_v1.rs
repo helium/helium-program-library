@@ -134,13 +134,13 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
     // it. So the shape is confirmed, and then the signed message is required to name the running
     // task and its accounts (via the verification hash tuktuk itself checks for a genuine RemoteV0
     // run) and to authorize this reward.
-    let (task_info, task) = running_remote_task(
+    let (task_info, task, run_task_ix) = running_remote_task(
       &ctx.accounts.sysvar_instructions,
       ctx.remaining_accounts,
       &signer,
     )?;
     verify_remote_reward_binding(
-      &ctx.accounts.sysvar_instructions,
+      &run_task_ix,
       task_info.key(),
       task.queued_at,
       &data,
@@ -197,7 +197,7 @@ const RUN_TASK_TASK_ACCOUNT: usize = 3;
 const RUN_TASK_HEADER_ACCOUNTS: usize = 6;
 
 /// Finds the task `run_task_v0` is running among `remaining_accounts` and verifies it is a
-/// `RemoteV0` task signed by `signer`.
+/// `RemoteV0` task signed by `signer`. Returns the task and the `run_task_v0` instruction.
 ///
 /// The task is found by key, not by position: `run_task_v0` passes the task's free-task accounts
 /// after the instruction's own accounts, so the running task is not always the last one.
@@ -205,11 +205,16 @@ fn running_remote_task<'a, 'info>(
   sysvar_instructions: &AccountInfo,
   remaining_accounts: &'a [AccountInfo<'info>],
   signer: &Pubkey,
-) -> Result<(&'a AccountInfo<'info>, TaskV0)> {
+) -> Result<(&'a AccountInfo<'info>, TaskV0, Instruction)> {
   let index = load_current_index_checked(sysvar_instructions)?;
   let run_task_ix = load_instruction_at_checked(index as usize, sysvar_instructions)?;
+  require_keys_eq!(
+    run_task_ix.program_id,
+    tuktuk::ID,
+    VerifyRunningRemoteTaskError::NotRunningAsTask
+  );
   require!(
-    run_task_ix.program_id == tuktuk::ID && run_task_ix.data.starts_with(RunTaskV0::DISCRIMINATOR),
+    run_task_ix.data.starts_with(RunTaskV0::DISCRIMINATOR),
     VerifyRunningRemoteTaskError::NotRunningAsTask
   );
   let running_task = run_task_ix
@@ -222,7 +227,7 @@ fn running_remote_task<'a, 'info>(
     .find(|account| account.key() == running_task)
     .ok_or_else(|| error!(VerifyRunningRemoteTaskError::TaskMismatch))?;
   let task = verify_running_remote_task(sysvar_instructions, task_info, signer)?;
-  Ok((task_info, task))
+  Ok((task_info, task, run_task_ix))
 }
 
 /// Re-derives, from the oracle-signed `RemoteTaskTransactionV0`, that the signature authorizes this
@@ -239,7 +244,7 @@ fn running_remote_task<'a, 'info>(
 /// oracle signed rather than one the caller chose. That instruction must also reference the
 /// recipient this call writes, so the signed amount is bound to the account it is written to.
 fn verify_remote_reward_binding(
-  sysvar_instructions: &AccountInfo,
+  run_task_ix: &Instruction,
   task_key: Pubkey,
   task_queued_at: i64,
   message: &[u8],
@@ -264,11 +269,10 @@ fn verify_remote_reward_binding(
     .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?;
   let num_accounts = usize::from(max_index) + 1;
 
-  // The current top-level instruction is `run_task_v0` (verified by `verify_running_remote_task`),
-  // whose accounts are [crank_turner, rent_refund, task_queue, task, system_program,
-  // sysvar_instructions, ..remaining]. The signed verification hash is over the remaining accounts.
-  let index = load_current_index_checked(sysvar_instructions)?;
-  let run_task_ix = load_instruction_at_checked(index as usize, sysvar_instructions)?;
+  // `run_task_ix` is the current top-level instruction, `run_task_v0` (verified by
+  // `running_remote_task`), whose accounts are [crank_turner, rent_refund, task_queue, task,
+  // system_program, sysvar_instructions, ..remaining]. The signed verification hash is over the
+  // remaining accounts.
   let hashed_accounts = run_task_ix
     .accounts
     .get(RUN_TASK_HEADER_ACCOUNTS..RUN_TASK_HEADER_ACCOUNTS + num_accounts)
@@ -446,21 +450,8 @@ mod tests {
 
     fn run(self) -> Result<()> {
       let ix = run_task_ix(self.task, self.acc0, self.acc1);
-      let mut sysvar_data = sysvar_holding(&ix);
-      let mut lamports = 0u64;
-      let owner = Pubkey::default();
-      let sysvar = AccountInfo::new(
-        &IX_ID,
-        false,
-        false,
-        &mut lamports,
-        &mut sysvar_data,
-        &owner,
-        false,
-        0,
-      );
       verify_remote_reward_binding(
-        &sysvar,
+        &ix,
         self.task_arg,
         self.queued_at,
         &self.message,
@@ -488,21 +479,8 @@ mod tests {
     // The signature was issued for `case.task`; the task actually running is someone else's.
     case.task_arg = Pubkey::new_unique();
     let ix = run_task_ix(case.task_arg, case.acc0, case.acc1);
-    let mut sysvar_data = sysvar_holding(&ix);
-    let mut lamports = 0u64;
-    let owner = Pubkey::default();
-    let sysvar = AccountInfo::new(
-      &IX_ID,
-      false,
-      false,
-      &mut lamports,
-      &mut sysvar_data,
-      &owner,
-      false,
-      0,
-    );
     let err = verify_remote_reward_binding(
-      &sysvar,
+      &ix,
       case.task_arg,
       case.queued_at,
       &case.message,
@@ -659,7 +637,7 @@ mod tests {
       })
       .collect();
 
-    running_remote_task(&sysvar, &remaining, &signer).map(|(info, task)| (info.key(), task))
+    running_remote_task(&sysvar, &remaining, &signer).map(|(info, task, _)| (info.key(), task))
   }
 
   // run_task_v0 hands each CPI the task's free-task accounts after the instruction's own, so the
@@ -682,6 +660,11 @@ mod tests {
     // check has to come before the task lookup.
     for top_level in [
       top_level_ix(Pubkey::new_unique(), &[0u8; 8], Pubkey::new_unique()),
+      top_level_ix(
+        Pubkey::new_unique(),
+        RunTaskV0::DISCRIMINATOR,
+        Pubkey::new_unique(),
+      ),
       top_level_ix(tuktuk::ID, QueueTaskV0::DISCRIMINATOR, Pubkey::new_unique()),
     ] {
       let err =
