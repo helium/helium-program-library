@@ -295,7 +295,10 @@ describe("mini-fanout under bankrun", () => {
   }
 
   // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
-  // queue_task_v0 created and the queue itself for one a run returned.
+  // queue_task_v0 created. For a task that a run returned, it is the rent refund of the task that
+  // ran when that task paid all of its rent. The rent_amount of the task that ran caps the rent of
+  // all the tasks that one run returns, so a task past the cap refunds to the task queue
+  // (helium/tuktuk#115).
   // Read through banksClient: anchor's fetchNullable goes through BankrunConnectionProxy,
   // which throws on a missing account rather than returning null.
   const taskRentRefundOf = async (miniFanout: PublicKey) => {
@@ -858,13 +861,23 @@ describe("mini-fanout under bankrun", () => {
       );
     });
 
-    it("refunds a task that a run returned to the task queue", async () => {
+    it("refunds a task that a run returned to the payer of the task that ran", async () => {
       const wallet = Keypair.generate();
       await ataWith(wallet.publicKey, 0);
+      // `me` pays the transaction fees, so the payer's lamports move only by task rent.
+      const payer = Keypair.generate();
+      await send([
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: payer.publicKey,
+          lamports: 1_000_000_000,
+        }),
+      ]);
       const { miniFanout, task } = await scheduledFanout({
-        seed: "delegate-refunds-queue",
+        seed: "delegate-refunds-run-payer",
         shares: [shareOf(wallet.publicKey, 100)],
         preTask: null,
+        payer,
       });
       const queued = await tuktukProgram.account.taskV0.fetch(task);
       await warpTo(ctx, BigInt(queued.trigger.timestamp![0].toString()));
@@ -872,21 +885,31 @@ describe("mini-fanout under bankrun", () => {
 
       const { nextTask } = await program.account.miniFanoutV0.fetch(miniFanout);
       expect((await taskRentRefundOf(miniFanout)).toBase58()).to.equal(
-        taskQueue.toBase58(),
-        "the run should have returned a task that refunds to the task queue"
+        payer.publicKey.toBase58(),
+        "the run should have returned a task that refunds to the payer of the task that ran"
       );
       const taskLamports = await lamportsHeldBy(nextTask);
       expect(await lamportsOf(nextTask)).to.equal(taskLamports);
-      const before = await lamportsOf(taskQueue);
+      const before = await lamportsOf(payer.publicKey);
+      const queueBefore = await lamportsOf(taskQueue);
 
-      const { delegate, newTask } = await changeDelegate(miniFanout, wallet);
+      const { delegate, newTask } = await changeDelegate(
+        miniFanout,
+        wallet,
+        payer
+      );
 
       expect(await readAccount(ctx, nextTask)).to.equal(null);
       const acc = await program.account.miniFanoutV0.fetch(miniFanout);
       expect(acc.shares[0].delegate.toBase58()).to.equal(delegate.toBase58());
       expect(acc.nextTask.toBase58()).to.equal(newTask.toBase58());
-      expect(await lamportsOf(newTask)).to.equal(await lamportsHeldBy(newTask));
-      expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
+      // The payer got the returned task's lamports back and funded the new task.
+      const newTaskLamports = await lamportsOf(newTask);
+      expect(newTaskLamports).to.equal(await lamportsHeldBy(newTask));
+      expect(await lamportsOf(payer.publicKey)).to.equal(
+        before + taskLamports - newTaskLamports
+      );
+      expect(await lamportsOf(taskQueue)).to.equal(queueBefore);
     });
 
     describe("with a task whose rent refund is no account of the instruction", () => {
