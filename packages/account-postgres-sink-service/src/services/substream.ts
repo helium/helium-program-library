@@ -64,6 +64,7 @@ export const setupSubstream = async (
   let gcIntervalId: NodeJS.Timeout | undefined;
   let hasAttemptedCursorReset = false;
   let pendingReconnect: { startBlock?: number } | null = null;
+  let activeStream: AbortController | null = null;
 
   const cursorManager = CursorManager(
     "account_sink",
@@ -102,6 +103,12 @@ export const setupSubstream = async (
 
     if (isConnecting) return;
     isConnecting = true;
+
+    // A stale-cursor reconnect can start while the previous stream is still
+    // open. Abort it so only one loop writes accounts and cursors.
+    activeStream?.abort();
+    const stream = new AbortController();
+    activeStream = stream;
 
     try {
       // Fresh token on each connection to survive token expiry across reconnects
@@ -151,7 +158,9 @@ export const setupSubstream = async (
       isConnecting = false;
       let hasReceivedBlock = false;
 
-      for await (const response of streamBlocks(transport, request)) {
+      for await (const response of streamBlocks(transport, request, {
+        signal: stream.signal,
+      })) {
         const message = response.message;
 
         if (message.case === "fatalError") {
@@ -276,6 +285,8 @@ export const setupSubstream = async (
         }
       }
 
+      if (stream.signal.aborted) return;
+
       // Stream ended normally (server closed gracefully), reconnect
       cursorManager.stopStalenessCheck();
       if (gcIntervalId) {
@@ -286,6 +297,9 @@ export const setupSubstream = async (
       isConnecting = false;
       handleReconnect(1);
     } catch (err) {
+      // A newer connection replaced this one and owns the shared state.
+      if (stream.signal.aborted) return;
+
       cursorManager.stopStalenessCheck();
       if (gcIntervalId) {
         clearInterval(gcIntervalId);
