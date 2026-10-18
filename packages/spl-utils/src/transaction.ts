@@ -1141,6 +1141,7 @@ export async function batchParallelInstructionsWithPriorityFee(
       computeUnitLimit,
       basePriorityFee,
       computeScaleUp,
+      extraSigners,
       version,
     }
   );

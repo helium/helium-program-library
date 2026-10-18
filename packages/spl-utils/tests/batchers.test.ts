@@ -407,6 +407,39 @@ describe("batchParallelInstructions", () => {
       sent.map((tx) => tx.message.header.numRequiredSignatures)
     ).to.deep.equal([2, 1]);
   });
+
+  it("batchParallelInstructionsWithPriorityFee signs with the extra signers its ixs need", async () => {
+    const sent: VersionedTransaction[] = [];
+    const provider = {
+      connection: {
+        ...makeConnection(),
+        getBlockHeight: async () => 0,
+        sendRawTransaction: async (raw: Buffer) => {
+          sent.push(VersionedTransaction.deserialize(raw));
+          return `sig${sent.length}`;
+        },
+        getTransactions: async (txids: string[]) =>
+          txids.map(() => ({ meta: { err: null } })),
+      },
+      wallet: {
+        publicKey: FEE_PAYER,
+        signAllTransactions: async (signing: VersionedTransaction[]) => {
+          signing.forEach((tx) => tx.sign([FEE_PAYER_KEYPAIR]));
+          return signing;
+        },
+      },
+    } as unknown as AnchorProvider;
+
+    await batchParallelInstructionsWithPriorityFee(
+      provider,
+      [signerIx, readIx],
+      { computeUnitLimit: 200000, extraSigners: [signer] }
+    );
+
+    expect(
+      sent.map((tx) => tx.message.header.numRequiredSignatures)
+    ).to.deep.equal([2, 1]);
+  });
 });
 
 describe("version pins on the priority-fee batchers", () => {
