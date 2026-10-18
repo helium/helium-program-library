@@ -40,12 +40,8 @@ export const useExtendDelegation = () => {
         !now || !provider || !provider.wallet || !position.isDelegated;
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
-      const proxyProgram = await initProxy(
-        provider as any,
-        PROXY_PROGRAM_ID,
-        idl
-      );
-      const vsrProgram = await initVsr(provider as any, VSR_PROGRAM_ID, idl);
+      const proxyProgram = await initProxy(provider as any, PROXY_PROGRAM_ID);
+      const vsrProgram = await initVsr(provider as any, VSR_PROGRAM_ID);
 
       if (loading) return;
 

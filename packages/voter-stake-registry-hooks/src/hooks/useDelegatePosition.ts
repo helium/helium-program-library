@@ -185,7 +185,7 @@ export const useDelegatePositions = ({
               } else {
                 await batchSequentialParallelInstructions({
                   provider,
-                  instructions,
+                  instructions: claims,
                   onProgress: () => {},
                   triesRemaining: 10,
                   extraSigners: [],
@@ -196,12 +196,12 @@ export const useDelegatePositions = ({
             }
             // Close out the expired positions.
             const closeInstructions = await Promise.all(
-              expiredPositions.map(({ position }, index) => {
+              expiredPositions.map(({ position, delegatedPosition }) => {
                 return hsdProgram.methods
                   .closeDelegationV0()
                   .accountsPartial({
                     position: position.pubkey,
-                    subDao: delegatedPositions[index].info?.subDao,
+                    subDao: delegatedPosition.info?.subDao,
                   })
                   .instruction();
               })
