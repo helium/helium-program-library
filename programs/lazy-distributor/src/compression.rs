@@ -21,7 +21,7 @@ fn tree_len(max_depth: usize, max_buffer_size: usize) -> Option<usize> {
 
 /// Number of proof nodes `verify_leaf` needs for `merkle_tree`: its max depth minus the depth of
 /// the canopy stored after the tree.
-pub(crate) fn proof_len(merkle_tree: &AccountInfo) -> Result<usize> {
+fn proof_len(merkle_tree: &AccountInfo) -> Result<usize> {
   let data = merkle_tree.try_borrow_data()?;
   let read_u32 = |offset: usize| -> Option<usize> {
     Some(u32::from_le_bytes(data.get(offset..offset + 4)?.try_into().ok()?) as usize)
@@ -39,6 +39,20 @@ pub(crate) fn proof_len(merkle_tree: &AccountInfo) -> Result<usize> {
   Ok(max_depth.saturating_sub(canopy_depth))
 }
 
+/// The proof nodes `verify_leaf` needs: the first `proof_len` remaining accounts.
+pub(crate) fn proof_accounts<'info>(
+  merkle_tree: &AccountInfo<'info>,
+  remaining_accounts: &[AccountInfo<'info>],
+) -> Result<Vec<AccountInfo<'info>>> {
+  Ok(
+    remaining_accounts
+      .iter()
+      .take(proof_len(merkle_tree)?)
+      .cloned()
+      .collect(),
+  )
+}
+
 #[cfg(test)]
 mod tests {
   use spl_concurrent_merkle_tree::concurrent_merkle_tree::ConcurrentMerkleTree;
@@ -50,8 +64,8 @@ mod tests {
     data.extend(max_buffer_size.to_le_bytes());
     data.extend(max_depth.to_le_bytes());
     data.resize(
-      // CONCURRENT_MERKLE_TREE_HEADER_SIZE_V1 in @solana/spl-account-compression.
-      56 + tree_len(max_depth as usize, max_buffer_size as usize).unwrap()
+      TREE_HEADER_LEN
+        + tree_len(max_depth as usize, max_buffer_size as usize).expect("tree size fits usize")
         + ((1usize << (canopy_depth + 1)) - 2) * NODE_LEN,
       0,
     );
@@ -93,10 +107,22 @@ mod tests {
 
   #[test]
   fn proof_len_is_depth_minus_canopy_depth() {
-    assert_eq!(proof_len_of(tree_account_data(3, 8, 0)).unwrap(), 3);
-    assert_eq!(proof_len_of(tree_account_data(14, 64, 0)).unwrap(), 14);
-    assert_eq!(proof_len_of(tree_account_data(14, 64, 11)).unwrap(), 3);
-    assert_eq!(proof_len_of(tree_account_data(20, 1024, 14)).unwrap(), 6);
+    assert_eq!(
+      proof_len_of(tree_account_data(3, 8, 0)).expect("valid tree account"),
+      3
+    );
+    assert_eq!(
+      proof_len_of(tree_account_data(14, 64, 0)).expect("valid tree account"),
+      14
+    );
+    assert_eq!(
+      proof_len_of(tree_account_data(14, 64, 11)).expect("valid tree account"),
+      3
+    );
+    assert_eq!(
+      proof_len_of(tree_account_data(20, 1024, 14)).expect("valid tree account"),
+      6
+    );
   }
 
   #[test]

@@ -126,22 +126,17 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
       ErrorCode::InvalidLazyDistributor
     );
   } else if discriminator == RemoteTaskTransactionV0::DISCRIMINATOR {
-    // A RemoteV0 oracle signature authorizes a reward only when it is bound, by the oracle, to the
-    // task that is running and to this exact reward. Neither "an oracle signed some
-    // RemoteTaskTransactionV0" nor "the task account currently reads as a RemoteV0 signed by the
-    // oracle" is sufficient on its own: the signed message is replayable, and a task tuktuk runs as
-    // CompiledV0 can rewrite its own account into RemoteV0 shape before this instruction inspects
-    // it. So the shape is confirmed, and then the signed message is required to name the running
-    // task and its accounts (via the verification hash tuktuk itself checks for a genuine RemoteV0
-    // run) and to authorize this reward.
-    let (task_info, task, run_task_ix) = running_remote_task(
+    // The running task must be a RemoteV0 task signed by this oracle, and the signed message must
+    // bind that task's key, its `queued_at`, the hashed accounts, this recipient and this
+    // `(oracle_index, current_rewards)`. The reasons are on the two helpers below.
+    let (task_key, task, run_task_ix) = running_remote_task(
       &ctx.accounts.sysvar_instructions,
       ctx.remaining_accounts,
       &signer,
     )?;
     verify_remote_reward_binding(
       &run_task_ix,
-      task_info.key(),
+      task_key,
       task.queued_at,
       &data,
       &args,
@@ -199,13 +194,12 @@ const RUN_TASK_HEADER_ACCOUNTS: usize = 6;
 /// Finds the task `run_task_v0` is running among `remaining_accounts` and verifies it is a
 /// `RemoteV0` task signed by `signer`. Returns the task and the `run_task_v0` instruction.
 ///
-/// The task is found by key, not by position: `run_task_v0` passes the task's free-task accounts
-/// after the instruction's own accounts, so the running task is not always the last one.
-fn running_remote_task<'a, 'info>(
+/// The running task is the remaining account whose key is `run_task_v0`'s task account (account 3).
+fn running_remote_task(
   sysvar_instructions: &AccountInfo,
-  remaining_accounts: &'a [AccountInfo<'info>],
+  remaining_accounts: &[AccountInfo],
   signer: &Pubkey,
-) -> Result<(&'a AccountInfo<'info>, TaskV0, Instruction)> {
+) -> Result<(Pubkey, TaskV0, Instruction)> {
   let index = load_current_index_checked(sysvar_instructions)?;
   let run_task_ix = load_instruction_at_checked(index as usize, sysvar_instructions)?;
   require_keys_eq!(
@@ -227,7 +221,7 @@ fn running_remote_task<'a, 'info>(
     .find(|account| account.key() == running_task)
     .ok_or_else(|| error!(VerifyRunningRemoteTaskError::TaskMismatch))?;
   let task = verify_running_remote_task(sysvar_instructions, task_info, signer)?;
-  Ok((task_info, task, run_task_ix))
+  Ok((running_task, task, run_task_ix))
 }
 
 /// Re-derives, from the oracle-signed `RemoteTaskTransactionV0`, that the signature authorizes this
@@ -614,7 +608,7 @@ mod tests {
       description: String::new(),
     }
     .try_serialize(&mut task_data)
-    .unwrap();
+    .expect("serialize task");
 
     let tuktuk_id = tuktuk::ID;
     let system_id = Pubkey::default();
@@ -637,7 +631,7 @@ mod tests {
       })
       .collect();
 
-    running_remote_task(&sysvar, &remaining, &signer).map(|(info, task, _)| (info.key(), task))
+    running_remote_task(&sysvar, &remaining, &signer).map(|(key, task, _)| (key, task))
   }
 
   // run_task_v0 hands each CPI the task's free-task accounts after the instruction's own, so the

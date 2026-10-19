@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use bubblegum_cpi::get_asset_id;
 use shared_utils::{verify_compressed_nft, VerifyCompressedNftArgs};
 
-use crate::{error::ErrorCode, state::*};
+use crate::{compression::proof_accounts, error::ErrorCode, state::*};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct UpdateCompressionDestinationArgsV0 {
@@ -45,12 +45,7 @@ pub fn handler<'info>(
     owner: ctx.accounts.owner.key(),
     delegate: ctx.accounts.owner.key(),
     // Only the first depth minus canopy depth accounts are proof nodes; ignore any after them.
-    proof_accounts: ctx
-      .remaining_accounts
-      .iter()
-      .take(crate::compression::proof_len(&ctx.accounts.merkle_tree)?)
-      .cloned()
-      .collect(),
+    proof_accounts: proof_accounts(&ctx.accounts.merkle_tree, ctx.remaining_accounts)?,
   })?;
 
   ctx.accounts.recipient.destination = ctx.accounts.destination.key();
