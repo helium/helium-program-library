@@ -20,7 +20,7 @@ import {
   COMPUTE_BUDGET_IX_DATA_SIZE,
   setLoadedAccountsDataSizeLimit,
 } from "../src/priorityFees";
-import { resetTxVersionCache } from "../src/txVersion";
+import { resetTxVersionCache, WALLET_SIGNED } from "../src/txVersion";
 
 const FEE_PAYER_KEYPAIR = Keypair.generate();
 const FEE_PAYER = FEE_PAYER_KEYPAIR.publicKey;
@@ -221,6 +221,45 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
       simulatingProvider(),
       await pairAt(1232, 500, 0),
       { signing: { feePayer: "wallet" } }
+    );
+    expect(drafts).to.have.length(1);
+    expect(hasDataSizeIx(drafts[0])).to.equal(false);
+    expect(await serializedSize(drafts[0])).to.equal(1232);
+  });
+
+  it("sizes a simulated keypair chunk with a wallet co-signer without a data-size ix, as it is sent", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      simulatingProvider(),
+      await pairAt(1232, 500, 0),
+      { signing: { feePayer: "keypair", coSigners: ["wallet"] }, version: 0 }
+    );
+    expect(drafts).to.have.length(1);
+    expect(hasDataSizeIx(drafts[0])).to.equal(false);
+    expect(await serializedSize(drafts[0])).to.equal(1232);
+  });
+
+  it("sizes a simulated keypair chunk with a versions co-signer with the data-size ix it is sent with", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      simulatingProvider(),
+      await pairAt(1232, 500, 0, [setLoadedAccountsDataSizeLimit(1)]),
+      {
+        signing: {
+          feePayer: "keypair",
+          coSigners: [{ versions: ["legacy", 0] }],
+        },
+        version: 0,
+      }
+    );
+    expect(drafts).to.have.length(1);
+    expect(hasDataSizeIx(drafts[0])).to.equal(true);
+    expect(await serializedSize(drafts[0])).to.equal(1232);
+  });
+
+  it("sizes a wallet chunk with an explicit CU limit without a data-size ix, as it is sent", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      makeProvider(),
+      await pairAt(1232, 500, 0),
+      { computeUnitLimit: 200000, signing: WALLET_SIGNED }
     );
     expect(drafts).to.have.length(1);
     expect(hasDataSizeIx(drafts[0])).to.equal(false);
