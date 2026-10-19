@@ -3,6 +3,21 @@ import { Connection, PublicKey } from "@solana/web3.js";
 export type SignerTransactionVersion = "legacy" | 0 | 1;
 export type TxVersionOption = 0 | 1 | "auto";
 
+/**
+ * Who signs a transaction. A `wallet` fee payer signs in a wallet the builder
+ * cannot see: its version stops at the wallet ceiling (v0), and its
+ * loaded-accounts data size limit is not derived from simulation, because the
+ * wallet may append instructions. A `keypair` fee payer signs every version.
+ * Each co-signer narrows the version to its own capability set.
+ */
+export type TransactionSigning = {
+  feePayer: "wallet" | "keypair";
+  coSigners?: SignerTransactionVersion[][];
+};
+
+// web3.js 1.x cannot serialize a v1 tx signed by a wallet adapter.
+const WALLET_CEILING = 0;
+
 // Feature gate `enable_tx_v1`.
 const TX_V1_FEATURE_GATE = new PublicKey(
   "txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL"
@@ -103,22 +118,47 @@ function detectedTxVersion(connection: Connection): Promise<0 | 1> {
   return detected;
 }
 
+// The signing a provider wallet implies: a keypair-backed wallet (`payer`)
+// that can sign v1 is a keypair fee payer; anything else is a wallet.
+export const signingFromWallet = (wallet: any): TransactionSigning => ({
+  feePayer:
+    wallet?.payer && resolveSignerVersions(wallet).has(1)
+      ? "keypair"
+      : "wallet",
+});
+
+// The highest version every signer can sign, capped by the wallet ceiling for
+// a wallet fee payer.
+const signingCeiling = ({
+  feePayer,
+  coSigners = [],
+}: TransactionSigning): 0 | 1 => {
+  const feePayerCeiling = feePayer === "keypair" ? 1 : WALLET_CEILING;
+  return feePayerCeiling === 1 && coSigners.every((c) => c.includes(1)) ? 1 : 0;
+};
+
 // Precedence (4.2 SPEC §2.2): per-call `version` > HPL_TX_VERSION=v0 (kill
-// switch) > signer capability > HPL_TX_VERSION=v1 or node detection. The
-// signer check runs before any RPC.
+// switch) > signer capability > HPL_TX_VERSION=v1 or node detection. The kill
+// switch skips signer capability; a forced v1 does not. `signing` wins over
+// `wallet`, which only implies one. The signer check runs before any RPC.
 export async function resolveTxVersion(
   connection: Connection,
-  { version = "auto", wallet }: { version?: TxVersionOption; wallet?: any } = {}
+  {
+    version = "auto",
+    wallet,
+    signing = wallet ? signingFromWallet(wallet) : undefined,
+  }: {
+    version?: TxVersionOption;
+    wallet?: any;
+    signing?: TransactionSigning;
+  } = {}
 ): Promise<0 | 1> {
   // Read before the pin check so a typo throws on pinned calls too.
   const env = envTxVersionOption();
   if (version !== "auto") return version;
   if (env === 0) return 0;
-  if (wallet && !resolveSignerVersions(wallet).has(1)) return 0;
-  const nodeVersion = env === 1 ? 1 : await detectedTxVersion(connection);
-  if (nodeVersion === 0 || !wallet) return nodeVersion;
-  // web3.js 1.x cannot serialize a v1 tx signed by a wallet adapter.
-  return wallet.payer ? 1 : 0;
+  if (signing && signingCeiling(signing) === 0) return 0;
+  return env === 1 ? 1 : await detectedTxVersion(connection);
 }
 
 /** Test hook: clears the cached env, node, and signer versions. Exported for tests; no stability guarantee. */

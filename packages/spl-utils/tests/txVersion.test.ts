@@ -316,3 +316,126 @@ describe("transaction version precedence", () => {
     expect(calls).to.be.empty;
   });
 });
+
+describe("transaction version from signing", () => {
+  const keypairWallet = () => {
+    const payer = Keypair.generate();
+    return { payer, publicKey: payer.publicKey };
+  };
+  const adapterWallet = (versions: any[]) => ({
+    publicKey: Keypair.generate().publicKey,
+    supportedTransactionVersions: new Set(versions),
+  });
+  // A node that fails the test when asked anything.
+  const silentNode = () =>
+    ({
+      rpcEndpoint: "http://silent",
+      getVersion: async () => expect.fail("called getVersion"),
+      getAccountInfo: async () => expect.fail("called getAccountInfo"),
+      getSlot: async () => expect.fail("called getSlot"),
+    }) as any;
+
+  beforeEach(() => resetTxVersionCache());
+  afterEach(() => {
+    delete process.env.HPL_TX_VERSION;
+    resetTxVersionCache();
+  });
+
+  it("builds v1 for a keypair fee payer on a v1 node", async () => {
+    const { connection } = fakeConnection();
+    expect(
+      await resolveTxVersion(connection, { signing: { feePayer: "keypair" } })
+    ).to.equal(1);
+  });
+
+  it("builds v0 for a keypair fee payer on a node without v1", async () => {
+    const { connection } = fakeConnection({ solanaCore: "4.1.5" });
+    expect(
+      await resolveTxVersion(connection, { signing: { feePayer: "keypair" } })
+    ).to.equal(0);
+  });
+
+  it("builds v0 for a wallet fee payer without calling the node", async () => {
+    expect(
+      await resolveTxVersion(silentNode(), { signing: { feePayer: "wallet" } })
+    ).to.equal(0);
+  });
+
+  it("builds v0 for a wallet fee payer with a v0-only co-signer", async () => {
+    expect(
+      await resolveTxVersion(silentNode(), {
+        signing: { feePayer: "wallet", coSigners: [["legacy", 0]] },
+      })
+    ).to.equal(0);
+  });
+
+  it("builds v0 for a keypair fee payer with a v0-only co-signer", async () => {
+    expect(
+      await resolveTxVersion(silentNode(), {
+        signing: { feePayer: "keypair", coSigners: [["legacy", 0, 1], [0]] },
+      })
+    ).to.equal(0);
+  });
+
+  it("builds v1 for a keypair fee payer whose co-signers all sign v1", async () => {
+    const { connection } = fakeConnection();
+    expect(
+      await resolveTxVersion(connection, {
+        signing: { feePayer: "keypair", coSigners: [[0, 1], ["legacy", 1]] },
+      })
+    ).to.equal(1);
+  });
+
+  it("follows signing over the provider wallet", async () => {
+    const { connection } = fakeConnection();
+    expect(
+      await resolveTxVersion(connection, {
+        wallet: keypairWallet(),
+        signing: { feePayer: "wallet" },
+      })
+    ).to.equal(0);
+  });
+
+  it("infers a keypair fee payer from a wallet with a payer", async () => {
+    const { connection } = fakeConnection();
+    expect(
+      await resolveTxVersion(connection, { wallet: keypairWallet() })
+    ).to.equal(1);
+  });
+
+  it("infers a wallet fee payer from an adapter, even one that signs v1", async () => {
+    expect(
+      await resolveTxVersion(silentNode(), {
+        wallet: adapterWallet(["legacy", 0, 1]),
+      })
+    ).to.equal(0);
+  });
+
+  it("follows the node alone with no signing and no wallet", async () => {
+    const { connection } = fakeConnection();
+    expect(await resolveTxVersion(connection)).to.equal(1);
+  });
+
+  it("lets the per-call version win over signing", async () => {
+    expect(
+      await resolveTxVersion(silentNode(), {
+        version: 1,
+        signing: { feePayer: "wallet" },
+      })
+    ).to.equal(1);
+  });
+
+  it("lets HPL_TX_VERSION=v0 win over a keypair fee payer", async () => {
+    process.env.HPL_TX_VERSION = "v0";
+    expect(
+      await resolveTxVersion(silentNode(), { signing: { feePayer: "keypair" } })
+    ).to.equal(0);
+  });
+
+  it("keeps a wallet fee payer on v0 under HPL_TX_VERSION=v1", async () => {
+    process.env.HPL_TX_VERSION = "v1";
+    expect(
+      await resolveTxVersion(silentNode(), { signing: { feePayer: "wallet" } })
+    ).to.equal(0);
+  });
+});
