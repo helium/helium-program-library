@@ -160,14 +160,16 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
 }
 
 pub fn get_next_time(mini_fanout: &MiniFanoutV0) -> Result<i64> {
-  next_time_after(&mini_fanout.schedule, Clock::get().unwrap().unix_timestamp)
+  next_time_after(&mini_fanout.schedule, Clock::get()?.unix_timestamp)
 }
 
 /// The first time of `schedule` after the unix timestamp `ts`.
 fn next_time_after(schedule: &str, ts: i64) -> Result<i64> {
   let schedule = Schedule::from_str(schedule).map_err(|_| ErrorCode::InvalidSchedule)?;
   let now = &DateTime::<Utc>::from_naive_utc_and_offset(
-    DateTime::from_timestamp(ts, 0).unwrap().naive_utc(),
+    DateTime::from_timestamp(ts, 0)
+      .ok_or(ErrorCode::InvalidSchedule)?
+      .naive_utc(),
     Utc,
   );
   Ok(
