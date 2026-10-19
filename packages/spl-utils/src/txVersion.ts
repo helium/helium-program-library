@@ -140,13 +140,13 @@ export const signingFromWallet = (wallet: any): TransactionSigning => ({
       : "wallet",
 });
 
-const signers = ({ feePayer, coSigners = [] }: TransactionSigning) => [
+const allSigners = ({ feePayer, coSigners = [] }: TransactionSigning) => [
   feePayer,
   ...coSigners,
 ];
 
 export const hasWalletSigner = (signing: TransactionSigning): boolean =>
-  signers(signing).includes("wallet");
+  allSigners(signing).includes("wallet");
 
 const signsV1 = (signer: TransactionSigner): boolean =>
   signer === "keypair" ||
@@ -156,7 +156,7 @@ const signsV1 = (signer: TransactionSigner): boolean =>
 // any signer is a wallet.
 const signingCeiling = (signing: TransactionSigning): 0 | 1 => {
   if (hasWalletSigner(signing)) return WALLET_CEILING;
-  return signers(signing).every(signsV1) ? 1 : 0;
+  return allSigners(signing).every(signsV1) ? 1 : 0;
 };
 
 // Precedence (4.2 SPEC §2.2): per-call `version` > HPL_TX_VERSION=v0 (kill
