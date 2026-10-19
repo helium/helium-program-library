@@ -1,5 +1,9 @@
 import { PROGRAM_ID } from "@helium/helium-sub-daos-sdk";
-import { Status, batchSequentialParallelInstructions } from "@helium/spl-utils";
+import {
+  Status,
+  batchSequentialParallelInstructions,
+  WALLET_SIGNED,
+} from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
@@ -50,7 +54,7 @@ export const useClaimPositionRewards = () => {
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
-            signing: { feePayer: "wallet" },
+            signing: WALLET_SIGNED,
           });
         }
       }

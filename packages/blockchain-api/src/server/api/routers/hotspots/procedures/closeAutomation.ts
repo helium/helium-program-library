@@ -10,6 +10,7 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import { PublicKey } from "@solana/web3.js";
 import { buildTeardownInstructions } from "./automation-data-helpers";
@@ -96,7 +97,7 @@ export const closeAutomation = publicProcedure.hotspots.closeAutomation.handler(
               : HELIUM_COMMON_LUT,
           ],
           commitment: "finalized",
-          signing: { feePayer: "wallet" },
+          signing: WALLET_SIGNED,
         })
       ).map((tx) => toVersionedTx(tx)),
     );

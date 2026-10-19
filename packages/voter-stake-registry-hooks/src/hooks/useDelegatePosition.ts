@@ -22,6 +22,7 @@ import {
   fetchBackwardsCompatibleIdl,
   HNT_MINT,
   sleep,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import {
   init as initTuktuk,
@@ -200,7 +201,7 @@ export const useDelegatePositions = ({
                   triesRemaining: 10,
                   extraSigners: [],
                   maxSignatureBatch: 10,
-                  signing: { feePayer: "wallet" },
+                  signing: WALLET_SIGNED,
                 });
               }
             }
@@ -222,7 +223,7 @@ export const useDelegatePositions = ({
               await batchParallelInstructionsWithPriorityFee(
                 provider,
                 closeInstructions,
-                { signing: { feePayer: "wallet" } }
+                { signing: WALLET_SIGNED }
               );
             }
 
@@ -491,7 +492,7 @@ export const useDelegatePositions = ({
               triesRemaining: 10,
               extraSigners: [],
               maxSignatureBatch: 10,
-              signing: { feePayer: "wallet" },
+              signing: WALLET_SIGNED,
             }
           );
         }

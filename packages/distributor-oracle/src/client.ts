@@ -74,7 +74,7 @@ const MISSING_RECIPIENT_CU = 400000;
 // the oracle co-signs with web3.js 1.x, which cannot sign v1.
 const ORACLE_CO_SIGNED: TransactionSigning = {
   feePayer: "wallet",
-  coSigners: [["legacy", 0]],
+  coSigners: [{ versions: ["legacy", 0] }],
 };
 
 export type Reward = {

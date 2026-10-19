@@ -5,6 +5,7 @@ import {
   sendAndConfirmWithRetry,
   toBN,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import {
@@ -151,7 +152,7 @@ export const useSplitPosition = () => {
             provider,
             instructions,
             // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-            { signing: { feePayer: "wallet" } }
+            { signing: WALLET_SIGNED }
           );
           const transactions = await Promise.all(drafts.map(toVersionedTx));
 

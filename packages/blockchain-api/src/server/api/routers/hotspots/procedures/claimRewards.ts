@@ -32,6 +32,7 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import {
   getJitoTipAmountLamports,
@@ -415,7 +416,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
               : HELIUM_COMMON_LUT,
           ],
           commitment: "finalized",
-          signing: { feePayer: "wallet" },
+          signing: WALLET_SIGNED,
         })
       ).map((tx) => toVersionedTx(tx)),
     );

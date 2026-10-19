@@ -7,6 +7,7 @@ import {
 import {
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -98,7 +99,7 @@ export const buildAutomationTransactionResponse = async ({
       await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
         addressLookupTableAddresses: [getHeliumLookupTable()],
         commitment: "finalized",
-        signing: { feePayer: "wallet" },
+        signing: WALLET_SIGNED,
       })
     ).map((tx) => toVersionedTx(tx)),
   );
