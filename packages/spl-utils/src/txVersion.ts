@@ -4,16 +4,29 @@ export type SignerTransactionVersion = "legacy" | 0 | 1;
 export type TxVersionOption = 0 | 1 | "auto";
 
 /**
- * Who signs a transaction. A `wallet` fee payer signs in a wallet the builder
- * cannot see: its version stops at the wallet ceiling (v0), and its
+ * One signer of a transaction. A `wallet` signs in a wallet the builder cannot
+ * see; a `keypair` signs every version; `{ versions }` signs only the listed
+ * versions.
+ */
+export type TransactionSigner =
+  | "wallet"
+  | "keypair"
+  | { versions: SignerTransactionVersion[] };
+
+/**
+ * Who signs a transaction: the fee payer and each co-signer. If any signer is
+ * a `wallet`, the version stops at the wallet ceiling (v0) and the
  * loaded-accounts data size limit is not derived from simulation, because the
- * wallet may append instructions. A `keypair` fee payer signs every version.
- * Each co-signer narrows the version to its own capability set.
+ * wallet may append instructions. Otherwise the version is the highest one
+ * every signer can sign.
  */
 export type TransactionSigning = {
-  feePayer: "wallet" | "keypair";
-  coSigners?: SignerTransactionVersion[][];
+  feePayer: TransactionSigner;
+  coSigners?: TransactionSigner[];
 };
+
+/** Signing for a transaction whose fee payer is the user's wallet. */
+export const WALLET_SIGNED: TransactionSigning = { feePayer: "wallet" };
 
 // web3.js 1.x cannot serialize a v1 tx signed by a wallet adapter.
 const WALLET_CEILING = 0;
@@ -127,14 +140,23 @@ export const signingFromWallet = (wallet: any): TransactionSigning => ({
       : "wallet",
 });
 
-// The highest version every signer can sign, capped by the wallet ceiling for
-// a wallet fee payer.
-const signingCeiling = ({
+const signers = ({ feePayer, coSigners = [] }: TransactionSigning) => [
   feePayer,
-  coSigners = [],
-}: TransactionSigning): 0 | 1 => {
-  const feePayerCeiling = feePayer === "keypair" ? 1 : WALLET_CEILING;
-  return feePayerCeiling === 1 && coSigners.every((c) => c.includes(1)) ? 1 : 0;
+  ...coSigners,
+];
+
+export const hasWalletSigner = (signing: TransactionSigning): boolean =>
+  signers(signing).includes("wallet");
+
+const signsV1 = (signer: TransactionSigner): boolean =>
+  signer === "keypair" ||
+  (typeof signer === "object" && signer.versions.includes(1));
+
+// The highest version every signer can sign, capped by the wallet ceiling when
+// any signer is a wallet.
+const signingCeiling = (signing: TransactionSigning): 0 | 1 => {
+  if (hasWalletSigner(signing)) return WALLET_CEILING;
+  return signers(signing).every(signsV1) ? 1 : 0;
 };
 
 // Precedence (4.2 SPEC §2.2): per-call `version` > HPL_TX_VERSION=v0 (kill

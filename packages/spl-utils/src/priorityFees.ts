@@ -10,7 +10,7 @@ import {
 import { populateMissingDraftInfo, TransactionDraft } from "./draft";
 import { toVersionedTx } from "./transaction";
 import { MAX_COMPUTE_UNITS, tableComputeUnits } from "./computeUnitTable";
-import { TransactionSigning } from "./txVersion";
+import { hasWalletSigner, TransactionSigning } from "./txVersion";
 
 const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;
 export const MAX_PRIO_FEE = 2500000;
@@ -62,7 +62,7 @@ const derivesDataSizeLimit = ({
   signing?: TransactionSigning;
   deriveLoadedAccountsDataSizeLimit?: boolean;
 }): boolean =>
-  deriveLoadedAccountsDataSizeLimit ?? signing?.feePayer !== "wallet";
+  deriveLoadedAccountsDataSizeLimit ?? !(signing && hasWalletSigner(signing));
 
 // The ComputeBudget ixs a tx carries before its fees are known, with
 // placeholder values of the same encoded size. withPriorityFees simulates

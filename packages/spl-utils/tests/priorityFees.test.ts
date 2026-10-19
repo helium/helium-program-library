@@ -162,6 +162,23 @@ describe("withPriorityFees loaded-accounts data size", () => {
     expect(simulatedDataSizeLimit(simulated[0])).to.equal(undefined);
   });
 
+  it("omits the limit for a keypair fee payer with a wallet co-signer", async () => {
+    const { connection, simulated } = simConnection([MEASURED]);
+    const ixs = await fees(connection, {
+      signing: { feePayer: "keypair", coSigners: ["wallet"] },
+    });
+    expect(dataSizeLimit(ixs)).to.equal(undefined);
+    expect(simulatedDataSizeLimit(simulated[0])).to.equal(undefined);
+  });
+
+  it("derives the limit for a keypair fee payer with a non-wallet co-signer", async () => {
+    const { connection } = simConnection([MEASURED]);
+    const ixs = await fees(connection, {
+      signing: { feePayer: "keypair", coSigners: [{ versions: ["legacy", 0] }] },
+    });
+    expect(dataSizeLimit(ixs)).to.equal(DERIVED);
+  });
+
   it("honors an explicit limit for a wallet fee payer", async () => {
     const { connection } = simConnection([MEASURED]);
     const ixs = await fees(connection, {

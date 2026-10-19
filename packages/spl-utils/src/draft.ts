@@ -19,7 +19,9 @@ export type TransactionDraft = {
   signers?: Signer[];
   // Per-call override for resolveTxVersion; 0 pins a path to v0.
   version?: TxVersionOption;
-  // Who signs; decides the version and whether the data-size limit is derived.
+  // Who signs. withPriorityFees reads it to decide whether the data-size limit
+  // is derived; toVersionedTx does not read it, so set `version` to
+  // resolveTxVersion(connection, { signing }) where the version matters.
   signing?: TransactionSigning;
 };
 

@@ -5,9 +5,14 @@ export * from "./utils";
 export * from "./token";
 export * from "./constants";
 export * from "./draft";
-export { resolveTxVersion, resetTxVersionCache } from "./txVersion";
+export {
+  resolveTxVersion,
+  resetTxVersionCache,
+  WALLET_SIGNED,
+} from "./txVersion";
 export type {
   SignerTransactionVersion,
+  TransactionSigner,
   TransactionSigning,
   TxVersionOption,
 } from "./txVersion";

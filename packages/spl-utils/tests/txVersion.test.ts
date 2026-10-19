@@ -364,7 +364,10 @@ describe("transaction version from signing", () => {
   it("builds v0 for a wallet fee payer with a v0-only co-signer", async () => {
     expect(
       await resolveTxVersion(silentNode(), {
-        signing: { feePayer: "wallet", coSigners: [["legacy", 0]] },
+        signing: {
+          feePayer: "wallet",
+          coSigners: [{ versions: ["legacy", 0] }],
+        },
       })
     ).to.equal(0);
   });
@@ -372,7 +375,18 @@ describe("transaction version from signing", () => {
   it("builds v0 for a keypair fee payer with a v0-only co-signer", async () => {
     expect(
       await resolveTxVersion(silentNode(), {
-        signing: { feePayer: "keypair", coSigners: [["legacy", 0, 1], [0]] },
+        signing: {
+          feePayer: "keypair",
+          coSigners: [{ versions: ["legacy", 0, 1] }, { versions: [0] }],
+        },
+      })
+    ).to.equal(0);
+  });
+
+  it("builds v0 for a keypair fee payer with a wallet co-signer without calling the node", async () => {
+    expect(
+      await resolveTxVersion(silentNode(), {
+        signing: { feePayer: "keypair", coSigners: ["wallet"] },
       })
     ).to.equal(0);
   });
@@ -381,9 +395,29 @@ describe("transaction version from signing", () => {
     const { connection } = fakeConnection();
     expect(
       await resolveTxVersion(connection, {
-        signing: { feePayer: "keypair", coSigners: [[0, 1], ["legacy", 1]] },
+        signing: {
+          feePayer: "keypair",
+          coSigners: ["keypair", { versions: [0, 1] }, { versions: ["legacy", 1] }],
+        },
       })
     ).to.equal(1);
+  });
+
+  it("builds v1 for a fee payer described by versions that include v1", async () => {
+    const { connection } = fakeConnection();
+    expect(
+      await resolveTxVersion(connection, {
+        signing: { feePayer: { versions: [0, 1] } },
+      })
+    ).to.equal(1);
+  });
+
+  it("builds v0 for a fee payer described by versions without v1", async () => {
+    expect(
+      await resolveTxVersion(silentNode(), {
+        signing: { feePayer: { versions: ["legacy", 0] } },
+      })
+    ).to.equal(0);
   });
 
   it("follows signing over the provider wallet", async () => {
