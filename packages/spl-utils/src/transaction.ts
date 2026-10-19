@@ -23,7 +23,6 @@ import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 import {
   COMPUTE_BUDGET_IX_DATA_SIZE,
-  DEFAULT_COMPUTE_SCALE_UP,
   DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
   MAX_PRIO_FEE,
   callerComputeBudgetTypes,
@@ -772,7 +771,6 @@ export const packInstructionGroups = async ({
   toProbe,
   maxTxSize,
   maxInstructionsPerTx,
-  computeScaleUp = DEFAULT_COMPUTE_SCALE_UP,
 }: {
   groups: TransactionInstruction[][];
   versions: (0 | 1)[];
@@ -782,6 +780,10 @@ export const packInstructionGroups = async ({
   ) => TransactionDraft;
   maxTxSize?: number;
   maxInstructionsPerTx?: number;
+  /**
+   * @deprecated Unused. The CU bound is the table value as is, which already
+   * carries FALLBACK_CU_MARGIN (ADR-0001).
+   */
   computeScaleUp?: number;
 }): Promise<{ instructions: TransactionInstruction[]; version: 0 | 1 }[]> => {
   const sizeLimit = (version: 0 | 1) =>
@@ -804,7 +806,9 @@ export const packInstructionGroups = async ({
           const tableCu = tableComputeUnitsForInstructions(instructions, {
             throwOnMiss: true,
           });
-          if (tableCu * computeScaleUp > MAX_COMPUTE_UNITS) {
+          // The table caps its value at the maximum, so reaching it means
+          // the chunk may need more.
+          if (tableCu >= MAX_COMPUTE_UNITS) {
             break;
           }
         } catch {
@@ -1098,7 +1102,6 @@ export async function batchInstructionsToTxsWithPriorityFee(
     },
     maxTxSize,
     maxInstructionsPerTx,
-    computeScaleUp,
   });
   for (const chunk of chunks) {
     await flushChunk(chunk.instructions, chunk.version);

@@ -3,15 +3,11 @@ import {
   ComputeBudgetProgram,
   Connection,
   Keypair,
-  SystemProgram,
+  PublicKey,
   TransactionInstruction,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { expect } from "chai";
-import {
-  MAX_COMPUTE_UNITS,
-  tableComputeUnitsForInstructions,
-} from "../src/computeUnitTable";
 import {
   batchInstructionsToTxsWithPriorityFee,
   batchParallelInstructions,
@@ -77,13 +73,6 @@ const bodyIxs = (draft: TransactionDraft) =>
     (ix) => !ix.programId.equals(ComputeBudgetProgram.programId)
   );
 
-const transfer = () =>
-  SystemProgram.transfer({
-    fromPubkey: FEE_PAYER,
-    toPubkey: Keypair.generate().publicKey,
-    lamports: 1,
-  });
-
 const serializedSize = async (draft: TransactionDraft) =>
   (await toVersionedTx(draft)).serialize().length;
 
@@ -124,6 +113,19 @@ const pairAt = async (
   );
   return [dataIx(first), dataIx(base + target - size)];
 };
+
+// An ix the CU table prices at its `programId:discriminator` entry.
+const tabledIx = (key: string) => {
+  const [programId, discriminator] = key.split(":");
+  return new TransactionInstruction({
+    programId: new PublicKey(programId),
+    keys: [],
+    data: Buffer.from(discriminator, "hex"),
+  });
+};
+const CRON_380K = "hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu:3f865a9ff98338b5";
+const HEM_277K = "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:1351db1e0a220c50";
+const HEM_811K = "hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8:e8c27a44a7f677c5";
 
 // An extra signer, an ix that needs its signature, and one that only reads it.
 const signer = Keypair.generate();
@@ -263,27 +265,30 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
     expect(drafts).to.have.length(1);
   });
 
-  it("stops growth once table CU × computeScaleUp passes 1.4M", async () => {
-    const tableCu = (count: number) =>
-      tableComputeUnitsForInstructions(
-        Array.from({ length: count }, transfer),
-        { throwOnMiss: true }
-      );
-    // Between the 3- and 4-transfer bounds: 3 fit, 4 do not.
-    const computeScaleUp = (2 * MAX_COMPUTE_UNITS) / (tableCu(3) + tableCu(4));
+  it("packs a pair whose table CU (raw × 2.0) fits 1.4M into one tx", async () => {
+    // Raw 380865 + 277706 = 658571: × 2.0 fits 1.4M, × 2.2 would not.
     const drafts = await batchInstructionsToTxsWithPriorityFee(
       makeProvider(),
-      Array.from({ length: 10 }, transfer),
-      { ...OPTIONS, version: 0, computeScaleUp }
+      [tabledIx(CRON_380K), tabledIx(HEM_277K)],
+      { ...OPTIONS, version: 0 }
     );
-    expect(drafts.map((d) => bodyIxs(d).length)).to.deep.equal([3, 3, 3, 1]);
+    expect(drafts).to.have.length(1);
+  });
+
+  it("stops growth once table CU reaches 1.4M", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      makeProvider(),
+      [tabledIx(HEM_811K), tabledIx(HEM_811K)],
+      { ...OPTIONS, version: 0 }
+    );
+    expect(drafts).to.have.length(2);
   });
 
   it("packs by size alone when an ix misses the CU table", async () => {
     const drafts = await batchInstructionsToTxsWithPriorityFee(
       makeProvider(),
-      [transfer(), dataIx(10), transfer(), transfer()],
-      { ...OPTIONS, version: 0, computeScaleUp: 1e9 }
+      [tabledIx(HEM_811K), dataIx(10), tabledIx(HEM_811K)],
+      { ...OPTIONS, version: 0 }
     );
     expect(drafts).to.have.length(1);
   });
@@ -291,8 +296,8 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
   it("never rejects a lone group for its CU", async () => {
     const drafts = await batchInstructionsToTxsWithPriorityFee(
       makeProvider(),
-      [transfer()],
-      { ...OPTIONS, version: 0, computeScaleUp: 1e9 }
+      [[tabledIx(HEM_811K), tabledIx(HEM_811K)]],
+      { ...OPTIONS, version: 0 }
     );
     expect(drafts).to.have.length(1);
   });
