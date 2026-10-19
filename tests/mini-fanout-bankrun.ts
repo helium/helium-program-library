@@ -215,12 +215,14 @@ describe("mini-fanout under bankrun", () => {
     funding = FANOUT_AMOUNT,
     preTask = { compiledV0: [memoPreTask as any] } as any,
     payer,
+    schedule = HOURLY,
   }: {
     seed: string;
     shares: any[];
     funding?: number;
     preTask?: any;
     payer?: Keypair;
+    schedule?: string;
   }) {
     const {
       pubkeys: { miniFanout },
@@ -228,7 +230,7 @@ describe("mini-fanout under bankrun", () => {
       .initializeMiniFanoutV0({
         seed: Buffer.from(seed, "utf-8"),
         shares,
-        schedule: HOURLY,
+        schedule,
         preTask,
       })
       .accounts({ payer: me, owner: me, taskQueue, rentRefund: me, mint })
@@ -612,6 +614,27 @@ describe("mini-fanout under bankrun", () => {
       createMemoInstruction("topped up", []),
     ]);
     expect(Number(await tokenAmount(ctx, walletAta))).to.equal(FANOUT_AMOUNT);
+  });
+
+  it("refuses to distribute when the schedule has no future time", async () => {
+    const wallet = Keypair.generate();
+    const walletAta = await ataWith(wallet.publicKey, 0);
+    // The only time of the schedule is the last second of this year, so once the clock reaches
+    // it the distribution that runs then has no next time to queue. clockwork-cron finds no time
+    // in a later year whose month is before the current month, so the year stays this one.
+    const { unixTimestamp } = await ctx.banksClient.getClock();
+    const year = new Date(Number(unixTimestamp) * 1000).getUTCFullYear();
+    const { task, preTask } = await scheduledFanout({
+      seed: "no-future-time",
+      shares: [shareOf(wallet.publicKey, 100)],
+      schedule: `59 59 23 31 12 * ${year}`,
+    });
+
+    const distribute = await reachDistribution(task, preTask);
+    expect(await programErrorLogs(distribute())).to.match(
+      /Error Code: InvalidSchedule\. Error Number: 6003\./
+    );
+    expect(Number(await tokenAmount(ctx, walletAta))).to.equal(0);
   });
 
   it("clears a stale next pre task when it reschedules", async () => {
