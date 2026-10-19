@@ -7,7 +7,6 @@ import {
 import {
   currentEpoch,
   delegatedPositionKey,
-  getLockupEffectiveEndTs,
   init,
   PROGRAM_ID,
   subDaoEpochInfoKey,
@@ -29,6 +28,10 @@ import {
   nextAvailableTaskIds,
   taskKey,
 } from "@helium/tuktuk-sdk";
+import {
+  init as initVsr,
+  PROGRAM_ID as VSR_PROGRAM_ID,
+} from "@helium/voter-stake-registry-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
   LAMPORTS_PER_SOL,
@@ -45,6 +48,7 @@ import { PREPAID_TX_FEES, usePositionsFees } from "./usePositionFees";
 import { useProxyConfig } from "./useProxyConfig";
 import { useRegistrar } from "./useRegistrar";
 import { formPositionClaims } from "../utils/formPositionClaims";
+import { getDelegationExpiration } from "../utils/getDelegationExpiration";
 
 const HNT_EPOCH = 20117;
 
@@ -141,14 +145,20 @@ export const useDelegatePositions = ({
         !subDao ||
         !delegatedPositions ||
         !delegationClaimBots;
+
+      if (loading) return;
+
+      if (isInvalid) {
+        throw new Error("Unable to Delegate Position, Invalid params");
+      }
+
       const idl = await fetchBackwardsCompatibleIdl(programId, provider as any);
       const hsdProgram = await init(provider as any, programId, idl);
       const hplCronsProgram = await initHplCrons(provider as any);
       const tuktukProgram = await initTuktuk(provider as any);
+      const vsrProgram = await initVsr(provider as any, VSR_PROGRAM_ID);
 
-      if (loading) return;
-
-      if (isInvalid || !hsdProgram) {
+      if (!hsdProgram) {
         throw new Error("Unable to Delegate Position, Invalid params");
       } else {
         const instructions: TransactionInstruction[][] = [];
@@ -234,36 +244,40 @@ export const useDelegatePositions = ({
               delegatedPositionAcc &&
               !delegatedPositionAcc.info!.subDao.equals(subDao.pubkey)
             ) {
-              const newExpirationTs = Math.min(
-                [...proxyConfig.seasons]
-                  .reverse()
-                  .find((season) => now.gte(season.start))
-                  ?.end.toNumber() ?? 0,
-                getLockupEffectiveEndTs(position.lockup).toNumber()
+              // change_delegation_v0 judges the season and genesis end against
+              // the cluster clock plus the registrar's time_offset.
+              const registrarAcc = await vsrProgram.account.registrar.fetch(
+                position.registrar
               );
-              if (!newExpirationTs) {
-                throw new Error("No new valid expiration ts found");
-              }
-              const oldExpirationTs = delegatedPositionAcc!.info!.expirationTs;
+              const registrarNow = now.add(registrarAcc.timeOffset);
+              const { newExpirationTs, oldClosingTs, genesisEndTs } =
+                getDelegationExpiration({
+                  position,
+                  expirationTs: delegatedPositionAcc!.info!.expirationTs,
+                  seasons: proxyConfig.seasons,
+                  registrarNow,
+                });
               const oldSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                now
+                registrarNow
+              )[0];
+              const oldClosingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
+                delegatedPositionAcc!.info!.subDao,
+                oldClosingTs
               )[0];
               const newSubDaoEpochInfo = subDaoEpochInfoKey(
                 subDao.pubkey,
-                now
+                registrarNow
               )[0];
               const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                position.genesisEnd.lt(now)
-                  ? oldExpirationTs
+                position.genesisEnd.lte(registrarNow)
+                  ? oldClosingTs
                   : position.genesisEnd
               )[0];
               const newGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 subDao.pubkey,
-                position.genesisEnd.lt(now)
-                  ? newExpirationTs
-                  : position.genesisEnd
+                genesisEndTs
               )[0];
               const closingTimeSubDaoEpochInfo = subDaoEpochInfoKey(
                 subDao.pubkey,
@@ -286,6 +300,7 @@ export const useDelegatePositions = ({
                     subDao: subDao.pubkey,
                     oldSubDao: delegatedPositionAcc.info!.subDao,
                     oldSubDaoEpochInfo,
+                    oldClosingTimeSubDaoEpochInfo,
                     oldGenesisEndSubDaoEpochInfo,
                     subDaoEpochInfo: newSubDaoEpochInfo,
                     closingTimeSubDaoEpochInfo,
@@ -304,22 +319,21 @@ export const useDelegatePositions = ({
                   .instruction()
               );
             } else if (position.isDelegated && position.isDelegationRenewable) {
-              const now = new BN(Date.now() / 1000);
-              const newExpirationTs = Math.min(
-                [...proxyConfig.seasons]
-                  .reverse()
-                  .find((season) => now.gte(season.start))
-                  ?.end.toNumber() ?? 0,
-                getLockupEffectiveEndTs(position.lockup).toNumber()
+              const registrarAcc = await vsrProgram.account.registrar.fetch(
+                position.registrar
               );
-              if (!newExpirationTs) {
-                throw new Error("No new valid expiration ts found");
-              }
-              const oldExpirationTs = delegatedPositionAcc!.info!.expirationTs;
+              const registrarNow = now.add(registrarAcc.timeOffset);
+              const { newExpirationTs, oldClosingTs, genesisEndTs } =
+                getDelegationExpiration({
+                  position,
+                  expirationTs: delegatedPositionAcc!.info!.expirationTs,
+                  seasons: proxyConfig.seasons,
+                  registrarNow,
+                });
 
               const oldSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                oldExpirationTs
+                oldClosingTs
               )[0];
               const newSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
@@ -327,9 +341,7 @@ export const useDelegatePositions = ({
               )[0];
               const oldGenesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
                 delegatedPositionAcc!.info!.subDao,
-                position.genesisEnd.lt(now)
-                  ? newExpirationTs
-                  : position.genesisEnd
+                genesisEndTs
               )[0];
               innerInstructions.push(
                 await hsdProgram.methods

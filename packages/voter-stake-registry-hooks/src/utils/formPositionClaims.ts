@@ -124,9 +124,12 @@ export const formPositionClaims = async ({
         const { lastClaimedEpoch, claimedEpochsBitmap } =
           delegatedPosition.account;
         const epoch = lastClaimedEpoch.add(new BN(1));
-        const epochsCount = isDecayed
-          ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
-          : currentEpoch.sub(epoch).toNumber();
+        // claim_rewards_v1 fails EpochNotOver for the current epoch, so the
+        // last claimable epoch is the one before it.
+        const lastEpoch = isDecayed
+          ? BN.min(decayedEpoch, currentEpoch.sub(new BN(1)))
+          : currentEpoch.sub(new BN(1));
+        const epochsCount = lastEpoch.sub(epoch).add(new BN(1)).toNumber();
 
         const epochsToClaim = Array.from(
           { length: epochsCount > 0 ? epochsCount : 0 },
@@ -150,16 +153,42 @@ export const formPositionClaims = async ({
             connection: connNoCache,
             keys: subDaoEpochInfoKeys,
           });
-          bucketedEpochsByPosition[position.pubkey.toBase58()].push(
+          const daoEpochInfoAccounts = await getMultipleAccounts({
+            connection: connNoCache,
+            keys: chunk.map(
+              (epoch) =>
+                daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
+            ),
+          });
+          const chunkInstructions = (
             await Promise.all(
               chunk.map((epoch, index) => {
-                const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index]!;
+                const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
+                if (!subDaoEpochInfoAccount) return null;
                 const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
                   "subDaoEpochInfoV0",
-                  subDaoEpochInfoAccount?.data
+                  subDaoEpochInfoAccount.data
                 );
+                // claim_rewards_v0 fails EpochNotClosed until rewards_issued_at
+                // is set, and claim_rewards_v1 until the DAO epoch's
+                // done_issuing_rewards is set.
+                if (!subDaoEpochInfoData.rewardsIssuedAt) return null;
 
                 if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
+                  // claim_rewards_v1 also fails EpochNotClosed until the DAO
+                  // epoch is done issuing rewards.
+                  const daoEpochInfoAccount = daoEpochInfoAccounts[index];
+                  if (!daoEpochInfoAccount) return null;
+                  const daoEpochInfoData = hsdProgram.coder.accounts.decode(
+                    "daoEpochInfoV0",
+                    daoEpochInfoAccount.data
+                  );
+                  if (!daoEpochInfoData.doneIssuingRewards) return null;
+                  // claim_rewards_v1 also rejects an epoch with no delegation
+                  // rewards issued.
+                  if (daoEpochInfoData.delegationRewardsIssued.isZero())
+                    return null;
+
                   return hsdProgram.methods
                     .claimRewardsV1({
                       epoch,
@@ -237,7 +266,12 @@ export const formPositionClaims = async ({
                 }
               })
             )
-          );
+          ).filter(truthy);
+          if (chunkInstructions.length > 0) {
+            bucketedEpochsByPosition[position.pubkey.toBase58()].push(
+              chunkInstructions
+            );
+          }
         }
       }
     }
