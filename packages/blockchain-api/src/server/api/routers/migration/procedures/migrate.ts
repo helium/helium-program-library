@@ -844,8 +844,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       addressLookupTableAddresses: [lut],
       commitment: "finalized" as const,
       // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-      deriveLoadedAccountsDataSizeLimit: false,
-      version: 0 as const,
+      signing: { feePayer: "wallet" as const },
     };
 
     const addDrafts = (drafts: TransactionDraft[], description: string) => {
@@ -987,7 +986,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       for (let i = allDrafts.length - 1; i >= 0; i--) {
         allDrafts[i].instructions.push(tipIx);
         const testTx = await toVersionedTx(allDrafts[i]);
-        // batchOpts pins these drafts to v0.
+        // batchOpts' wallet signing keeps these drafts on v0.
         if (testTx.serialize().length <= getTransactionSizeLimit(0)) {
           tipPlaced = true;
           break;

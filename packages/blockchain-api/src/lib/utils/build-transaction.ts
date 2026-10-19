@@ -110,7 +110,7 @@ export async function buildVersionedTransaction({
       computeUnits: tableComputeUnitLimit,
       // The wallet signs this tx and may append guard ixs (Lighthouse) that
       // load more account data than a sim-derived limit allows.
-      deriveLoadedAccountsDataSizeLimit: false,
+      signing: { feePayer: "wallet" },
     });
   } catch (error) {
     console.warn(

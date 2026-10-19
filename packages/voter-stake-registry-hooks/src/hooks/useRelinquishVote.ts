@@ -203,7 +203,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
-            version: 0,
+            signing: { feePayer: "wallet" },
           });
         }
       }

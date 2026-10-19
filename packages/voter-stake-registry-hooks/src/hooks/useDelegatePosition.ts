@@ -200,7 +200,7 @@ export const useDelegatePositions = ({
                   triesRemaining: 10,
                   extraSigners: [],
                   maxSignatureBatch: 10,
-                  version: 0,
+                  signing: { feePayer: "wallet" },
                 });
               }
             }
@@ -222,7 +222,7 @@ export const useDelegatePositions = ({
               await batchParallelInstructionsWithPriorityFee(
                 provider,
                 closeInstructions,
-                { version: 0 }
+                { signing: { feePayer: "wallet" } }
               );
             }
 
@@ -491,7 +491,7 @@ export const useDelegatePositions = ({
               triesRemaining: 10,
               extraSigners: [],
               maxSignatureBatch: 10,
-              version: 0,
+              signing: { feePayer: "wallet" },
             }
           );
         }
