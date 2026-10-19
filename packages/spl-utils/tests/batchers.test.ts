@@ -16,7 +16,10 @@ import {
   toVersionedTx,
 } from "../src/transaction";
 import { TransactionDraft } from "../src/draft";
-import { setLoadedAccountsDataSizeLimit } from "../src/priorityFees";
+import {
+  COMPUTE_BUDGET_IX_DATA_SIZE,
+  setLoadedAccountsDataSizeLimit,
+} from "../src/priorityFees";
 import { resetTxVersionCache } from "../src/txVersion";
 
 const FEE_PAYER_KEYPAIR = Keypair.generate();
@@ -170,6 +173,67 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
       { ...OPTIONS, loadedAccountsDataSizeLimit: 100000, version: 0 }
     );
     expect(drafts).to.have.length(2);
+  });
+
+  // A provider whose simulation measures a loaded-accounts data size.
+  const simulatingProvider = () =>
+    ({
+      connection: {
+        ...makeConnection(),
+        simulateTransaction: async () => ({
+          value: { err: null, unitsConsumed: 1000, loadedAccountsDataSize: 1 },
+        }),
+      },
+      wallet: { publicKey: FEE_PAYER },
+    } as unknown as AnchorProvider);
+
+  const hasDataSizeIx = (draft: TransactionDraft) =>
+    draft.instructions.some(
+      (ix) =>
+        ix.programId.equals(ComputeBudgetProgram.programId) &&
+        ix.data[0] === COMPUTE_BUDGET_IX_DATA_SIZE
+    );
+
+  it("sizes a keypair chunk with an explicit CU limit without a data-size ix, as it is sent", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      makeProvider(),
+      await pairAt(1232, 500, 0),
+      { computeUnitLimit: 200000, signing: { feePayer: "keypair" }, version: 0 }
+    );
+    expect(drafts).to.have.length(1);
+    expect(hasDataSizeIx(drafts[0])).to.equal(false);
+    expect(await serializedSize(drafts[0])).to.equal(1232);
+  });
+
+  it("sizes a simulated keypair chunk with the data-size ix it is sent with", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      simulatingProvider(),
+      await pairAt(1232, 500, 0, [setLoadedAccountsDataSizeLimit(1)]),
+      { signing: { feePayer: "keypair" }, version: 0 }
+    );
+    expect(drafts).to.have.length(1);
+    expect(hasDataSizeIx(drafts[0])).to.equal(true);
+    expect(await serializedSize(drafts[0])).to.equal(1232);
+  });
+
+  it("sizes a simulated wallet chunk without a data-size ix, as it is sent", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      simulatingProvider(),
+      await pairAt(1232, 500, 0),
+      { signing: { feePayer: "wallet" } }
+    );
+    expect(drafts).to.have.length(1);
+    expect(hasDataSizeIx(drafts[0])).to.equal(false);
+    expect(await serializedSize(drafts[0])).to.equal(1232);
+  });
+
+  it("infers a wallet fee payer from an adapter provider", async () => {
+    const drafts = await batchInstructionsToTxsWithPriorityFee(
+      simulatingProvider(),
+      await pairAt(1232, 500, 0)
+    );
+    expect(drafts).to.have.length(1);
+    expect(hasDataSizeIx(drafts[0])).to.equal(false);
   });
 
   it("packs a v1 tx of exactly 4096 bytes into one tx", async () => {

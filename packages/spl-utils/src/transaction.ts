@@ -23,15 +23,19 @@ import bs58 from "bs58";
 import { ProgramError } from "./anchorError";
 import {
   COMPUTE_BUDGET_IX_DATA_SIZE,
-  DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
   MAX_PRIO_FEE,
   callerComputeBudgetTypes,
-  prependComputeBudgetIxs,
+  prependPlaceholderComputeBudgetIxs,
   prependedComputeBudgetIxs,
   withPriorityFees,
 } from "./priorityFees";
 import { TransactionDraft, populateMissingDraftInfo } from "./draft";
-import { TxVersionOption, resolveTxVersion } from "./txVersion";
+import {
+  TransactionSigning,
+  TxVersionOption,
+  resolveTxVersion,
+  signingFromWallet,
+} from "./txVersion";
 import {
   MAX_COMPUTE_UNITS,
   tableComputeUnitsForInstructions,
@@ -120,6 +124,7 @@ export async function sendInstructionsWithPriorityFee(
     maxPriorityFee = MAX_PRIO_FEE,
     priorityFeeOptions,
     loadedAccountsDataSizeLimit,
+    signing,
   }: {
     signers?: Signer[];
     payer?: PublicKey;
@@ -130,10 +135,13 @@ export async function sendInstructionsWithPriorityFee(
     maxPriorityFee?: number;
     priorityFeeOptions?: any;
     loadedAccountsDataSizeLimit?: number;
+    // Who signs; inferred from provider.wallet when unset.
+    signing?: TransactionSigning;
   } = {}
 ): Promise<string> {
+  const resolvedSigning = signing ?? signingFromWallet(provider.wallet);
   const resolved = await resolveTxVersion(provider.connection, {
-    wallet: provider.wallet,
+    signing: resolvedSigning,
   });
   const version =
     resolved === 1 && exceedsV1Limits(payer, instructions) ? 0 : resolved;
@@ -149,6 +157,7 @@ export async function sendInstructionsWithPriorityFee(
       loadedAccountsDataSizeLimit,
       feePayer: payer,
       version,
+      signing: resolvedSigning,
     }),
     signers,
     payer,
@@ -867,6 +876,7 @@ export async function batchParallelInstructions({
   maxTxSize,
   addressLookupTableAddresses = [],
   version: versionOption,
+  signing,
 }: {
   provider: AnchorProvider;
   instructions: TransactionInstruction[];
@@ -877,6 +887,8 @@ export async function batchParallelInstructions({
   maxSignatureBatch?: number;
   addressLookupTableAddresses?: PublicKey[];
   version?: TxVersionOption;
+  // Who signs; inferred from provider.wallet when unset.
+  signing?: TransactionSigning;
 }): Promise<void> {
   const blockhash = (await provider.connection.getLatestBlockhash()).blockhash;
   const addressLookupTables = await getAddressLookupTableAccounts(
@@ -886,6 +898,7 @@ export async function batchParallelInstructions({
   const version = await resolveTxVersion(provider.connection, {
     version: versionOption,
     wallet: provider.wallet,
+    signing,
   });
   const toDraft = (
     chunk: TransactionInstruction[],
@@ -935,6 +948,7 @@ export async function batchSequentialParallelInstructions({
   extraSigners = [],
   maxSignatureBatch = TX_BATCH_SIZE,
   version,
+  signing,
 }: {
   provider: AnchorProvider;
   instructions: TransactionInstruction[][];
@@ -944,6 +958,7 @@ export async function batchSequentialParallelInstructions({
   maxSignatureBatch?: number;
   addressLookupTableAddresses?: PublicKey[];
   version?: TxVersionOption;
+  signing?: TransactionSigning;
 }): Promise<void> {
   for (const instruction of instructions) {
     await batchParallelInstructionsWithPriorityFee(provider, instruction, {
@@ -952,6 +967,7 @@ export async function batchSequentialParallelInstructions({
       extraSigners,
       maxSignatureBatch,
       version,
+      signing,
     });
   }
 }
@@ -973,9 +989,10 @@ export async function batchInstructionsToTxsWithPriorityFee(
     commitment = "confirmed",
     // Leave unset to let withPriorityFees derive it from simulation.
     loadedAccountsDataSizeLimit,
-    // See withPriorityFees; set false for wallet-signed txs.
+    // See withPriorityFees.
     deriveLoadedAccountsDataSizeLimit,
     version,
+    signing,
   }: {
     commitment?: Commitment;
     // Manually specify limit instead of simulating
@@ -993,9 +1010,12 @@ export async function batchInstructionsToTxsWithPriorityFee(
     // Optional parameter to limit number of instructions per transaction
     maxInstructionsPerTx?: number;
     loadedAccountsDataSizeLimit?: number;
+    /** @deprecated Pass `signing`; a `wallet` fee payer gets no derived limit. */
     deriveLoadedAccountsDataSizeLimit?: boolean;
     // Resolved once, then carried onto every draft; see TransactionDraft.version.
     version?: TxVersionOption;
+    // Who signs; inferred from provider.wallet when unset.
+    signing?: TransactionSigning;
   } = {}
 ): Promise<TransactionDraft[]> {
   const blockhash = (await provider.connection.getLatestBlockhash(commitment))
@@ -1005,9 +1025,10 @@ export async function batchInstructionsToTxsWithPriorityFee(
     provider.connection,
     addressLookupTableAddresses || []
   );
+  const resolvedSigning = signing ?? signingFromWallet(provider.wallet);
   const resolvedVersion = await resolveTxVersion(provider.connection, {
     version,
-    wallet: provider.wallet,
+    signing: resolvedSigning,
   });
 
   let firstTxComputeBudgetIxs: TransactionInstruction[] | null = null;
@@ -1040,6 +1061,7 @@ export async function batchInstructionsToTxsWithPriorityFee(
         feePayer: provider.wallet.publicKey,
         loadedAccountsDataSizeLimit,
         deriveLoadedAccountsDataSizeLimit,
+        signing: resolvedSigning,
         // Simulate in the version the draft is sent in.
         version: chunkVersion,
       });
@@ -1083,15 +1105,11 @@ export async function batchInstructionsToTxsWithPriorityFee(
       // mis-measures: under-counting overflows maxTxSize, over-counting
       // splits early. The placeholder values don't affect sizing.
       return {
-        instructions: prependComputeBudgetIxs(chunk, {
-          computeUnits: computeUnitLimit || 100000,
-          microLamports: 1,
-          loadedAccountsDataSizeLimit:
-            loadedAccountsDataSizeLimit != null ||
-            deriveLoadedAccountsDataSizeLimit !== false
-              ? (loadedAccountsDataSizeLimit ??
-                DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT)
-              : undefined,
+        instructions: prependPlaceholderComputeBudgetIxs(chunk, {
+          computeUnits: computeUnitLimit,
+          loadedAccountsDataSizeLimit,
+          signing: resolvedSigning,
+          deriveLoadedAccountsDataSizeLimit,
         }),
         addressLookupTableAddresses: addressLookupTableAddresses || [],
         feePayer: provider.wallet.publicKey,
@@ -1124,6 +1142,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     extraSigners,
     maxSignatureBatch = TX_BATCH_SIZE,
     version,
+    signing,
   }: {
     // Manually specify limit instead of simulating
     computeUnitLimit?: number;
@@ -1135,6 +1154,7 @@ export async function batchParallelInstructionsWithPriorityFee(
     extraSigners?: Keypair[];
     maxSignatureBatch?: number;
     version?: TxVersionOption;
+    signing?: TransactionSigning;
   } = {}
 ): Promise<void> {
   const transactions = await batchInstructionsToTxsWithPriorityFee(
@@ -1146,6 +1166,7 @@ export async function batchParallelInstructionsWithPriorityFee(
       computeScaleUp,
       extraSigners,
       version,
+      signing,
     }
   );
 
