@@ -32,6 +32,7 @@ import {
 } from "@solana/web3.js";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { PositionWithMeta, SubDao } from "../sdk/types";
+import { createClaimWindow } from "./claimWindow";
 
 const DAO = daoKey(HNT_MINT)[0];
 
@@ -143,6 +144,8 @@ export const formPositionClaims = async ({
             })
         );
 
+        const claimWindow = createClaimWindow();
+
         // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap
         for (const chunk of chunks(epochsToClaim, 128)) {
           const subDaoEpochInfoKeys = chunk.map(
@@ -163,32 +166,43 @@ export const formPositionClaims = async ({
           const chunkInstructions = (
             await Promise.all(
               chunk.map((epoch, index) => {
-                const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
-                if (!subDaoEpochInfoAccount) return null;
-                const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
-                  "subDaoEpochInfoV0",
-                  subDaoEpochInfoAccount.data
-                );
-                // claim_rewards_v0 fails EpochNotClosed until rewards_issued_at
-                // is set, and claim_rewards_v1 until the DAO epoch's
-                // done_issuing_rewards is set.
-                if (!subDaoEpochInfoData.rewardsIssuedAt) return null;
-
-                if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
-                  // claim_rewards_v1 also fails EpochNotClosed until the DAO
-                  // epoch is done issuing rewards.
-                  const daoEpochInfoAccount = daoEpochInfoAccounts[index];
-                  if (!daoEpochInfoAccount) return null;
-                  const daoEpochInfoData = hsdProgram.coder.accounts.decode(
-                    "daoEpochInfoV0",
-                    daoEpochInfoAccount.data
+                let hntRewardsIssued = false;
+                const decision = claimWindow.decide(epoch.toNumber(), () => {
+                  const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
+                  if (!subDaoEpochInfoAccount)
+                    return { subDaoEpochInfo: null, daoEpochInfo: null };
+                  const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
+                    "subDaoEpochInfoV0",
+                    subDaoEpochInfoAccount.data
                   );
-                  if (!daoEpochInfoData.doneIssuingRewards) return null;
-                  // claim_rewards_v1 also rejects an epoch with no delegation
-                  // rewards issued.
-                  if (daoEpochInfoData.delegationRewardsIssued.isZero())
-                    return null;
+                  hntRewardsIssued = subDaoEpochInfoData.hntRewardsIssued.gt(
+                    new BN(0)
+                  );
+                  const daoEpochInfoAccount = daoEpochInfoAccounts[index];
+                  const daoEpochInfoData =
+                    subDaoEpochInfoData.rewardsIssuedAt &&
+                    hntRewardsIssued &&
+                    daoEpochInfoAccount
+                      ? hsdProgram.coder.accounts.decode(
+                          "daoEpochInfoV0",
+                          daoEpochInfoAccount.data
+                        )
+                      : null;
+                  return {
+                    subDaoEpochInfo: {
+                      rewardsIssued: !!subDaoEpochInfoData.rewardsIssuedAt,
+                      hntRewardsIssued,
+                    },
+                    daoEpochInfo: daoEpochInfoData && {
+                      doneIssuingRewards: !!daoEpochInfoData.doneIssuingRewards,
+                      delegationRewardsIssued:
+                        !daoEpochInfoData.delegationRewardsIssued.isZero(),
+                    },
+                  };
+                });
+                if (decision !== "claim") return null;
 
+                if (hntRewardsIssued) {
                   return hsdProgram.methods
                     .claimRewardsV1({
                       epoch,
@@ -272,6 +286,21 @@ export const formPositionClaims = async ({
               chunkInstructions
             );
           }
+        }
+        const { skipped: skippedEpochs, dropped: droppedEpochs } = claimWindow;
+        if (skippedEpochs.length > 0) {
+          const skipped = skippedEpochs
+            .map(({ epoch, reason }) => `${epoch} ${reason}`)
+            .join(", ");
+          const dropped =
+            droppedEpochs.length > 0
+              ? `; dropped epochs [${droppedEpochs.join(
+                  ", "
+                )}] past the claim window`
+              : "";
+          console.warn(
+            `formPositionClaims: position ${position.pubkey.toBase58()} skipped epochs [${skipped}]; last_claimed_epoch stops at the first one${dropped}`
+          );
         }
       }
     }

@@ -334,6 +334,8 @@ export async function withPriorityFees({
   priorityFeeOptions?: any;
   maxPriorityFee?: number;
   loadedAccountsDataSizeLimit?: number;
+  // Who signs; decides whether the data-size limit is derived.
+  signing?: TransactionSigning;
 } & Partial<TransactionDraft>): Promise<TransactionInstruction[]> {
   // A caller's `computeUnits: 0` or `loadedAccountsDataSizeLimit: 0` is never
   // valid — 0 CU can't run, and a 0-byte data-size ix is rejected on-chain as

@@ -28,9 +28,6 @@ export type TransactionSigning = {
 /** Signing for a transaction whose fee payer is the user's wallet. */
 export const WALLET_SIGNED: TransactionSigning = { feePayer: "wallet" };
 
-// web3.js 1.x cannot serialize a v1 tx signed by a wallet adapter.
-const WALLET_CEILING = 0;
-
 // Feature gate `enable_tx_v1`.
 const TX_V1_FEATURE_GATE = new PublicKey(
   "txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL"
@@ -148,14 +145,13 @@ const allSigners = ({ feePayer, coSigners = [] }: TransactionSigning) => [
 export const hasWalletSigner = (signing: TransactionSigning): boolean =>
   allSigners(signing).includes("wallet");
 
+// A wallet never signs v1: web3.js 1.x cannot serialize a v1 tx signed by a wallet adapter.
 const signsV1 = (signer: TransactionSigner): boolean =>
   signer === "keypair" ||
   (typeof signer === "object" && signer.versions.includes(1));
 
-// The highest version every signer can sign, capped by the wallet ceiling when
-// any signer is a wallet.
+// The highest version every signer can sign.
 const signingCeiling = (signing: TransactionSigning): 0 | 1 => {
-  if (hasWalletSigner(signing)) return WALLET_CEILING;
   return allSigners(signing).every(signsV1) ? 1 : 0;
 };
 

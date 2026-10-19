@@ -4,6 +4,7 @@ import {
   resetTxVersionCache,
   resolveSignerVersions,
   resolveTxVersion,
+  signingFromWallet,
 } from "../src/txVersion";
 
 const TX_V1_GATE = "txv1aq4pp281K9um3tnPgkfX8UqtFT6wcVW3hNezGLL";
@@ -353,6 +354,18 @@ describe("transaction version from signing", () => {
     expect(
       await resolveTxVersion(connection, { signing: { feePayer: "keypair" } })
     ).to.equal(0);
+  });
+
+  it("infers a wallet fee payer from a wallet with a payer that does not sign v1", async () => {
+    const payer = Keypair.generate();
+    const wallet = {
+      payer,
+      publicKey: payer.publicKey,
+      supportedTransactionVersions: new Set(["legacy", 0]),
+    };
+    expect(signingFromWallet(wallet)).to.deep.equal({ feePayer: "wallet" });
+    const { connection } = fakeConnection();
+    expect(await resolveTxVersion(connection, { wallet })).to.equal(0);
   });
 
   it("builds v0 for a wallet fee payer without calling the node", async () => {

@@ -7,7 +7,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import { getAddressLookupTableAccounts } from "./transaction";
-import { TransactionSigning, TxVersionOption } from "./txVersion";
+import { TxVersionOption } from "./txVersion";
 
 export type TransactionDraft = {
   recentBlockhash?: string;
@@ -19,10 +19,6 @@ export type TransactionDraft = {
   signers?: Signer[];
   // Per-call override for resolveTxVersion; 0 pins a path to v0.
   version?: TxVersionOption;
-  // Who signs. withPriorityFees reads it to decide whether the data-size limit
-  // is derived; toVersionedTx does not read it, so set `version` to
-  // resolveTxVersion(connection, { signing }) where the version matters.
-  signing?: TransactionSigning;
 };
 
 export async function populateMissingDraftInfo(

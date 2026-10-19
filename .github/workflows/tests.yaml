@@ -213,8 +213,8 @@ jobs:
   # These suites fake every RPC, so they need no chain and no anchor build.
   # setup-ts would build @helium/idls, which needs target/types; the filtered
   # turbo run builds only the four packages the suites import. automation-hooks
-  # runs its suite directly: its dependency graph needs an anchor build, and
-  # its tests load only source through swc.
+  # and voter-stake-registry-hooks run their suites directly: their dependency
+  # graphs need an anchor build, and their tests load only source through swc.
   test-ts-unit:
     name: spl-utils, sus, account-fetch-cache and automation-hooks Unit Tests
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
@@ -242,6 +242,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run test --filter=@helium/spl-utils --filter=@helium/sus --filter=@helium/account-fetch-cache
       - run: pnpm --filter @helium/automation-hooks test
+      - run: pnpm --filter @helium/voter-stake-registry-hooks test
 
   test-testing-guard:
     name: TESTING Build Guard

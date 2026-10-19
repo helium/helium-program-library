@@ -791,7 +791,7 @@ export const packInstructionGroups = async ({
   maxInstructionsPerTx?: number;
   /**
    * @deprecated Unused. The CU bound is the table value as is, which already
-   * carries FALLBACK_CU_MARGIN (ADR-0001).
+   * carries FALLBACK_CU_MARGIN (computeUnitTable.ts).
    */
   computeScaleUp?: number;
 }): Promise<{ instructions: TransactionInstruction[]; version: 0 | 1 }[]> => {
