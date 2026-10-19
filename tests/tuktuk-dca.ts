@@ -170,7 +170,9 @@ describe("tuktuk-dca", () => {
     await createAtaAndMint(
       provider,
       hntMint,
-      new BN(100_00000000 * 100), // Mint 10,000 HNT for testing
+      // The suite swaps ~4,600 USDC in all. Its HNT output grows as the oracle
+      // price falls: at $0.40 it needs ~11,400 HNT.
+      new BN(100_000_00000000), // 100,000 HNT
       swapPayer,
     );
 
