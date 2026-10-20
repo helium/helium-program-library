@@ -1,5 +1,36 @@
 # Change Log
 
+## 0.13.2
+
+### Patch Changes
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973) Thanks [@bryzettler](https://github.com/bryzettler)! - The packing report sizes chunks with the same ComputeBudget placeholders as the batcher.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`3a49713`](https://github.com/helium/helium-program-library/commit/3a49713a94d5bf3edca705d2a6c0545659a6e1de) Thanks [@bryzettler](https://github.com/bryzettler)! - `sendInstructionsOrSquadsV4` sends the instructions directly when no multisig is given. Before, the guard tested the `@sqds/multisig` import, which is always set.
+
+- Updated dependencies [[`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973), [`07e6c4c`](https://github.com/helium/helium-program-library/commit/07e6c4c62a62091d290a3b10437ce4d1bcc5b12f), [`ccd06d5`](https://github.com/helium/helium-program-library/commit/ccd06d5f39e90e9f1ef6630fe7608d02f57915c1), [`c0235ed`](https://github.com/helium/helium-program-library/commit/c0235ed8d17e48cd9177dcfd3635352bde70582c), [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973)]:
+  - @helium/distributor-oracle@0.14.2
+  - @helium/idls@0.12.2
+  - @helium/spl-utils@0.15.0
+  - @helium/circuit-breaker-sdk@0.12.1
+  - @helium/data-credits-sdk@0.13.1
+  - @helium/dc-auto-top-sdk@0.12.1
+  - @helium/fanout-sdk@0.12.1
+  - @helium/helium-entity-manager-sdk@0.12.1
+  - @helium/helium-sub-daos-sdk@0.13.1
+  - @helium/hexboosting-sdk@0.12.1
+  - @helium/hpl-crons-sdk@0.15.1
+  - @helium/lazy-distributor-sdk@0.13.1
+  - @helium/lazy-transactions-sdk@0.12.1
+  - @helium/mini-fanout-sdk@0.12.1
+  - @helium/mobile-entity-manager-sdk@0.12.1
+  - @helium/no-emit-sdk@0.12.1
+  - @helium/price-oracle-sdk@0.12.1
+  - @helium/rewards-oracle-sdk@0.12.1
+  - @helium/treasury-management-sdk@0.12.1
+  - @helium/tuktuk-dca-sdk@0.12.1
+  - @helium/voter-stake-registry-sdk@0.13.1
+
 ## 0.13.1
 
 ### Patch Changes
