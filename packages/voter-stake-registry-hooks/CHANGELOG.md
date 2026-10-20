@@ -1,5 +1,27 @@
 # Change Log
 
+## 0.14.2
+
+### Patch Changes
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`b0c7cd1`](https://github.com/helium/helium-program-library/commit/b0c7cd1d09cc7c0023fd025eff9413b1df5e55dc) Thanks [@bryzettler](https://github.com/bryzettler)! - `formPositionClaims` now skips epochs the program would reject (not over, rewards not issued, or no delegation rewards), so the other claims land; closing a delegation still needs every epoch up to the close bound claimed. Claims stop 128 epochs past the first skipped epoch, since the on-chain claim bitmap cannot reach further, and each skipped epoch is logged. `useExtendDelegation` and the extend and change branches of `useDelegatePositions` now build the closing, genesis-end and season accounts the program expects, using the registrar's time offset. `useCreatePosition` throws when no season covers the current time instead of building a delegation that cannot land.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`f00868f`](https://github.com/helium/helium-program-library/commit/f00868faa24137e6101e9e191f75c5d01e0866a4) Thanks [@bryzettler](https://github.com/bryzettler)! - `useDelegatePositions` now sends the reward claims for expired delegations. Before, it sent an empty batch. It also closes each expired delegation against its own sub-DAO, not the sub-DAO at the filtered index. `useExtendDelegation` no longer passes the helium-sub-daos IDL to the proxy and VSR programs.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`a2a1e16`](https://github.com/helium/helium-program-library/commit/a2a1e168668b8f3d5b5a00bcae72fdc12dc42c71) Thanks [@bryzettler](https://github.com/bryzettler)! - `HeliumVsrStateProvider` now recomputes position metadata when `now` or the proxy config changes. Before, decay, delegation expiry and the current season stayed stale until the positions changed.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973) Thanks [@bryzettler](https://github.com/bryzettler)! - Declare wallet signing with `signing: WALLET_SIGNED` on every priority-fee batcher call, in place of the `version: 0` and `deriveLoadedAccountsDataSizeLimit: false` pins. Behaviour change: these hooks pinned only `version: 0` and still derived a loaded-accounts data size limit; they no longer derive one, so a wallet that appends guard instructions cannot push them past the limit: `useAssignProxies`, `useClaimAllPositionsRewards`, `useClaimPositionRewards`, `useDelegatePosition` (3 calls), `useUnassignProxies`, `useUndelegatePosition`.
+
+- Updated dependencies [[`07e6c4c`](https://github.com/helium/helium-program-library/commit/07e6c4c62a62091d290a3b10437ce4d1bcc5b12f), [`ccd06d5`](https://github.com/helium/helium-program-library/commit/ccd06d5f39e90e9f1ef6630fe7608d02f57915c1), [`c0235ed`](https://github.com/helium/helium-program-library/commit/c0235ed8d17e48cd9177dcfd3635352bde70582c), [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973)]:
+  - @helium/idls@0.12.2
+  - @helium/spl-utils@0.15.0
+  - @helium/automation-hooks@0.14.2
+  - @helium/circuit-breaker-sdk@0.12.1
+  - @helium/helium-react-hooks@0.12.1
+  - @helium/helium-sub-daos-sdk@0.13.1
+  - @helium/hpl-crons-sdk@0.15.1
+  - @helium/voter-stake-registry-sdk@0.13.1
+
 ## 0.14.1
 
 ### Patch Changes

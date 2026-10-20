@@ -1,5 +1,0 @@
----
-"@helium/spl-utils": minor
----
-
-Add a `signing` option to `withPriorityFees`, the batchers and `sendInstructionsWithPriorityFee`, and export `WALLET_SIGNED`. `signing` is `{ feePayer, coSigners? }`, and each signer is `"wallet"`, `"keypair"` or `{ versions }`. In the batchers, `sendInstructionsWithPriorityFee` and `resolveTxVersion`, `signing` decides the transaction version: any wallet signer caps it at v0. In `withPriorityFees`, `signing` decides only whether the loaded-accounts data size limit is derived: it is not derived when any signer is a wallet. Default change: the batchers and `sendInstructionsWithPriorityFee` read `signing` from `provider.wallet` when it is not given, so callers with an adapter wallet and no `signing` no longer get a derived data-size limit. This includes callers outside this repo, and `useAutomateHotspotClaims` in `@helium/automation-hooks`. `deriveLoadedAccountsDataSizeLimit` is deprecated, and the packer no longer scales the table CU bound by `computeScaleUp`.

@@ -1,5 +1,20 @@
 # Change Log
 
+## 0.14.2
+
+### Patch Changes
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973) Thanks [@bryzettler](https://github.com/bryzettler)! - Declare the recipient wallet as fee payer and the oracle as a v0-only co-signer with `signing`, in place of the `version: 0` and `deriveLoadedAccountsDataSizeLimit: false` pins.
+
+- Updated dependencies [[`07e6c4c`](https://github.com/helium/helium-program-library/commit/07e6c4c62a62091d290a3b10437ce4d1bcc5b12f), [`ccd06d5`](https://github.com/helium/helium-program-library/commit/ccd06d5f39e90e9f1ef6630fe7608d02f57915c1), [`c0235ed`](https://github.com/helium/helium-program-library/commit/c0235ed8d17e48cd9177dcfd3635352bde70582c), [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973)]:
+  - @helium/idls@0.12.2
+  - @helium/spl-utils@0.15.0
+  - @helium/helium-entity-manager-sdk@0.12.1
+  - @helium/helium-sub-daos-sdk@0.13.1
+  - @helium/hpl-crons-sdk@0.15.1
+  - @helium/lazy-distributor-sdk@0.13.1
+  - @helium/rewards-oracle-sdk@0.12.1
+
 ## 0.14.1
 
 ### Patch Changes
