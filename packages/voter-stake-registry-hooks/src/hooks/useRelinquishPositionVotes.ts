@@ -1,6 +1,11 @@
 import { init as initOrg, proposalKey } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
-import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
+import {
+  Status,
+  batchParallelInstructions,
+  truthy,
+  WALLET_SIGNED,
+} from "@helium/spl-utils";
 import {
   init as initVsr,
   voteMarkerKey,
@@ -111,7 +116,7 @@ export const useRelinquishPositionVotes = () => {
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
-            version: 0,
+            signing: WALLET_SIGNED,
           });
         }
       }

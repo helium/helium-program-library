@@ -566,7 +566,8 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
     const txs = await batchInstructionsToTxsWithPriorityFee(
       provider,
       manyTransfers(),
-      { useFirstEstimateForAll: true }
+      // A keypair fee payer, so the first tx gets a sim-derived limit.
+      { useFirstEstimateForAll: true, signing: { feePayer: "keypair" } }
     );
     expect(txs.length).to.be.greaterThan(2);
     // First tx keeps its own sim-derived limit; every later tx — including the

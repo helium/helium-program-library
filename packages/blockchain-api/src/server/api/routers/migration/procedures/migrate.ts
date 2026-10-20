@@ -56,8 +56,10 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
   proofArgsAndAccounts,
+  resolveTxVersion,
   toVersionedTx,
   type TransactionDraft,
+  type TransactionSigning,
 } from "@helium/spl-utils";
 import {
   PROGRAM_ID as BUBBLEGUM_PROGRAM_ID,
@@ -94,6 +96,13 @@ import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 import { AssetOwner, HotspotOwnership } from "@/lib/models/hotspot";
 import { Recipient } from "@/lib/models/recipient";
 import { MiniFanout } from "@/lib/models/mini-fanout";
+
+// The server keypair pays; the user's wallet co-signs and may append guard
+// ixs (see withPriorityFees), so these txs stay on v0 with no derived limit.
+const MIGRATION_SIGNING: TransactionSigning = {
+  feePayer: "keypair",
+  coSigners: ["wallet"],
+};
 
 // mpl-bubblegum's createTransferInstruction marks leafOwner with isSigner: false,
 // but the on-chain program requires the leaf owner or delegate to sign.
@@ -843,9 +852,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const batchOpts = {
       addressLookupTableAddresses: [lut],
       commitment: "finalized" as const,
-      // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-      deriveLoadedAccountsDataSizeLimit: false,
-      version: 0 as const,
+      signing: MIGRATION_SIGNING,
     };
 
     const addDrafts = (drafts: TransactionDraft[], description: string) => {
@@ -987,7 +994,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
       for (let i = allDrafts.length - 1; i >= 0; i--) {
         allDrafts[i].instructions.push(tipIx);
         const testTx = await toVersionedTx(allDrafts[i]);
-        // batchOpts pins these drafts to v0.
+        // MIGRATION_SIGNING's wallet co-signer keeps these drafts on v0.
         if (testTx.serialize().length <= getTransactionSizeLimit(0)) {
           tipPlaced = true;
           break;
@@ -1014,7 +1021,9 @@ export const migrate = publicProcedure.migration.migrate.handler(
             ],
             feePayer,
             addressLookupTableAddresses: [lut],
-            version: 0,
+            version: await resolveTxVersion(connection, {
+              signing: MIGRATION_SIGNING,
+            }),
           } as TransactionDraft);
           txMetadata.push({
             type: TRANSACTION_TYPES.MIGRATION,

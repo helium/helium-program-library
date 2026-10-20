@@ -2,7 +2,12 @@ import { useSolanaUnixNow } from "@helium/helium-react-hooks";
 import { init as hsdInit } from "@helium/helium-sub-daos-sdk";
 import { useProposal } from "@helium/modular-governance-hooks";
 import { init as hplCronsInit, TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
-import { Status, batchParallelInstructions, truthy } from "@helium/spl-utils";
+import {
+  Status,
+  batchParallelInstructions,
+  truthy,
+  WALLET_SIGNED,
+} from "@helium/spl-utils";
 import {
   init,
   proxyVoteMarkerKey,
@@ -357,7 +362,7 @@ export const useVote = (proposalKey: PublicKey) => {
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
-            version: 0,
+            signing: WALLET_SIGNED,
           });
         }
       }

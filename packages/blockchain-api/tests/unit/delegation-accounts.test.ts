@@ -263,6 +263,37 @@ describe("extendExpirationAccounts", () => {
     );
   });
 
+  it("keys the old closing epoch off a cliff lockup that ends before the old expiration", () => {
+    const accounts = extendExpirationAccounts({
+      ...base,
+      lockupEndTs: epochStart(850).addn(20),
+      expirationTs: EXPIRATION,
+      seasonEndTs: SEASON_END,
+    });
+
+    expect(accounts.oldClosingTimeSubDaoEpochInfo.toBase58()).to.equal(
+      epochInfo(subDao, 850),
+    );
+    expect(accounts.closingTimeSubDaoEpochInfo.toBase58()).to.equal(
+      epochInfo(subDao, 850),
+    );
+  });
+
+  it("reuses the new closing epoch when the genesis end equals the registrar clock", () => {
+    // extend_expiration_ts_v0 compares genesis_end <= clock, so equality
+    // counts as passed.
+    const accounts = extendExpirationAccounts({
+      ...base,
+      now: GENESIS_END,
+      expirationTs: EXPIRATION,
+      seasonEndTs: SEASON_END,
+    });
+
+    expect(accounts.genesisEndSubDaoEpochInfo.toBase58()).to.equal(
+      epochInfo(subDao, 980),
+    );
+  });
+
   it("signs with the position token account owner rather than a position authority", () => {
     const accounts = extendExpirationAccounts({
       ...base,

@@ -305,6 +305,8 @@ export const HeliumVsrStateProvider: React.FC<{
     delegatedAccounts,
     proxyAccounts,
     proxyAccountsByAsset,
+    now,
+    proxyConfig,
   ]);
 
   const sortedPositions = useMemo(

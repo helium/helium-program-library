@@ -6,12 +6,11 @@ import {
 } from "@helium/hpl-crons-sdk";
 import { init as initMfan } from "@helium/mini-fanout-sdk";
 import {
-  DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT,
   getAddressLookupTableAccounts,
   HELIUM_COMMON_LUT,
   HNT_PYTH_PRICE_FEED,
   packInstructionGroups,
-  setLoadedAccountsDataSizeLimit,
+  prependPlaceholderComputeBudgetIxs,
   toVersionedTx,
   TransactionDraft,
 } from "@helium/spl-utils";
@@ -170,14 +169,11 @@ function probeDraft({
   luts: AddressLookupTableAccount[];
 }): TransactionDraft {
   return {
-    instructions: [
-      ComputeBudgetProgram.setComputeUnitLimit({
-        units: computeUnitLimit || 100000,
-      }),
-      ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
-      setLoadedAccountsDataSizeLimit(DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT),
-      ...chunk,
-    ],
+    // The payers are keypairs.
+    instructions: prependPlaceholderComputeBudgetIxs(chunk, {
+      computeUnits: computeUnitLimit,
+      signing: { feePayer: "keypair" },
+    }),
     addressLookupTableAddresses: luts.map((lut) => lut.key),
     addressLookupTables: luts,
     feePayer: payer,
