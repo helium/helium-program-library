@@ -382,6 +382,9 @@ importers:
       '@types/pg':
         specifier: ^8.6.6
         version: 8.18.0
+      '@types/sinon':
+        specifier: ^22.0.0
+        version: 22.0.0
       '@types/stream-json':
         specifier: ^1.7.8
         version: 1.7.8
@@ -397,6 +400,9 @@ importers:
       mocha:
         specifier: ^9.0.3
         version: 9.2.2
+      sinon:
+        specifier: ^22.1.0
+        version: 22.1.0
       ts-loader:
         specifier: ^9.2.3
         version: 9.4.4(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.19)))
@@ -3405,9 +3411,27 @@ importers:
         specifier: ^16.8 || ^17 || ^18
         version: 18.2.0(react@18.2.0)
     devDependencies:
+      '@swc-node/register':
+        specifier: ^1.11.1
+        version: 1.11.1(@swc/core@1.15.18(@swc/helpers@0.5.19))(@swc/types@0.1.25)(typescript@5.9.3)
+      '@swc/core':
+        specifier: ^1.13.5
+        version: 1.15.18(@swc/helpers@0.5.19)
+      '@types/chai':
+        specifier: ^5.2.3
+        version: 5.2.3
+      '@types/mocha':
+        specifier: ^10.0.10
+        version: 10.0.10
+      chai:
+        specifier: ^6.2.0
+        version: 6.2.2
       git-format-staged:
         specifier: ^2.1.3
         version: 2.1.3
+      mocha:
+        specifier: ^11.7.5
+        version: 11.7.5
       ts-loader:
         specifier: ^9.2.3
         version: 9.4.4(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.18(@swc/helpers@0.5.19)))
@@ -7332,6 +7356,12 @@ packages:
   '@sinonjs/fake-timers@10.3.0':
     resolution: {integrity: sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA==}
 
+  '@sinonjs/fake-timers@15.4.0':
+    resolution: {integrity: sha512-DsG+8/LscQIQg68J6Ef3dv10u6nVyetYn923s3/sus5eaGfTo1of5WMZSLf0UJc9KDuKPilPH0UDJCjvNbDNCA==}
+
+  '@sinonjs/samsam@10.0.2':
+    resolution: {integrity: sha512-8lVwD1Df1BmzoaOLhMcGGcz/Jyr5QY2KSB75/YK1QgKzoabTeLdIVyhXNZK9ojfSKSdirbXqdbsXXqP9/Ve8+A==}
+
   '@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.1':
     resolution: {integrity: sha512-zpMEU40PJ2rmRgqXbn7JqyHhrygQLX9MVszAczVDzqg39aMD7yo6VyTI8NEH422JzCj3Cjl9DndQZJRNdqdOHw==}
     peerDependencies:
@@ -8761,6 +8791,12 @@ packages:
 
   '@types/serve-static@1.15.2':
     resolution: {integrity: sha512-J2LqtvFYCzaj8pVYKw8klQXrLLk7TBZmQ4ShlcdkELFKGwGMfevMLneMMRkMgZxotOD9wg497LpC7O8PcvAmfw==}
+
+  '@types/sinon@22.0.0':
+    resolution: {integrity: sha512-TDbVpbccc2HfiqHR09Argj3mHV1KMW7sCCKj52fsl8lbRLkEn7fB1966EWhOKWUBcqfBueZuPoA7/OK1CKiy3g==}
+
+  '@types/sinonjs__fake-timers@15.0.1':
+    resolution: {integrity: sha512-Ko2tjWJq8oozHzHV+reuvS5KYIRAokHnGbDwGh/J64LntgpbuylF74ipEL24HCyRjf9FOlBiBHWBR1RlVKsI1w==}
 
   '@types/stack-utils@2.0.3':
     resolution: {integrity: sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==}
@@ -10489,6 +10525,10 @@ packages:
 
   diff@7.0.0:
     resolution: {integrity: sha512-PJWHUb1RFevKCwaFA9RlG5tCd+FO5iRh9A8HEtkmBH2Li03iJriB6m6JIN4rGz3K3JLawI7/veA1xzRKP6ISBw==}
+    engines: {node: '>=0.3.1'}
+
+  diff@9.0.0:
+    resolution: {integrity: sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw==}
     engines: {node: '>=0.3.1'}
 
   dijkstrajs@1.0.3:
@@ -14107,6 +14147,9 @@ packages:
     resolution: {integrity: sha512-VpsrsJSUcJEseSbMHkrsrAVSdvVS5I96Qo1QAQ4FxQ9wXFcB+pjj7FB7/us9+GcgfW4ziHtYMc1J0PLczb55mg==}
     engines: {node: '>=8.10.0'}
 
+  sinon@22.1.0:
+    resolution: {integrity: sha512-n1ajF2rBWMTtEwbKcw4UdFg4nCnDdq/U6RDoxtOd7oapOlRoJ5ynwFx60owROyhDpA9QhMZi0pCO/xtmwFjG7w==}
+
   sisteransi@1.0.5:
     resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
@@ -14750,6 +14793,10 @@ packages:
 
   type-detect@4.0.8:
     resolution: {integrity: sha512-0fr/mIH1dlO+x7TlcMy+bIDqKPsw/70tVyeHW787goQjhmqaZe10uwLujubK9q9Lg6Fiho1KUKDYz0Z7k7g5/g==}
+    engines: {node: '>=4'}
+
+  type-detect@4.1.0:
+    resolution: {integrity: sha512-Acylog8/luQ8L7il+geoSxhEkazvkslg7PSNKOX59mbB9cOveP5aq9h74Y7YU8yDpJwetzQQrfIwtf4Wp4LKcw==}
     engines: {node: '>=4'}
 
   type-fest@0.20.2:
@@ -21576,6 +21623,15 @@ snapshots:
     dependencies:
       '@sinonjs/commons': 3.0.1
 
+  '@sinonjs/fake-timers@15.4.0':
+    dependencies:
+      '@sinonjs/commons': 3.0.1
+
+  '@sinonjs/samsam@10.0.2':
+    dependencies:
+      '@sinonjs/commons': 3.0.1
+      type-detect: 4.1.0
+
   '@solana-mobile/mobile-wallet-adapter-protocol-web3js@2.0.1(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(react-native@0.72.17(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(bufferutil@4.0.7)(encoding@0.1.13)(react@18.2.0)(utf-8-validate@5.0.10))':
     dependencies:
       '@solana-mobile/mobile-wallet-adapter-protocol': 1.0.1(react-native@0.72.17(@babel/core@7.29.0)(@babel/preset-env@7.29.2(@babel/core@7.29.0))(bufferutil@4.0.7)(encoding@0.1.13)(react@18.2.0)(utf-8-validate@5.0.10))
@@ -23380,6 +23436,12 @@ snapshots:
       '@types/http-errors': 2.0.1
       '@types/mime': 3.0.1
       '@types/node': 20.19.37
+
+  '@types/sinon@22.0.0':
+    dependencies:
+      '@types/sinonjs__fake-timers': 15.0.1
+
+  '@types/sinonjs__fake-timers@15.0.1': {}
 
   '@types/stack-utils@2.0.3': {}
 
@@ -25878,6 +25940,8 @@ snapshots:
   diff@5.0.0: {}
 
   diff@7.0.0: {}
+
+  diff@9.0.0: {}
 
   dijkstrajs@1.0.3: {}
 
@@ -30475,6 +30539,13 @@ snapshots:
     dependencies:
       semver: 7.0.0
 
+  sinon@22.1.0:
+    dependencies:
+      '@sinonjs/commons': 3.0.1
+      '@sinonjs/fake-timers': 15.4.0
+      '@sinonjs/samsam': 10.0.2
+      diff: 9.0.0
+
   sisteransi@1.0.5: {}
 
   slash@3.0.0: {}
@@ -31286,6 +31357,8 @@ snapshots:
       prelude-ls: 1.2.1
 
   type-detect@4.0.8: {}
+
+  type-detect@4.1.0: {}
 
   type-fest@0.20.2: {}
 

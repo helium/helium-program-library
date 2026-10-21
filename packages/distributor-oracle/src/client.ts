@@ -28,7 +28,9 @@ import {
   getAssetProof,
   getAssetProofBatch,
   populateMissingDraftInfo,
+  resolveTxVersion,
   toVersionedTx,
+  TransactionSigning,
   truthy,
   withPriorityFees,
 } from "@helium/spl-utils";
@@ -67,6 +69,13 @@ const HNT = process.env.HNT_MINT
 
 const RECIPIENT_EXISTS_CU = 200000;
 const MISSING_RECIPIENT_CU = 400000;
+
+// The recipient's wallet pays and may append guard ixs (see withPriorityFees);
+// the oracle co-signs with web3.js 1.x, which cannot sign v1.
+const ORACLE_CO_SIGNED: TransactionSigning = {
+  feePayer: "wallet",
+  coSigners: [{ versions: ["legacy", 0] }],
+};
 
 export type Reward = {
   currentRewards: string;
@@ -553,11 +562,7 @@ export async function formBulkTransactions({
       addressLookupTableAddresses: [
         isDevnet ? HELIUM_COMMON_LUT_DEVNET : HELIUM_COMMON_LUT,
       ],
-      // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-      deriveLoadedAccountsDataSizeLimit: false,
-      // The oracle's /bulk-sign co-signs with web3.js 1.x, which cannot
-      // sign v1.
-      version: 0,
+      signing: ORACLE_CO_SIGNED,
     }
   );
   const initialTxs = await Promise.all(initialTxDrafts.map(toVersionedTx));
@@ -775,14 +780,14 @@ export async function formTransaction({
     connection: provider.connection,
     basePriorityFee,
     ...fullDraft,
-    // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-    deriveLoadedAccountsDataSizeLimit: false,
+    signing: ORACLE_CO_SIGNED,
   });
   const tx = await toVersionedTx({
     ...fullDraft,
     instructions,
-    // The oracle co-signs with web3.js 1.x, which cannot sign v1.
-    version: 0,
+    version: await resolveTxVersion(provider.connection, {
+      signing: ORACLE_CO_SIGNED,
+    }),
   });
   // @ts-ignore
   const oracleUrls = lazyDistributorAcc.oracles.map((x: any) => x.url);

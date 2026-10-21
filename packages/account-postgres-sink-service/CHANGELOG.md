@@ -1,5 +1,16 @@
 # Change Log
 
+## 0.11.20
+
+### Patch Changes
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`f592621`](https://github.com/helium/helium-program-library/commit/f592621c24a561d87769cf75357aea3ff8203046) Thanks [@bryzettler](https://github.com/bryzettler)! - account-postgres-sink-service aborts the previous stream before a reconnect, so a stalled stream that resumes no longer writes accounts or an older cursor. A cursor reset always runs its planned reconnect.
+
+  blockchain-api-service builds delegation extend accounts with the shared helper, so a position whose genesis end equals the registrar clock no longer fails `ConstraintSeeds`. Position create skips an ended season and returns `BAD_REQUEST` when no season covers now. Wallet-signed routes declare `WALLET_SIGNED` in place of a v0 pin.
+
+- Updated dependencies [[`c0235ed`](https://github.com/helium/helium-program-library/commit/c0235ed8d17e48cd9177dcfd3635352bde70582c), [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973)]:
+  - @helium/spl-utils@0.15.0
+
 ## 0.11.19
 
 ### Patch Changes

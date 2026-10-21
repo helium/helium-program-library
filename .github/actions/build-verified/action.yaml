@@ -15,34 +15,36 @@ inputs:
   program-id:
     description: "The program id of the program we are uploading"
     required: true
+  cache:
+    description: "Restore and save the Anchor, Solana CLI, toml, solana-verify and Cargo registry caches"
+    required: false
+    default: "true"
+  setup-anchor:
+    description: "Run setup-anchor; pass false when an earlier step in the job already ran it"
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
   steps:
     - uses: ./.github/actions/setup/
     - uses: ./.github/actions/setup-anchor/
+      with:
+        cache: ${{ inputs.cache }}
+      if: inputs.setup-anchor == 'true'
     - uses: actions/cache@v4
       name: Cache Cargo registry + index
       id: cache-cargo-registry
+      if: inputs.cache == 'true'
       with:
         path: |
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
         key: cargo-${{ runner.os }}-v0001-${{ hashFiles('**/Cargo.lock') }}
-    - uses: actions/cache@v4
-      name: Cache Solana Verify
-      id: cache-solana-verify
+    - uses: ./.github/actions/install-solana-verify/
       with:
-        path: |
-          ~/.cargo/bin/solana-verify
-        key: cargo-${{ runner.os }}-solana-verify-0.5.0
-    # Pinned: solana-verify 0.5.1+ pulls deps (solana-address, solana-system-interface)
-    # that require rustc 1.89, but the build toolchain is pinned to 1.85. 0.5.0 is the
-    # newest release that still builds on 1.85. Bump alongside the rustc pin.
-    - run: cargo install solana-verify --version 0.5.0 --locked --force
-      if: steps.cache-solana-verify.outputs.cache-hit != 'true'
-      shell: bash
+        cache: ${{ inputs.cache }}
     # A verified build cannot be a test build: solana-verify compiles inside a container
     # that receives neither TESTING nor HELIUM_TEST_BUILD, so the binary would carry
     # production values under a test label.

@@ -170,7 +170,9 @@ describe("tuktuk-dca", () => {
     await createAtaAndMint(
       provider,
       hntMint,
-      new BN(100_00000000 * 100), // Mint 10,000 HNT for testing
+      // The suite swaps ~4,600 USDC in all. Its HNT output grows as the oracle
+      // price falls: at $0.40 it needs ~11,400 HNT.
+      new BN(100_000_00000000), // 100,000 HNT
       swapPayer,
     );
 
@@ -656,34 +658,46 @@ describe("tuktuk-dca", () => {
         expect(await lamportsOf(payer)).to.equal(before + closed);
         expect(await lamportsOf(taskQueue)).to.equal(queueBefore);
       });
-    });
 
-    it("refunds a task that a run returned to the task queue", async () => {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      await runAllTasks();
-      const { nextTask } = await program.account.dcaV0.fetch(dca);
-      expect(nextTask.toBase58()).to.not.equal(task.toBase58());
-      const { rentRefund } = await tuktukProgram.account.taskV0.fetch(nextTask);
-      expect(rentRefund.toBase58()).to.equal(
-        taskQueue.toBase58(),
-        "the run should have returned a task that refunds to the task queue",
-      );
-      const taskLamports = await lamportsHeldBy(nextTask);
-      expect(await lamportsOf(nextTask)).to.equal(taskLamports);
-      const before = await lamportsOf(taskQueue);
+      it("refunds a task that a run returned to the payer of the task that ran", async () => {
+        const payer = rentPayer!.publicKey;
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await runAllTasks();
+        const { nextTask } = await program.account.dcaV0.fetch(dca);
+        expect(nextTask.toBase58()).to.not.equal(task.toBase58());
+        const { rentRefund } =
+          await tuktukProgram.account.taskV0.fetch(nextTask);
+        expect(rentRefund.toBase58()).to.equal(
+          payer.toBase58(),
+          "the run should have returned a task that refunds to the payer of the task that ran",
+        );
+        const taskLamports = await lamportsHeldBy(nextTask);
+        expect(await lamportsOf(nextTask)).to.equal(taskLamports);
+        // That payer is also the DCA's rent refund, so the close pays it the rent of the DCA
+        // and of its input account as well.
+        const closed =
+          taskLamports +
+          (await lamportsOf(dca)) +
+          (await lamportsOf(inputAccount));
+        const before = await lamportsOf(payer);
+        const queueBefore = await lamportsOf(taskQueue);
 
-      await program.methods
-        .closeDcaV0()
-        .accountsPartial({
-          dca,
-          authority: dcaAuthority.publicKey,
-        })
-        .signers([dcaAuthority])
-        .rpc({ skipPreflight: true });
+        await program.methods
+          .closeDcaV0()
+          .accountsPartial({
+            dca,
+            authority: dcaAuthority.publicKey,
+          })
+          .signers([dcaAuthority])
+          .rpc({ skipPreflight: true });
 
-      expect(await provider.connection.getAccountInfo(nextTask)).to.equal(null);
-      expect(await program.account.dcaV0.fetchNullable(dca)).to.equal(null);
-      expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
+        expect(await provider.connection.getAccountInfo(nextTask)).to.equal(
+          null,
+        );
+        expect(await program.account.dcaV0.fetchNullable(dca)).to.equal(null);
+        expect(await lamportsOf(payer)).to.equal(before + closed);
+        expect(await lamportsOf(taskQueue)).to.equal(queueBefore);
+      });
     });
 
     it("refuses a close that sends the input somewhere other than the authority's account", async () => {

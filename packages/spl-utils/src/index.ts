@@ -5,8 +5,17 @@ export * from "./utils";
 export * from "./token";
 export * from "./constants";
 export * from "./draft";
-export { resolveTxVersion, resetTxVersionCache } from "./txVersion";
-export type { TxVersionOption } from "./txVersion";
+export {
+  resolveTxVersion,
+  resetTxVersionCache,
+  WALLET_SIGNED,
+} from "./txVersion";
+export type {
+  SignerTransactionVersion,
+  TransactionSigner,
+  TransactionSigning,
+  TxVersionOption,
+} from "./txVersion";
 export {
   fetchBackwardsCompatibleIdl,
   useBackwardsCompatibleIdl,
@@ -39,6 +48,7 @@ export {
   estimateComputeBudget,
   estimatePrioritizationFee,
   prependComputeBudgetIxs,
+  prependPlaceholderComputeBudgetIxs,
   setLoadedAccountsDataSizeLimit,
   withPriorityFees,
   sleep,

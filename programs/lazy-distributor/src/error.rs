@@ -52,4 +52,7 @@ pub enum ErrorCode {
 
   #[msg("Remote task signature does not authorize this reward")]
   RemoteRewardNotSigned,
+
+  #[msg("Merkle tree account is not a concurrent merkle tree")]
+  InvalidMerkleTree,
 }

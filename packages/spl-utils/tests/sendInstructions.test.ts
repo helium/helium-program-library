@@ -1,5 +1,6 @@
 import { ed25519 } from "@noble/curves/ed25519";
 import {
+  ComputeBudgetProgram,
   Keypair,
   SystemProgram,
   TransactionInstruction,
@@ -10,6 +11,7 @@ import {
   sendInstructions,
   sendInstructionsWithPriorityFee,
 } from "../src/transaction";
+import { COMPUTE_BUDGET_IX_DATA_SIZE } from "../src/priorityFees";
 import { resetTxVersionCache } from "../src/txVersion";
 
 // A 4.2 node with `enable_tx_v1` active that confirms whatever it is sent
@@ -183,6 +185,43 @@ describe("sendInstructions", () => {
     });
 
     expect(VersionedTransaction.deserialize(sent[0]).version).to.equal(0);
+  });
+
+  it("sends v0 without a data-size ix through the priority-fee path for an adapter wallet", async () => {
+    const { connection, sent } = fakeV1Node();
+    connection.simulateTransaction = async () => ({
+      value: { err: null, unitsConsumed: 1000, loadedAccountsDataSize: 1 },
+    });
+    connection._rpcRequest = async () => ({
+      result: { priorityFeeEstimate: 1 },
+    });
+    connection._buildArgs = (args: unknown[]) => args;
+    const payer = Keypair.generate();
+    const wallet = {
+      publicKey: payer.publicKey,
+      supportedTransactionVersions: new Set(["legacy", 0, 1]),
+      signTransaction: signWith(payer),
+    };
+    const provider: any = { connection, wallet };
+
+    await sendInstructionsWithPriorityFee(provider, [
+      SystemProgram.transfer({
+        fromPubkey: payer.publicKey,
+        toPubkey: Keypair.generate().publicKey,
+        lamports: 1,
+      }),
+    ]);
+
+    const tx = VersionedTransaction.deserialize(sent[0]);
+    expect(tx.version).to.equal(0);
+    const keys = tx.message.staticAccountKeys;
+    expect(
+      tx.message.compiledInstructions.some(
+        (ix) =>
+          keys[ix.programIdIndex].equals(ComputeBudgetProgram.programId) &&
+          ix.data[0] === COMPUTE_BUDGET_IX_DATA_SIZE,
+      ),
+    ).to.equal(false);
   });
 
   it("sends the per-call version over node detection", async () => {

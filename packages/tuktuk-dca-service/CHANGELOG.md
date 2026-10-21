@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.11.22
+
+### Patch Changes
+
+- Updated dependencies [[`c0235ed`](https://github.com/helium/helium-program-library/commit/c0235ed8d17e48cd9177dcfd3635352bde70582c), [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973)]:
+  - @helium/spl-utils@0.15.0
+  - @helium/tuktuk-dca-sdk@0.12.1
+
 ## 0.11.21
 
 ### Patch Changes

@@ -769,7 +769,7 @@ export async function sendInstructionsOrSquadsV4({
   multisig?: PublicKey;
   addressLookupTableAddresses?: PublicKey[];
 }): Promise<string | undefined> {
-  if (!multisig) {
+  if (!multisigPda) {
     return await sendInstructions(
       provider,
       await withPriorityFees({

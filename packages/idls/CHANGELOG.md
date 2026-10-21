@@ -1,5 +1,13 @@
 # Change Log
 
+## 0.12.2
+
+### Patch Changes
+
+- [#1363](https://github.com/helium/helium-program-library/pull/1363) [`07e6c4c`](https://github.com/helium/helium-program-library/commit/07e6c4c62a62091d290a3b10437ce4d1bcc5b12f) Thanks [@bryzettler](https://github.com/bryzettler)! - The `lazy_distributor` IDL adds the error `InvalidMerkleTree`.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`ccd06d5`](https://github.com/helium/helium-program-library/commit/ccd06d5f39e90e9f1ef6630fe7608d02f57915c1) Thanks [@bryzettler](https://github.com/bryzettler)! - mini-fanout `schedule_task_v0` and `distribute_v0` fail with `InvalidSchedule` when the fanout's schedule does not parse or has no future time. Before, both cases failed with `InvalidDataIncrease`.
+
 ## 0.12.1
 
 ### Patch Changes
