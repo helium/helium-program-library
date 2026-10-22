@@ -62,16 +62,27 @@ runs:
     # The programs refuse to compile when TESTING is set without HELIUM_TEST_BUILD, so a
     # test build carries both.
     # cargo-build-sbf defaults to v0 up to the 4.3.0 release and to v3 from 4.3.2. Bankrun cannot
-    # load v3, and the SBPFv3 move belongs to the 4.4 PR, so the arch is pinned here.
+    # load v3, and the SBPFv3 move belongs to the 4.4 PR, so the arch is pinned here. `anchor build`
+    # hands its cargo args to the IDL's `cargo test` too, which rejects `--arch`, so the SBF build
+    # skips the IDL and `anchor idl build` writes it per program.
     - run: |
-        ARGS=()
-        if [ -n "$PROGRAM" ]; then ARGS+=(-p "$PROGRAM"); fi
-        ARGS+=(-- --arch v0)
-        if [ "$DEVNET" = "true" ]; then ARGS+=(--features devnet); fi
+        set -euo pipefail
+        FEATURES=()
+        if [ "$DEVNET" = "true" ]; then FEATURES=(--features devnet); fi
         if [ "$TESTING_BUILD" = "true" ]; then
           export TESTING=true HELIUM_TEST_BUILD=true
         fi
-        ~/.cargo/bin/anchor build "${ARGS[@]}"
+        if [ -n "$PROGRAM" ]; then
+          ~/.cargo/bin/anchor build --no-idl -p "$PROGRAM" -- --arch v0 "${FEATURES[@]}"
+          PROGRAMS=("$PROGRAM")
+        else
+          ~/.cargo/bin/anchor build --no-idl -- --arch v0 "${FEATURES[@]}"
+          mapfile -t PROGRAMS < <(~/.cargo/bin/anchor keys list | cut -d: -f1)
+        fi
+        mkdir -p target/idl target/types
+        for P in "${PROGRAMS[@]}"; do
+          ~/.cargo/bin/anchor idl build -p "$P" -o "target/idl/$P.json" -t "target/types/$P.ts" -- "${FEATURES[@]}"
+        done
       if: inputs.target-artifact == '' && steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash
       env:
