@@ -3,9 +3,10 @@
 name: "Install Solana Verify"
 description: "Installs the pinned solana-verify to ~/.cargo/bin"
 inputs:
-  # Pinned: solana-verify 0.5.1+ pulls deps (solana-address, solana-system-interface)
-  # that require rustc 1.89, but the build toolchain is pinned to 1.85. 0.5.0 is the
-  # newest release that still builds on 1.85. Bump alongside the rustc pin.
+  # Pinned: 0.5.0 was the newest release that built on the old rustc 1.85 pin; 0.5.1+
+  # pulls deps (solana-address, solana-system-interface) that require rustc 1.89.
+  # setup-anchor now pins 1.89.0, so rustc no longer holds this back. The bump waits
+  # for the SBPFv3 build, which also needs `--arch v3` and a new base image.
   version:
     description: "The solana-verify version"
     required: false
