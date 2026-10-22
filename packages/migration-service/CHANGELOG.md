@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.11.25
+
+### Patch Changes
+
+- [#1367](https://github.com/helium/helium-program-library/pull/1367) [`e7a9362`](https://github.com/helium/helium-program-library/commit/e7a936255322fb4e4541d7b43525880a175d20fd) Thanks [@bryzettler](https://github.com/bryzettler)! - Use finalized commitment in place of confirmed now that mainnet runs Alpenglow.
+
+- Updated dependencies [[`e7a9362`](https://github.com/helium/helium-program-library/commit/e7a936255322fb4e4541d7b43525880a175d20fd)]:
+  - @helium/distributor-oracle@0.14.3
+
 ## 0.11.24
 
 ### Patch Changes
