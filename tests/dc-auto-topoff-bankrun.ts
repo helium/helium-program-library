@@ -401,8 +401,12 @@ describe("dc-auto-topoff under bankrun", () => {
   }
 
   // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
-  // queue_task_v0 created and the queue itself for one a run returned. A leg that was already
-  // dequeued has no task to read, and the instructions that dequeue skip it, so any address does.
+  // queue_task_v0 created. For a task that a run returned, it is the rent refund of the task that
+  // ran when that task paid all of its rent. The rent_amount of the task that ran caps the rent of
+  // all the tasks that one run returns, so a task past the cap refunds to the task queue
+  // (helium/tuktuk#115).
+  // A leg that was already dequeued has no task to read, and the instructions that dequeue skip
+  // it, so any address does.
   // Read through banksClient: anchor's fetchNullable goes through BankrunConnectionProxy,
   // which throws on a missing account rather than returning null.
   const refundFor = async (task: PublicKey) => {
@@ -1178,18 +1182,23 @@ describe("dc-auto-topoff under bankrun", () => {
 
   describe("an hourly schedule set a quarter hour before midnight UTC", () => {
     it("schedules the next run for midnight", async () => {
-      // Two day boundaries ahead, so the warp only moves the clock forward.
-      const day = 86_400n;
-      const now = (await ctx.banksClient.getClock()).unixTimestamp;
-      const midnight = (now / day + 2n) * day;
-      await warpTo(ctx, midnight - 15n * 60n);
+      // A fixed mid-month day, so the result does not depend on where earlier tests left the
+      // clock. The suite's clock is put back afterwards for the tests that follow.
+      // 2026-09-14 23:45:00 UTC, and the midnight that follows it.
+      const quarterToMidnight = 1_789_429_500n;
+      const midnight = 1_789_430_400n;
+      const suiteClock = (await ctx.banksClient.getClock()).unixTimestamp;
+      await warpTo(ctx, quarterToMidnight);
+      try {
+        const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
+        await dequeueBothLegs(autoTopOff, "0 0 * * * *");
+        await scheduleBothLegs(autoTopOff);
 
-      const { autoTopOff } = await autoTopOffWith(50_000_000, 1_000_000_000);
-      await dequeueBothLegs(autoTopOff, "0 0 * * * *");
-      await scheduleBothLegs(autoTopOff);
-
-      const scheduled = await program.account.autoTopOffV0.fetch(autoTopOff);
-      expect(scheduled.nextTaskTime.toString()).to.equal(midnight.toString());
+        const scheduled = await program.account.autoTopOffV0.fetch(autoTopOff);
+        expect(scheduled.nextTaskTime.toString()).to.equal(midnight.toString());
+      } finally {
+        await warpTo(ctx, suiteClock);
+      }
     });
   });
 
@@ -1532,7 +1541,7 @@ describe("dc-auto-topoff under bankrun", () => {
       );
     });
 
-    it("refunds a task that a run returned to the task queue", async () => {
+    it("refunds a task that a run returned to the payer of the task that ran", async () => {
       const payer = Keypair.generate();
       const autoTopOff = await closableAutoTopOff(payer);
       const due = await program.account.autoTopOffV0.fetch(autoTopOff);
@@ -1544,8 +1553,8 @@ describe("dc-auto-topoff under bankrun", () => {
       const taskRentRefund = await refundFor(nextTask);
       const hntTaskRentRefund = await refundFor(nextHntTask);
       expect(taskRentRefund.toBase58()).to.equal(
-        taskQueue.toBase58(),
-        "the run should have returned a DC task that refunds to the task queue"
+        payer.publicKey.toBase58(),
+        "the run should have returned a DC task that refunds to the payer of the task that ran"
       );
       expect(hntTaskRentRefund.toBase58()).to.equal(
         payer.publicKey.toBase58()
@@ -1562,9 +1571,9 @@ describe("dc-auto-topoff under bankrun", () => {
       expect(await readAccount(ctx, nextTask)).to.equal(null);
       expect(await readAccount(ctx, nextHntTask)).to.equal(null);
       expect(await readAccount(ctx, autoTopOff)).to.equal(null);
-      expect(await lamportsOf(taskQueue)).to.equal(queueBefore + taskLamports);
+      expect(await lamportsOf(taskQueue)).to.equal(queueBefore);
       expect(await lamportsOf(payer.publicKey)).to.equal(
-        payerBefore + hntTaskLamports
+        payerBefore + taskLamports + hntTaskLamports
       );
     });
 

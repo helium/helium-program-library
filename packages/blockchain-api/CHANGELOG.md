@@ -1,5 +1,28 @@
 # Change Log
 
+## 0.12.5
+
+### Patch Changes
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`f592621`](https://github.com/helium/helium-program-library/commit/f592621c24a561d87769cf75357aea3ff8203046) Thanks [@bryzettler](https://github.com/bryzettler)! - account-postgres-sink-service aborts the previous stream before a reconnect, so a stalled stream that resumes no longer writes accounts or an older cursor. A cursor reset always runs its planned reconnect.
+
+  blockchain-api-service builds delegation extend accounts with the shared helper, so a position whose genesis end equals the registrar clock no longer fails `ConstraintSeeds`. Position create skips an ended season and returns `BAD_REQUEST` when no season covers now. Wallet-signed routes declare `WALLET_SIGNED` in place of a v0 pin.
+
+- Updated dependencies [[`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973), [`07e6c4c`](https://github.com/helium/helium-program-library/commit/07e6c4c62a62091d290a3b10437ce4d1bcc5b12f), [`ccd06d5`](https://github.com/helium/helium-program-library/commit/ccd06d5f39e90e9f1ef6630fe7608d02f57915c1), [`c0235ed`](https://github.com/helium/helium-program-library/commit/c0235ed8d17e48cd9177dcfd3635352bde70582c), [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973)]:
+  - @helium/distributor-oracle@0.14.2
+  - @helium/idls@0.12.2
+  - @helium/spl-utils@0.15.0
+  - @helium/circuit-breaker-sdk@0.12.1
+  - @helium/data-credits-sdk@0.13.1
+  - @helium/helium-entity-manager-sdk@0.12.1
+  - @helium/helium-sub-daos-sdk@0.13.1
+  - @helium/hpl-crons-sdk@0.15.1
+  - @helium/lazy-distributor-sdk@0.13.1
+  - @helium/mini-fanout-sdk@0.12.1
+  - @helium/sus@0.12.1
+  - @helium/voter-stake-registry-sdk@0.13.1
+  - @helium/welcome-pack-sdk@0.13.1
+
 ## 0.12.4
 
 ### Patch Changes

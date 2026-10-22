@@ -3,7 +3,11 @@ import {
   delegatedPositionKey,
   init,
 } from "@helium/helium-sub-daos-sdk";
-import { Status, batchSequentialParallelInstructions } from "@helium/spl-utils";
+import {
+  Status,
+  batchSequentialParallelInstructions,
+  WALLET_SIGNED,
+} from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
 import { MAX_TRANSACTIONS_PER_SIGNATURE_BATCH } from "../constants";
@@ -119,7 +123,7 @@ export const useUndelegatePosition = ({
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
-            version: 0,
+            signing: WALLET_SIGNED,
           });
         }
       }

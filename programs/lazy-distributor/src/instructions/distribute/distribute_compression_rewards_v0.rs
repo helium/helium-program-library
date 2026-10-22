@@ -4,7 +4,7 @@ use bubblegum_cpi::get_asset_id;
 use shared_utils::*;
 
 use super::common::*;
-use crate::error::ErrorCode;
+use crate::{compression::proof_accounts, error::ErrorCode};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct DistributeCompressionRewardsArgsV0 {
@@ -41,7 +41,9 @@ pub fn handler<'info>(
     merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
     owner: ctx.accounts.common.owner.key(),
     delegate: ctx.accounts.common.owner.key(),
-    proof_accounts: ctx.remaining_accounts.to_vec(),
+    // Under a tuktuk task, run_task_v0 appends the task's free-task accounts after the proof.
+    // Pass on only the proof nodes the tree does not hold in its canopy.
+    proof_accounts: proof_accounts(&ctx.accounts.merkle_tree, ctx.remaining_accounts)?,
   })?;
 
   require_eq!(

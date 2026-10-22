@@ -160,18 +160,23 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
 }
 
 pub fn get_next_time(mini_fanout: &MiniFanoutV0) -> Result<i64> {
-  let schedule = Schedule::from_str(&mini_fanout.schedule)
-    .map_err(|_| crate::errors::ErrorCode::InvalidDataIncrease)?;
-  let ts = Clock::get().unwrap().unix_timestamp;
+  next_time_after(&mini_fanout.schedule, Clock::get()?.unix_timestamp)
+}
+
+/// The first time of `schedule` after the unix timestamp `ts`.
+fn next_time_after(schedule: &str, ts: i64) -> Result<i64> {
+  let schedule = Schedule::from_str(schedule).map_err(|_| ErrorCode::InvalidSchedule)?;
   let now = &DateTime::<Utc>::from_naive_utc_and_offset(
-    DateTime::from_timestamp(ts, 0).unwrap().naive_utc(),
+    DateTime::from_timestamp(ts, 0)
+      .ok_or(ErrorCode::InvalidSchedule)?
+      .naive_utc(),
     Utc,
   );
   Ok(
     schedule
       .after(now)
       .next()
-      .ok_or(crate::errors::ErrorCode::InvalidDataIncrease)?
+      .ok_or(ErrorCode::InvalidSchedule)?
       .timestamp(),
   )
 }
@@ -250,4 +255,29 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
 pub fn handler(ctx: Context<ScheduleTaskV0>, args: ScheduleTaskArgsV0) -> Result<()> {
   let ctx = ctx.accounts;
   schedule_impl(ctx, args)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // 2023-11-14, after the only time of the schedule below.
+  const TS: i64 = 1_700_000_000;
+
+  #[test]
+  fn next_time_after_returns_the_next_time_of_the_schedule() {
+    assert_eq!(next_time_after("0 0 * * * *", TS).unwrap(), 1_700_002_800);
+  }
+
+  #[test]
+  fn next_time_after_rejects_a_schedule_with_no_future_time() {
+    let err = next_time_after("0 0 0 1 1 * 2000", TS).unwrap_err();
+    assert_eq!(err, ErrorCode::InvalidSchedule.into());
+  }
+
+  #[test]
+  fn next_time_after_rejects_a_schedule_that_does_not_parse() {
+    let err = next_time_after("not a schedule", TS).unwrap_err();
+    assert_eq!(err, ErrorCode::InvalidSchedule.into());
+  }
 }

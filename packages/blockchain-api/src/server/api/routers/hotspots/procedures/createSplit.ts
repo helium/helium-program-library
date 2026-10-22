@@ -23,6 +23,7 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import {
   init as initTuktuk,
@@ -235,9 +236,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
               : HELIUM_COMMON_LUT,
           ],
           commitment: "finalized",
-          version: 0,
-          // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-          deriveLoadedAccountsDataSizeLimit: false,
+          signing: WALLET_SIGNED,
         })
       ).map((tx) => toVersionedTx(tx)),
     );

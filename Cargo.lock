@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "hexboosting"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1093,7 +1093,7 @@ dependencies = [
 
 [[package]]
 name = "lazy-distributor"
-version = "0.3.11"
+version = "0.3.12"
 dependencies = [
  "account-compression-cpi",
  "anchor-lang",
@@ -1106,6 +1106,7 @@ dependencies = [
  "solana-program",
  "solana-security-txt",
  "solana-zk-sdk",
+ "spl-concurrent-merkle-tree",
  "tuktuk-program",
 ]
 
@@ -1232,7 +1233,7 @@ dependencies = [
 
 [[package]]
 name = "mini-fanout"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -1514,7 +1515,7 @@ dependencies = [
 
 [[package]]
 name = "price-oracle"
-version = "0.2.2"
+version = "0.2.4"
 dependencies = [
  "anchor-lang",
  "default-env",

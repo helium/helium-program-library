@@ -29,4 +29,4 @@ Image: `public.ecr.aws/v0j6k5v6/tuktuk-pyth-service`
 | web-cluster / prod | [manifests/web-cluster/prod/helium/tuktuk-pyth-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/tuktuk-pyth-service.yaml) |
 | web-cluster / sdlc | [manifests/web-cluster/sdlc/helium/tuktuk-pyth-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/sdlc/helium/tuktuk-pyth-service.yaml) |
 
-Deploy: push a `docker-web-tuktuk-pyth-service-<version>` git tag.
+Image release: push a `docker-web-tuktuk-pyth-service-<version>` tag by hand (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.

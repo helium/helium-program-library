@@ -4,6 +4,7 @@ import {
   Status,
   batchParallelInstructionsWithPriorityFee,
   truthy,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import { ProxyAssignment } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
@@ -106,7 +107,7 @@ export const useUnassignProxies = () => {
               triesRemaining: 10,
               extraSigners: [],
               maxSignatureBatch,
-              version: 0,
+              signing: WALLET_SIGNED,
             }
           );
         }

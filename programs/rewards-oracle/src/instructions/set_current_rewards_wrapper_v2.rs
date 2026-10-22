@@ -50,7 +50,8 @@ pub fn handler<'info>(
 ) -> Result<()> {
   let mut approver = ctx.accounts.oracle_signer.to_account_info().clone();
   approver.is_signer = true;
-  // Remaining accounts (the running tuktuk task) are passed through to the lazy distributor.
+  // Remaining accounts (the running tuktuk task, then any free-task accounts tuktuk appends) are
+  // passed through to the lazy distributor.
   let mut remaining_accounts = vec![approver];
   remaining_accounts.extend(ctx.remaining_accounts.iter().cloned());
   let cpi_accounts = SetCurrentRewardsV1 {

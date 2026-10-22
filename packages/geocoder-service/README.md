@@ -20,7 +20,7 @@ Image: `public.ecr.aws/v0j6k5v6/geocoder-service`
 | --- | --- |
 | web-cluster / prod | [manifests/web-cluster/prod/helium/geocoder-service.yaml](https://github.com/helium/helium-foundation-k8s/blob/master/manifests/web-cluster/prod/helium/geocoder-service.yaml) |
 
-Deploy: push a `docker-web-geocoder-service-<version>` git tag.
+Image release: push a `docker-web-geocoder-service-<version>` tag by hand (see [repo README](../../README.md#deploying-docker-services)). The service deploy (the k8s bump) stays manual.
 
 ## FAQ
 

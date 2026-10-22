@@ -53,16 +53,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Anchor
+      # `@helium/idls` is the only published package built from the anchor
+      # output, and it compiles target/types alone (packages/idls/tsconfig.*).
+      # `anchor idl build` writes those without the SBF compile, which costs
+      # 1.4 min median, 13.6 min p90 on a cache miss. The action runs
+      # setup-anchor itself when its cache misses, so no separate setup step
+      # is needed.
+      - name: Build IDLs
         if: steps.check.outputs.has_changesets == 'false'
-        uses: ./.github/actions/setup-anchor/
-
-      - name: Build Anchor
-        if: steps.check.outputs.has_changesets == 'false'
-        uses: ./.github/actions/build-anchor/
-        with:
-          testing: false
-          devnet: false
+        uses: ./.github/actions/build-idls/
 
       - name: Build all packages
         if: steps.check.outputs.has_changesets == 'false'

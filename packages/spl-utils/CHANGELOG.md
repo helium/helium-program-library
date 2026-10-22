@@ -1,5 +1,27 @@
 # Change Log
 
+## 0.15.0
+
+### Minor Changes
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973) Thanks [@bryzettler](https://github.com/bryzettler)! - Add a `signing` option to `withPriorityFees`, the batchers and `sendInstructionsWithPriorityFee`, and export `WALLET_SIGNED`. `signing` is `{ feePayer, coSigners? }`, and each signer is `"wallet"`, `"keypair"` or `{ versions }`. In the batchers, `sendInstructionsWithPriorityFee` and `resolveTxVersion`, `signing` decides the transaction version: any wallet signer caps it at v0. In `withPriorityFees`, `signing` decides only whether the loaded-accounts data size limit is derived: it is not derived when any signer is a wallet. Default change: the batchers and `sendInstructionsWithPriorityFee` read `signing` from `provider.wallet` when it is not given, so callers with an adapter wallet and no `signing` no longer get a derived data-size limit. This includes callers outside this repo, and `useAutomateHotspotClaims` in `@helium/automation-hooks`. `deriveLoadedAccountsDataSizeLimit` is deprecated, and the packer no longer scales the table CU bound by `computeScaleUp`.
+
+### Patch Changes
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`c0235ed`](https://github.com/helium/helium-program-library/commit/c0235ed8d17e48cd9177dcfd3635352bde70582c) Thanks [@bryzettler](https://github.com/bryzettler)! - `batchParallelInstructionsWithPriorityFee` now passes `extraSigners` to the batcher, so it signs each transaction with the extra signers its instructions need.
+
+## 0.14.3
+
+### Patch Changes
+
+- [#1360](https://github.com/helium/helium-program-library/pull/1360) [`ce2c2e5`](https://github.com/helium/helium-program-library/commit/ce2c2e5ad0907999fb5b5ffd2ae89e2a67c5743b) Thanks [@bryzettler](https://github.com/bryzettler)! - Point `HELIUM_COMMON_LUT` at `Gfnhg9cf97YGLxvHK785zuK5GKEuBw8Y1W1YPo1i3QjL`. It holds the 53 addresses of `43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt` at the same indexes, plus the hpl-crons `queue_authority` PDA at index 53.
+
+## 0.14.2
+
+### Patch Changes
+
+- [#1357](https://github.com/helium/helium-program-library/pull/1357) [`efbc00f`](https://github.com/helium/helium-program-library/commit/efbc00f50e051366b2186b722d187312dfb12f18) Thanks [@bryzettler](https://github.com/bryzettler)! - Cap the `getRecentPrioritizationFees` fallback of `estimatePrioritizationFee` at `maxPriorityFee`, as the `getPriorityFeeEstimate` path already does.
+
 ## 0.14.1
 
 ### Patch Changes
