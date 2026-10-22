@@ -31,7 +31,7 @@ const config: ServiceConfig = JSON.parse(
 const connectionConfig: ConnectionConfig & {
   maxSupportedTransactionVersion: number;
 } = {
-  commitment: "confirmed",
+  commitment: "finalized",
   maxSupportedTransactionVersion: 1,
 };
 const connection = new Connection(RPC_URL, connectionConfig);

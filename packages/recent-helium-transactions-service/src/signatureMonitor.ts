@@ -59,7 +59,7 @@ export class SignatureMonitor {
       const subscriptionId = this.connection.onLogs(
         new PublicKey(programId),
         callback,
-        "confirmed"
+        "finalized"
       );
 
       this.logSubscriptions.set(programId, subscriptionId);
@@ -141,7 +141,7 @@ export class SignatureMonitor {
             limit: this.config.maxLookbackSize,
             until: lastSignature,
           },
-          "confirmed"
+          "finalized"
         );
 
         if (signatures.length > 0) {

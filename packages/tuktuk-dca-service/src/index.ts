@@ -45,7 +45,7 @@ server.get("/health", async () => {
 const wallet = new Wallet(DCA_SIGNER);
 
 const provider = new AnchorProvider(new Connection(SOLANA_URL), wallet, {
-  commitment: "confirmed",
+  commitment: "finalized",
 });
 
 let tuktukProgram: Promise<Program<Tuktuk>> | null = null;

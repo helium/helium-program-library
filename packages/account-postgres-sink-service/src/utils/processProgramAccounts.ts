@@ -47,7 +47,7 @@ export const processProgramAccounts = async (
             params: [
               programId.toBase58(),
               {
-                commitment: "confirmed",
+                commitment: "finalized",
                 encoding: "base64",
                 filters,
               },

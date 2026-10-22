@@ -50,7 +50,7 @@ export async function run(args: any = process.argv) {
   const tuktukProgram = await initTuktuk(provider);
   const cache = new AccountFetchCache({
     connection: provider.connection,
-    commitment: "confirmed",
+    commitment: "finalized",
     extendConnection: true,
   });
   const taskQueueAcc = await tuktukProgram.account.taskQueueV0.fetch(taskQueue);

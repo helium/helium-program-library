@@ -23,7 +23,7 @@ anchor.setProvider(anchor.AnchorProvider.local(SOLANA_URL));
 export const provider = anchor.getProvider() as anchor.AnchorProvider;
 export const cache = new AccountFetchCache({
   connection: provider.connection,
-  commitment: "confirmed",
+  commitment: "finalized",
   extendConnection: true,
 });
 export const keypair = Keypair.fromSecretKey(

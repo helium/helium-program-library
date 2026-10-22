@@ -147,7 +147,7 @@ const transferCompressedCollectable = async (
   const tree = await ConcurrentMerkleTreeAccount.fromAccountAddress(
     conn,
     merkleTree,
-    "confirmed"
+    "finalized"
   );
 
   const canopyHeight = tree.getCanopyDepth();
