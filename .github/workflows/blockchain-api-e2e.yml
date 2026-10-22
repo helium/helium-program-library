@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 env:
-  SOLANA_CLI_VERSION: 4.3.0
+  SOLANA_CLI_VERSION: 4.3.2
   # The commit of the `v1.5.0` tag. A tag can move; a commit cannot.
   # 1.6.0 deadlocks on sendTransaction (solana-foundation/surfpool#849); the
   # Agave 4.4 PR moves to the first 1.6.x commit with that fix.

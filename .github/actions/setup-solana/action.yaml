@@ -4,7 +4,7 @@ inputs:
   solana_cli_version:
     description: "Solana CLI version to install when SOLANA_CLI_VERSION is unset"
     required: false
-    default: "4.3.0"
+    default: "4.3.2"
   cache:
     description: "Restore and save the Solana tool suite cache"
     default: "true"
@@ -29,6 +29,7 @@ runs:
           case "$SOLANA_CLI_VERSION" in
             2.1.6) SHA256=f8a380288a36554d3e8489f158fec08cfae750e54411bfbe86b172db930078c7 ;;
             4.3.0) SHA256=c97289a8abb1d0efb497d8b5cb285baabd9b7f8ea6647f5d145c5dc8ff3611e8 ;;
+            4.3.2) SHA256=5c9599d7fa397375df69d58e8d4f550ee45463dd6d1ecad9e5a1f053ce8e0933 ;;
             *)
               echo "::error::No pinned sha256 for Solana CLI ${SOLANA_CLI_VERSION}. Add it to .github/actions/setup-solana/action.yaml."
               exit 1
