@@ -133,7 +133,7 @@ export async function run(args: any = process.argv) {
     instructions,
     signers: [],
     payer: provider.wallet.publicKey,
-    commitment: "confirmed",
+    commitment: "finalized",
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
   });
 }

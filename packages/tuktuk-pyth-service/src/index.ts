@@ -86,7 +86,7 @@ server.get("/health", async () => {
 const wallet = new Wallet(KEYPAIR);
 
 const provider = new AnchorProvider(connection, wallet, {
-  commitment: "confirmed",
+  commitment: "finalized",
 });
 let tuktukProgram: Promise<Program<Tuktuk>> | null = null;
 function getTuktukProgram() {

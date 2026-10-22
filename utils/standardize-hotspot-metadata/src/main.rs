@@ -149,7 +149,7 @@ async fn main() -> Result<()> {
   let anchor_client = Client::new_with_options(
     Cluster::Custom(args.url.clone(), wss_url.clone()),
     kp.clone(),
-    CommitmentConfig::confirmed(),
+    CommitmentConfig::finalized(),
   );
   let helium_entity_program = anchor_client.program(helium_entity_manager::id())?;
   let tpu_client = TpuClient::new(
