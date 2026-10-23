@@ -1,10 +1,11 @@
-import { BatchHandlerPlugin, RequestHeadersPlugin } from "@orpc/server/plugins";
+import { BatchHandlerPlugin } from "@orpc/server/plugins";
 import { onError } from "@orpc/server";
 import { appRouter } from "@/server/api";
 import { RPCHandler } from "@orpc/server/fastify";
 import { ORPCError } from "@orpc/server";
 import { ValidationError } from "@orpc/server";
 import * as Sentry from "@sentry/node";
+import { summarizeProcedureInput } from "@/lib/utils/log-input";
 
 export const rpcHandler = new RPCHandler(appRouter, {
   interceptors: [
@@ -51,7 +52,7 @@ export const rpcHandler = new RPCHandler(appRouter, {
                   message: error.cause.message,
                   name: error.cause.name,
                   issues: serializeValue(error.cause.issues),
-                  data: serializeValue(error.cause.data),
+                  data: summarizeProcedureInput(error.cause.data),
                 }
               : error.cause
               ? serializeValue(error.cause)
@@ -124,5 +125,5 @@ export const rpcHandler = new RPCHandler(appRouter, {
       }
     }),
   ],
-  plugins: [new RequestHeadersPlugin(), new BatchHandlerPlugin()],
+  plugins: [new BatchHandlerPlugin()],
 });

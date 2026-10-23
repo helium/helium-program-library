@@ -19,8 +19,6 @@ export function applyMinimalServerEnv(): void {
   process.env.PG_NAME ||= "test";
   process.env.PG_HOST ||= "localhost";
   process.env.PG_PORT ||= "5432";
-  process.env.PRIVY_APP_SECRET ||= "test";
-  process.env.PRIVY_APP_ID ||= "test";
   process.env.SOLANA_RPC_URL = getSurfpoolRpcUrl();
   process.env.SOLANA_CLUSTER ||= "mainnet";
   process.env.NO_PG ||= "true";

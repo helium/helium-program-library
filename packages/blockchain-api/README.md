@@ -11,7 +11,7 @@ pnpm dev                   # tsx watch src/server.ts
 pnpm build && pnpm start   # tsc -> lib/, then node --import ./lib/instrument.js lib/server.js
 ```
 
-Both read env from the process. Required: `PG_USER`, `PG_NAME`, `PG_HOST`, `PG_PORT`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `JUPITER_API_KEY`. Common optionals: `PG_PASSWORD`, `NO_PG=true` (skip Postgres and the background services), `SOLANA_RPC_URL`, `ASSET_ENDPOINT`, `SOLANA_CLUSTER`, `PUBLIC_URL`, `SENTRY_DSN`, `PORT` (default 3000). `src/lib/env.ts` is the full contract.
+Both read env from the process. Required: `PG_USER`, `PG_NAME`, `PG_HOST`, `PG_PORT`, `JUPITER_API_KEY`. Common optionals: `PG_PASSWORD`, `NO_PG=true` (skip Postgres and the background services), `SOLANA_RPC_URL`, `ASSET_ENDPOINT`, `SOLANA_CLUSTER`, `PUBLIC_URL`, `SENTRY_DSN`, `PORT` (default 3000). `src/lib/env.ts` is the full contract.
 
 ## Deployments
 

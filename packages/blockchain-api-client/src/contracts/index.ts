@@ -41,11 +41,7 @@ export const apiContract = oc.router({
   squads: squadsContract,
 });
 
-/**
- * Full API contract including internal-only routers.
- * Used for the full RPC handler (internal app access).
- */
+/** Same routes as apiContract. Kept as an alias for existing consumers; the RPC handler implements it. */
 export const fullApiContract = oc.router({
   ...apiContract,
-  migration: migrationContract,
 });

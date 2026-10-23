@@ -34,10 +34,7 @@ export const publicRouter = implement(apiContract)
 
 export const appRouter = implement(fullApiContract)
   .$context<AppContext>()
-  .router({
-    ...sharedRouters,
-    migration: migrationRouter,
-  });
+  .router(sharedRouters);
 
 /** Type of the main router for client-side type inference */
 export type ORPCRouter = typeof appRouter;
