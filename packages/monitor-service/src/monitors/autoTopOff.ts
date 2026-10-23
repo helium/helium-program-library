@@ -2,6 +2,7 @@ import { init as initDcAutoTop } from "@helium/dc-auto-top-sdk";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
 import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import { PublicKey } from "@solana/web3.js";
+import { TUKTUK_DCA_PROGRAM_ID } from "../env";
 import { autoTopOffTaskTrigger } from "../metrics";
 import { provider } from "../solana";
 import { watch } from "./watch";
@@ -49,7 +50,7 @@ function ownsTask(description: string, leg: Leg, address: string): boolean {
 export async function monitorAutoTopOff(autoTopOff: PublicKey, label: string) {
   const dcAutoTopProgram = await initDcAutoTop(provider);
   const tuktukProgram = await initTuktuk(provider);
-  const dcaProgram = await initTuktukDca(provider);
+  const dcaProgram = await initTuktukDca(provider, TUKTUK_DCA_PROGRAM_ID);
   const address = autoTopOff.toBase58();
 
   // `owner` is the key stamped into the task description: the auto top off for the dc and

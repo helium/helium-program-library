@@ -1,4 +1,4 @@
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";
 import { PublicKey } from "@solana/web3.js";

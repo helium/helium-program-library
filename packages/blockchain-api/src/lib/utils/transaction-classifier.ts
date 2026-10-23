@@ -3,8 +3,8 @@ import {
   BorshAccountsCoder,
   Program,
   Idl,
-} from "@coral-xyz/anchor";
-import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
+} from "@anchor-lang/core";
+import { convertIdlToCamelCase } from "@anchor-lang/core/dist/cjs/idl";
 import { PublicKey, Connection } from "@solana/web3.js";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { convertLegacyIdl } from "@helium/sus";

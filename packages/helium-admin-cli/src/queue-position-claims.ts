@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   delegatedPositionKey,
   EPOCH_LENGTH,
@@ -24,6 +24,7 @@ import {
   init as initHplCrons,
   delegationClaimBotKey,
   nextAvailableTaskIds,
+  taskRentRefund,
 } from "@helium/hpl-crons-sdk";
 
 export async function run(args: any = process.argv) {
@@ -91,7 +92,10 @@ export async function run(args: any = process.argv) {
     positionAcc.mint
   );
   const positionTokenAccount = account.value[0];
-  if (!(await provider.connection.getAccountInfo(claimBot))) {
+  const claimBotAcc = await program.account.delegationClaimBotV0.fetchNullable(
+    claimBot
+  );
+  if (!claimBotAcc) {
     instructions.push(
       await program.methods
         .initDelegationClaimBotV0()
@@ -132,6 +136,9 @@ export async function run(args: any = process.argv) {
     delegatedPositionAcc.subDao
   );
   const daoAcc = await hsdProgram.account.daoV0.fetch(subDaoAcc.dao);
+  const positionAuthority = (
+    await getAccount(provider.connection, positionTokenAccount.address)
+  ).owner;
   const { instruction, pubkeys } = await program.methods
     .startDelegationClaimBotV1({
       taskId: nextAvailable,
@@ -142,19 +149,31 @@ export async function run(args: any = process.argv) {
       dao: subDaoAcc.dao,
       mint: positionAcc.mint,
       hntMint: daoAcc.hntMint,
-      positionAuthority: (
-        await getAccount(provider.connection, positionTokenAccount.address)
-      ).owner,
+      positionAuthority,
       positionTokenAccount: positionTokenAccount.address,
       taskQueue,
       delegatedPosition,
       systemProgram: SystemProgram.programId,
       delegatorAta: getAssociatedTokenAddressSync(
         daoAcc.hntMint,
-        provider.wallet.publicKey
+        positionAuthority,
+        true
       ),
       task,
+      nextTask:
+        claimBotAcc && !claimBotAcc.nextTask.equals(PublicKey.default)
+          ? claimBotAcc.nextTask
+          : task,
+      // A bot that this transaction creates does not exist yet, so anchor cannot read it.
+      rentRefund: claimBotAcc
+        ? claimBotAcc.rentRefund
+        : provider.wallet.publicKey,
     })
+    .remainingAccounts(
+      claimBotAcc
+        ? await taskRentRefund(tuktukProgram, claimBotAcc.nextTask)
+        : []
+    )
     .prepare();
 
   console.log("Queue authority is", pubkeys.queueAuthority!.toBase58());

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init, organizationKey } from "@helium/organization-sdk";
 import {
   init as initLazy,

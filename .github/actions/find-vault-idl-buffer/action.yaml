@@ -1,0 +1,99 @@
+# The IDL counterpart of `find-vault-buffer`. It runs only the Solana and Anchor CLIs, so
+# `deploy-buffers` runs it next to the key.
+#
+# A run whose Squads step failed after `set-idl-buffer-authority` leaves a vault-owned IDL
+# buffer that only a Squads proposal can close. "Re-run all jobs" takes it back instead of
+# paying rent for a second.
+#
+# The caller installs the Solana and Anchor CLIs first (`setup-anchor` does it).
+name: "Find Vault IDL Buffer"
+description: "Finds an IDL buffer the buffer authority owns that holds the build IDL"
+inputs:
+  network:
+    description: "Solana RPC URL"
+    required: true
+  program:
+    description: "Program name (snake_case). The IDL is ./target/idl/<program>.json"
+    required: true
+  program-id:
+    description: "The program id. Its IdlAccounts are the candidates"
+    required: true
+  buffer-authority:
+    description: "The Squads vault. Its IDL buffers are the reuse candidates"
+    required: true
+
+outputs:
+  idl-buffer:
+    description: "The vault IDL buffer that holds the build IDL. Empty when there is none."
+    value: ${{ steps.find.outputs.idl-buffer }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Reuse a vault IDL buffer that holds the build IDL
+      id: find
+      shell: bash
+      run: |
+        # An IDL buffer is an Anchor IdlAccount of the program. `GEZivzqQe54=` is the
+        # IdlAccount discriminator, sha256("internal:IdlAccount")[..8], in base64. The
+        # authority follows it at offset 8. dataSlice length 0 fetches no account data.
+        REQUEST=$(jq -cn --arg program_id "$PROGRAM_ID" --arg authority "$AUTHORITY" '{
+          jsonrpc: "2.0", id: 1, method: "getProgramAccounts",
+          params: [$program_id, {
+            encoding: "base64",
+            dataSlice: {offset: 0, length: 0},
+            filters: [
+              {memcmp: {offset: 0, bytes: "GEZivzqQe54=", encoding: "base64"}},
+              {memcmp: {offset: 8, bytes: $authority}}
+            ]
+          }]
+        }')
+        set +e
+        RPC_OUT=$(curl -sS --fail-with-body --max-time 120 -X POST -H 'Content-Type: application/json' -d "$REQUEST" "$NETWORK" 2>&1)
+        EXIT_CODE=$?
+        if [ "$EXIT_CODE" -eq 0 ]; then
+          # An RPC error has no `.result`; that must stop the run, not read as "no buffers".
+          CANDIDATES=$(echo "$RPC_OUT" | jq -r '.result | if type == "array" then .[].pubkey else error("no .result") end' 2>&1)
+          EXIT_CODE=$?
+        fi
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          # The RPC URL is a secret and the CLI puts it in some errors.
+          echo "${RPC_OUT//"$NETWORK"/<rpc-url>}"
+          echo "::error::Could not list the IDL buffers of $AUTHORITY"
+          exit 1
+        fi
+
+        # The program's own IDL account matches the filter too. It is never a buffer.
+        IDL_BASE=$(solana find-program-derived-address "$PROGRAM_ID")
+        IDL_ACCOUNT=$(solana create-address-with-seed anchor:idl "$PROGRAM_ID" --from "$IDL_BASE")
+        if [ -z "$IDL_ACCOUNT" ]; then
+          echo "::error::Could not derive the IDL account of $PROGRAM_ID"
+          exit 1
+        fi
+
+        BUILD_IDL=$(jq -S . "./target/idl/$PROGRAM.json")
+        FETCHED_IDL=$(mktemp ./idl-fetch.XXXXXX.json)
+        trap 'rm -f "$FETCHED_IDL"' EXIT
+        for CANDIDATE in $CANDIDATES; do
+          if [ "$CANDIDATE" = "$IDL_ACCOUNT" ]; then
+            continue
+          fi
+          if ! anchor idl fetch "$CANDIDATE" --provider.cluster "$NETWORK" > "$FETCHED_IDL" 2> /dev/null; then
+            echo "::error::Could not fetch the vault IDL buffer $CANDIDATE"
+            exit 1
+          fi
+          if [ "$(jq -S . "$FETCHED_IDL" 2> /dev/null)" = "$BUILD_IDL" ]; then
+            echo "IDL buffer $CANDIDATE holds the build IDL"
+            echo "idl-buffer=$CANDIDATE" >> "$GITHUB_OUTPUT"
+            echo "- \`$PROGRAM\`: reused IDL buffer \`$CANDIDATE\`" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "IDL buffer $CANDIDATE does not hold the build IDL"
+        done
+        echo "No vault-owned IDL buffer holds the build IDL"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        NETWORK: ${{ inputs.network }}

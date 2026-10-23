@@ -1,4 +1,4 @@
-import { BN, Program } from "@coral-xyz/anchor";
+import { BN, Program } from "@anchor-lang/core";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import Address from "@helium/address/build/Address";

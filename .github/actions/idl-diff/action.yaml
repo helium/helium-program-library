@@ -1,8 +1,8 @@
 name: "IDL Diff"
 description: >
   How each changed program's IDL differs from the base commit, and the fixed
-  `@helium/idls` bump that follows. The changeset bot and the backstop check
-  both read this, so the rule lives in one place. The caller must check out with
+  `@helium/idls` bump that follows. The backstop check reads this, and the
+  changeset bot that part 2 adds later will too, so the rule lives in one place. The caller must check out with
   `fetch-depth: 0`: the cold base build checks out `base-sha`.
 
 inputs:
@@ -13,9 +13,8 @@ inputs:
     description: "The commit the diff is against: the cache key and the cold build's ref. For a PR, `github.event.pull_request.base.sha`."
     required: true
   target-artifact:
-    description: "Artifact of this run holding the head build (`target/idl`). Empty runs the `build-idls` action instead."
-    required: false
-    default: ""
+    description: "Artifact of this run holding the head build (`target/idl`)."
+    required: true
 
 outputs:
   diff-file:
@@ -46,19 +45,14 @@ runs:
         cp target/idl/*.json "$RUNNER_TEMP/idl-base/"
         rm -rf target/idl
 
-    # Head IDLs. The run's own `build` job already built them, so by default
-    # they come from its artifact; `build-idls` is the fallback for a caller
-    # with no build job.
+    # Head IDLs. The run's own `build` job already built them, so they come
+    # from its artifact.
     - name: Download the head build
-      if: inputs.programs != '' && inputs.target-artifact != ''
+      if: inputs.programs != ''
       uses: actions/download-artifact@v4
       with:
         name: ${{ inputs.target-artifact }}
         path: ./target
-
-    - name: Build the head IDLs
-      if: inputs.programs != '' && inputs.target-artifact == ''
-      uses: ./.github/actions/build-idls/
 
     - name: Set the head IDLs aside
       if: inputs.programs != ''
@@ -76,9 +70,11 @@ runs:
       if: inputs.programs != '' && steps.base-idls.outputs.cache-hit != 'true'
       uses: ./.github/actions/setup-anchor/
 
-    - name: Cache cargo registry for the cold base build
+    # Restore and save are split, and only develop and master save, as in build-idls.
+    - name: Restore cargo registry for the cold base build
+      id: cache-cargo-registry
       if: inputs.programs != '' && steps.base-idls.outputs.cache-hit != 'true'
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: |
           ~/.cargo/registry/index/
@@ -114,6 +110,16 @@ runs:
           echo "::endgroup::"
         done
         git checkout -
+
+    - name: Save cargo registry for the cold base build
+      if: inputs.programs != '' && steps.base-idls.outputs.cache-hit != 'true' && steps.cache-cargo-registry.outputs.cache-hit != 'true' && (github.ref_name == 'develop' || github.ref_name == 'master')
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: cargo-${{ runner.os }}-idl-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Diff the IDLs
       id: diff

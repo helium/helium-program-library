@@ -2,11 +2,11 @@
  * Fails a PR that changes a released npm package or a program without
  * declaring a release for it.
  *
- * The backstop behind the changeset bot: the rule is the bot's own fixed step
- * (`missing-changesets.mjs`), so a hand-written changeset and a bot-written one
- * pass alike. It does not care who wrote the file, it runs on drafts, and it
- * runs on forks, where the bot cannot: a fork's token is read-only, so its
- * author reads the fix from this failure.
+ * The backstop behind the changeset bot that part 2 adds later: the rule is the
+ * bot's own fixed step (`missing-changesets.mjs`), so a hand-written changeset
+ * and a bot-written one pass alike. It does not care who wrote the file, it
+ * runs on drafts, and it runs on forks, where the bot cannot: a fork's token is
+ * read-only, so its author reads the fix from this failure.
  */
 import { fileURLToPath } from "node:url";
 

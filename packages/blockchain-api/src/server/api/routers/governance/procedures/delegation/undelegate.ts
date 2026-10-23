@@ -14,7 +14,9 @@ import {
 import {
   delegationClaimBotKey,
   init as initHplCrons,
+  taskRentRefund,
 } from "@helium/hpl-crons-sdk";
+import { init as initTuktuk } from "@helium/tuktuk-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import { getAssociatedTokenAddressSync, NATIVE_MINT } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
@@ -181,6 +183,12 @@ export const undelegate = publicProcedure.governance.undelegatePosition.handler(
                 true,
               ),
             })
+            .remainingAccounts(
+              await taskRentRefund(
+                await initTuktuk(provider),
+                delegationClaimBot.nextTask,
+              ),
+            )
             .instruction(),
         ],
         metadata: {

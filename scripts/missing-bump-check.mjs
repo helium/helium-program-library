@@ -13,17 +13,16 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildGraph,
+  changedFiles as diffFiles,
   changedProgramsForBases,
   crateFor,
   isNoReleasePath,
+  lockfileAt,
+  manifestAt,
+  run,
 } from "./changed-programs.mjs";
+import { ENTRY } from "./missing-changesets.mjs";
 import { parseProgramTag } from "./program-hash-check.mjs";
-
-const run = (command, args) =>
-  execFileSync(command, args, {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
 
 const git = (...args) => run("git", args);
 
@@ -31,14 +30,16 @@ const git = (...args) => run("git", args);
 // ref that has no files, so one call answers for the candidates alone.
 const NO_BASE = Symbol("no base");
 
-/**
- * The files that mark one program as changed, for the failure text: its own
- * source, plus the source of the crates in its `via`.
- */
+// The root files that mark a program, and the `via` name each one marks it by.
+const MARKS = new Map([
+  ["Cargo.lock", "Cargo.lock"],
+  ["Cargo.toml", "Cargo.toml profile"],
+]);
+
 const markingFiles = ({ crateDirs }, { name, via }, files) =>
   files.filter((file) => {
     if (isNoReleasePath(file)) return false;
-    const crate = crateFor(crateDirs, file);
+    const crate = crateFor(crateDirs, file) ?? MARKS.get(file) ?? file;
     return crate === name || via.includes(crate);
   });
 
@@ -50,37 +51,47 @@ const markingFiles = ({ crateDirs }, { name, via }, files) =>
  * - `bumped`: no tag for the current version. The next tag bot run tags it.
  * - `clean`: the current version is tagged and nothing has changed since.
  * - `missing-bump`: the current version is tagged and the source moved. Fails.
- *   A program with a `skipped.json` SHA fails only when its source moved since
- *   the tag and also since that SHA.
+ *   A program with a reviewed SHA fails only when its source moved since the tag
+ *   and also since that SHA.
  *
  * @param {{
  *   metadata: object,
- *   programs: { name: string, version: string, tags: string[], tagCommit?: string, skippedSha?: string }[],
+ *   programs: { name: string, version: string, tags: string[], tagCommit?: string, reviewedSha?: string }[],
  *   changedFiles: (base: string) => string[],
+ *   lockfilesFor?: (base: string) => { base: string, head: string },
+ *   manifestsFor?: (base: string) => { base: string, head: string },
  * }} input `programs` carries each program's current version, the versions its
  *   `program-<name>-*` tags name, the commit of the tag for the current version
- *   and the program's `skipped.json` SHA. `changedFiles` gives the paths a base
- *   changed against HEAD.
+ *   and the program's reviewed SHA. `changedFiles` gives the paths a base
+ *   changed against HEAD. `lockfilesFor` gives `Cargo.lock` at a base and at
+ *   HEAD, for a base whose changed paths include it, and `manifestsFor` the root
+ *   `Cargo.toml` the same way.
  * @returns {{ ok: boolean, results: object[], failing: object[] }}
  */
-export const missingBumpCheck = ({ metadata, programs, changedFiles }) => {
+export const missingBumpCheck = ({
+  metadata,
+  programs,
+  changedFiles,
+  lockfilesFor,
+  manifestsFor,
+}) => {
   const graph = buildGraph(metadata);
 
   const bases = {};
-  const skippedBases = {};
-  for (const { name, version, tags, tagCommit, skippedSha } of programs) {
+  const reviewedBases = {};
+  for (const { name, version, tags, tagCommit, reviewedSha } of programs) {
     if (!tags.includes(version)) continue;
     bases[name] = tagCommit;
-    // A `none` level reviewed the program up to the SHA in `skipped.json`. Tags
-    // sit on master merge commits that develop never contains, so neither
+    // A `none` level reviewed the program up to its reviewed SHA. Tags sit on
+    // master merge commits that develop never contains, so neither
     // commit is reliably the later one, and a change must show against both.
-    if (skippedSha) skippedBases[name] = skippedSha;
+    if (reviewedSha) reviewedBases[name] = reviewedSha;
   }
 
   const filesByBase = {};
   for (const base of new Set([
     ...Object.values(bases),
-    ...Object.values(skippedBases),
+    ...Object.values(reviewedBases),
   ])) {
     filesByBase[base] = changedFiles(base);
   }
@@ -91,8 +102,11 @@ export const missingBumpCheck = ({ metadata, programs, changedFiles }) => {
       defaultBase: NO_BASE,
       filesByBase,
       programBases,
+      lockfilesFor,
+      manifestsFor,
     });
   const changedSinceTag = changedFrom(bases);
+  const changedSinceReviewed = changedFrom(reviewedBases);
 
   const results = programs.map(({ name, version, tags }) => {
     if (!tags.length) {
@@ -109,15 +123,23 @@ export const missingBumpCheck = ({ metadata, programs, changedFiles }) => {
       };
     }
     const base = bases[name];
-    const skippedBase = skippedBases[name];
+    const reviewedBase = reviewedBases[name];
     const tagEntry = changedSinceTag.find((program) => program.name === name);
-    // A skipped SHA clears a file only when the file has not changed since it.
+    const reviewedEntry = changedSinceReviewed.find(
+      (program) => program.name === name,
+    );
+    // A reviewed SHA clears a file only when the file has not changed since it.
+    // A root file counts as changed only when it marks the program since then.
     const files = tagEntry
       ? markingFiles(graph, tagEntry, filesByBase[base]).filter(
-          (file) => !skippedBase || filesByBase[skippedBase].includes(file),
+          (file) =>
+            !reviewedBase ||
+            (MARKS.has(file)
+              ? Boolean(reviewedEntry?.via.includes(MARKS.get(file)))
+              : filesByBase[reviewedBase].includes(file)),
         )
       : [];
-    const failing = tagEntry && (!skippedBase || files.length > 0);
+    const failing = tagEntry && (!reviewedBase || files.length > 0);
     return {
       name,
       version,
@@ -170,16 +192,38 @@ const USAGE =
 
 const PACKAGE_VERSION = /^version = "(\d+\.\d+\.\d+)"$/m;
 
-/** The file's content at `head`, or null when it is not in that tree. */
-const showFile = (head, file) => {
+// What `git show` prints when the ref exists and the path is not in its tree.
+const NOT_IN_TREE = /does not exist in|exists on disk, but not in/;
+
+/**
+ * The file's content at `head`, or null when it is not in that tree. Any other
+ * failure, such as a bad ref, throws.
+ */
+export const showFile = (head, file) => {
   try {
     return execFileSync("git", ["show", `${head}:${file}`], {
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
-  } catch {
-    return null;
+  } catch (err) {
+    if (NOT_IN_TREE.test(String(err.stderr ?? err.message))) return null;
+    throw err;
   }
+};
+
+/**
+ * The literal `version = "x.y.z"` in `name`'s `Cargo.toml`. A tag names that
+ * version, so a manifest without one (`version.workspace = true`) is an error
+ * rather than a program with no version.
+ */
+export const packageVersion = (name, cargo) => {
+  const match = cargo.match(PACKAGE_VERSION);
+  if (!match) {
+    throw new Error(
+      `programs/${name}/Cargo.toml has no literal version = "x.y.z"`,
+    );
+  }
+  return match[1];
 };
 
 /** The versions `name`'s `program-<name>-<x.y.z>` tags in `tags` name. */
@@ -189,6 +233,71 @@ export const taggedVersions = (name, tags) =>
     .filter((parsed) => parsed?.name === name)
     .map(({ version }) => version);
 
+const PROGRAM_CHANGESETS = ".changeset-programs/*.md";
+const NOT_README = ":!.changeset-programs/README.md";
+
+/**
+ * Each program's reviewed SHA: the newest commit reachable from `head` that
+ * declares the program `none` in a program changeset. The `none` reviews the
+ * program up to that commit. History keeps the commit after the version step
+ * consumes the changeset, and a squash merge keeps it as the squash commit.
+ * The walk follows `--first-parent`, so a declaration made on a side branch
+ * keys to the merge commit that brought it in.
+ *
+ * A commit declares a program when its diff adds a `<program>: none` line and
+ * removes none for that program, so a reworded changeset reviews nothing new.
+ * A commit that removes `<program>: none` and adds `<program>: <level>`
+ * retracts the review.
+ */
+export const reviewedShas = (head) => {
+  // No prototype, so no program name reads an inherited key.
+  const shas = Object.create(null);
+  const commits = git(
+    "log",
+    "--first-parent",
+    "--format=%H",
+    head,
+    "--",
+    PROGRAM_CHANGESETS,
+    NOT_README,
+  )
+    .split("\n")
+    .filter(Boolean);
+  for (const sha of commits) {
+    const diff = git(
+      "show",
+      "--format=",
+      "--unified=0",
+      "--no-ext-diff",
+      "--diff-merges=first-parent",
+      sha,
+      "--",
+      PROGRAM_CHANGESETS,
+      NOT_README,
+    ).split("\n");
+    const entries = (sign) =>
+      diff
+        .filter((line) => line.startsWith(sign))
+        .map((line) => line.slice(1).match(ENTRY))
+        .filter(Boolean);
+    const declared = (sign, isNone) =>
+      new Set(
+        entries(sign)
+          .filter((entry) => (entry[3] === "none") === isNone)
+          .map((entry) => entry[2]),
+      );
+    const removed = declared("-", true);
+    for (const name of declared("+", true)) {
+      if (!removed.has(name) && !(name in shas)) shas[name] = sha;
+    }
+    // Raising a `none` to a release level retracts the older review.
+    for (const name of declared("+", false)) {
+      if (removed.has(name) && !(name in shas)) shas[name] = null;
+    }
+  }
+  return shas;
+};
+
 /**
  * Every `programs/*` directory with a `Cargo.toml`, with its version at `head`,
  * its tagged versions and the commit the tag for that version points at.
@@ -197,14 +306,14 @@ export const taggedVersions = (name, tags) =>
  * carries legacy `-v0.0.7` tags and a `-0.2.34-new` suffix that a looser
  * pattern would read as versions.
  */
-export const readPrograms = (head, skipped) =>
+export const readPrograms = (head, reviewed) =>
   git("ls-tree", "-d", "--name-only", `${head}:programs`)
     .split("\n")
     .filter(Boolean)
     .map((name) => {
       const cargo = showFile(head, `programs/${name}/Cargo.toml`);
       if (!cargo) return null;
-      const version = cargo.match(PACKAGE_VERSION)[1];
+      const version = packageVersion(name, cargo);
       const tags = taggedVersions(
         name,
         git("tag", "-l", `program-${name}-*`).split("\n"),
@@ -216,7 +325,7 @@ export const readPrograms = (head, skipped) =>
         tagCommit: tags.includes(version)
           ? git("rev-list", "-n1", `program-${name}-${version}`).trim()
           : undefined,
-        skippedSha: skipped[name],
+        reviewedSha: reviewed[name],
       };
     })
     .filter(Boolean);
@@ -242,16 +351,18 @@ const main = (argv) => {
   const metadata = JSON.parse(
     run("cargo", ["metadata", "--format-version", "1", "--no-deps"]),
   );
-  const skipped = JSON.parse(
-    showFile(head, ".changeset-programs/skipped.json") ?? "{}",
-  );
   const result = missingBumpCheck({
     metadata,
-    programs: readPrograms(head, skipped),
-    changedFiles: (base) =>
-      git("diff", "--name-only", "-z", "--no-renames", base, head)
-        .split("\0")
-        .filter(Boolean),
+    programs: readPrograms(head, reviewedShas(head)),
+    changedFiles: (base) => diffFiles(base, head),
+    lockfilesFor: (base) => ({
+      base: lockfileAt(base),
+      head: lockfileAt(head),
+    }),
+    manifestsFor: (base) => ({
+      base: manifestAt(base),
+      head: manifestAt(head),
+    }),
   });
 
   const text = report(result);

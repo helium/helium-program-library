@@ -1,9 +1,12 @@
 import {
+  ComputeBudgetProgram,
   Connection,
   Keypair,
+  PublicKey,
   Transaction,
   TransactionInstruction,
   VersionedTransaction,
+  VersionedTransactionResponse,
 } from "@solana/web3.js";
 
 export interface TransactionDataLike {
@@ -13,6 +16,34 @@ export interface TransactionDataLike {
   }>;
   parallel: boolean;
   tag?: string;
+}
+
+/**
+ * The compute-unit price a transaction pays on top of its signature fees:
+ * limit × micro-lamport price, rounded up, as the runtime charges it. Zero when
+ * `feePayer` does not pay the transaction's fees.
+ */
+export function priorityFeeLamports(
+  tx: VersionedTransaction,
+  feePayer: PublicKey
+): number {
+  const keys = tx.message.staticAccountKeys;
+  if (!keys[0].equals(feePayer)) return 0;
+  let limit: number | undefined;
+  let microLamports = BigInt(0);
+  let otherIxs = 0;
+  for (const ix of tx.message.compiledInstructions) {
+    if (!keys[ix.programIdIndex].equals(ComputeBudgetProgram.programId)) {
+      otherIxs += 1;
+      continue;
+    }
+    const data = Buffer.from(ix.data);
+    if (data[0] === 2) limit = data.readUInt32LE(1);
+    if (data[0] === 3) microLamports = data.readBigUInt64LE(1);
+  }
+  // Without SetComputeUnitLimit the runtime defaults to 200k per instruction.
+  const units = BigInt(limit ?? Math.min(200_000 * otherIxs, 1_400_000));
+  return Number((units * microLamports + BigInt(999_999)) / BigInt(1_000_000));
 }
 
 export async function signAndSubmitTransactionData(
@@ -82,4 +113,26 @@ export async function sendAndConfirmInstructions(
     "confirmed"
   );
   return sig;
+}
+
+// Reads the landed transaction back, so the check is on what the node
+// executed, not on what the builder returned.
+export async function expectLandedTxVersion(
+  connection: Connection,
+  signature: string,
+  expected: 0 | 1
+): Promise<VersionedTransactionResponse> {
+  const tx = await connection.getTransaction(signature, {
+    commitment: "confirmed",
+    maxSupportedTransactionVersion: 1,
+  });
+  if (!tx) {
+    throw new Error(`expectLandedTxVersion: ${signature} not found`);
+  }
+  if (tx.version !== expected) {
+    throw new Error(
+      `expectLandedTxVersion: ${signature} landed as version ${tx.version}, expected ${expected}`
+    );
+  }
+  return tx;
 }

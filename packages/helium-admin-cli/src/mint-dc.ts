@@ -1,6 +1,6 @@
 import { init as initDc, mintDataCredits } from "@helium/data-credits-sdk";
 import { toBN, DC_MINT, sendInstructions } from "@helium/spl-utils";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   createAssociatedTokenAccountIdempotent,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -56,7 +56,7 @@ export async function run(args: any = process.argv) {
   let preBalance = 0;
   try {
     preBalance = (
-      await provider.connection.getTokenAccountBalance(destAta, "confirmed")
+      await provider.connection.getTokenAccountBalance(destAta, "finalized")
     ).value.uiAmount!;
   } catch (e: any) {
     if (!e.toString().includes("Invalid param: could not find account")) {
@@ -82,7 +82,7 @@ export async function run(args: any = process.argv) {
   await provider.sendAll(txs);
 
   const postBalance = (
-    await provider.connection.getTokenAccountBalance(destAta, "confirmed")
+    await provider.connection.getTokenAccountBalance(destAta, "finalized")
   ).value.uiAmount;
 
   console.log(

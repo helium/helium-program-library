@@ -6,13 +6,17 @@ use anchor_lang::{
   prelude::{borsh, Pubkey},
   AnchorDeserialize, AnchorSerialize,
 };
-use helium_crypto::{PublicKey, Verify};
+use helium_crypto::{Network, PublicKey, Verify};
 use rocket::{
   http::Status,
   serde::{json::Json, Deserialize, Serialize},
 };
 use solana_sdk::{
+  borsh0_10::try_from_slice_unchecked,
   bs58,
+  compute_budget::{self, ComputeBudgetInstruction},
+  instruction::CompiledInstruction,
+  message::VersionedMessage,
   signature::{read_keypair_file, Signature},
   signer::{Signer, SignerError},
   transaction::VersionedTransaction,
@@ -77,7 +81,7 @@ impl Signer for ExistingSigner {
 }
 
 #[post("/verify", format = "application/json", data = "<verify>")]
-async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult>, Status> {
+async fn verify(verify: Json<VerifyRequest<'_>>) -> Result<Json<VerifyResult>, Status> {
   let solana_txn_hex = hex::decode(verify.transaction).map_err(|e| {
     error!("failed to decode transaction: {:?}", e);
     Status::BadRequest
@@ -87,28 +91,39 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
     Status::BadRequest
   })?;
 
+  // From here on every program id is a static account key, and there is one signature per
+  // required signer, each for a static account key.
+  solana_txn.sanitize(true).map_err(|e| {
+    error!("invalid transaction: {:?}", e);
+    Status::BadRequest
+  })?;
   let account_keys = solana_txn.message.static_account_keys();
-  let instructions = solana_txn.message.instructions();
-  if instructions.len() > 3 {
-    error!("Invalid instruction count");
-    return Err(Status::BadRequest);
-  }
+  let program_id = |ixn: &CompiledInstruction| account_keys[usize::from(ixn.program_id_index)];
+  let compute_budget_ixn = |ixn: &CompiledInstruction| {
+    (program_id(ixn) == compute_budget::id())
+      .then(|| try_from_slice_unchecked::<ComputeBudgetInstruction>(&ixn.data).ok())
+      .flatten()
+  };
 
-  // Up to the first 2 instructions are compute budget
-  let mut compute_end_ix = 0;
-  for i in 0..2 {
-    compute_end_ix = i;
-    if i >= instructions.len() {
-      break;
-    }
-    let compute_ixn = &instructions[i];
-    let compute_program_id = account_keys[compute_ixn.program_id_index as usize];
-    if compute_program_id
-      != Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap()
+  // The verifier signs a compute unit limit and a compute unit price followed by the issue
+  // instruction, and nothing else.
+  let ixn = match solana_txn.message.instructions() {
+    [limit, price, issue]
+      if matches!(
+        compute_budget_ixn(limit),
+        Some(ComputeBudgetInstruction::SetComputeUnitLimit(_))
+      ) && matches!(
+        compute_budget_ixn(price),
+        Some(ComputeBudgetInstruction::SetComputeUnitPrice(_))
+      ) =>
     {
-      break;
+      issue
     }
-  }
+    _ => {
+      error!("Unexpected instructions");
+      return Err(Status::BadRequest);
+    }
+  };
 
   let keypair = read_keypair_file(env::var("ANCHOR_WALLET").unwrap_or("keypair.json".to_string()))
     .map_err(|_| {
@@ -116,26 +131,13 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
       Status::InternalServerError
     })?;
 
-  let start_index = compute_end_ix + 1;
-  // Second real ix (may) be a transfer
-  if instructions.len() - (compute_end_ix + 1) > 1 {
-    let transfer_ixn = &instructions[start_index + 1];
-    let transfer_program_id = account_keys[transfer_ixn.program_id_index as usize];
-    let transfer_from_acct = account_keys[transfer_ixn.accounts[0] as usize];
-    if transfer_program_id != Pubkey::from_str("11111111111111111111111111111111").unwrap() {
-      error!("Second instruction is not System transfer");
-      return Err(Status::BadRequest);
-    }
-    if transfer_from_acct == keypair.pubkey() {
-      error!("Cannot transfer from the verifier");
-      return Err(Status::BadRequest);
-    }
+  if !is_read_only_signer(&solana_txn.message, &keypair.pubkey()) {
+    error!("Verifier is not a read-only signer");
+    return Err(Status::BadRequest);
   }
 
   // Verify it's entity manager instruction
-  let ixn = &instructions[start_index];
-  let program_id = account_keys[ixn.program_id_index as usize];
-  if program_id != Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").unwrap() {
+  if program_id(ixn) != Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").unwrap() {
     error!("Pubkey mismatch");
     return Err(Status::BadRequest);
   }
@@ -143,34 +145,25 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   // Verify it's issue_entity or issue_data_only_entity
   let issue_sighash = sighash("global", "issue_entity_v0");
   let issue_do_sighash = sighash("global", "issue_data_only_entity_v0");
-  if issue_sighash != ixn.data[0..8] && issue_do_sighash != ixn.data[0..8] {
+  let discriminator = ixn.data.get(..8);
+  if discriminator != Some(&issue_sighash[..]) && discriminator != Some(&issue_do_sighash[..]) {
     error!("Sighash mismatch");
     return Err(Status::BadRequest);
   }
 
-  let pubkey: PublicKey = if issue_sighash == ixn.data[0..8] {
-    let issue_entity = IssueEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
-      error!("Failed to decode instruction: {:?}", e);
-      Status::BadRequest
-    })?;
-    let keystr = bs58::encode(&issue_entity.entity_key).into_string();
-    info!("key: {:?}", keystr);
-    PublicKey::from_str(&keystr).map_err(|e| {
-      error!("failed to parse pubkey: {:?}", e);
-      Status::BadRequest
-    })?
+  let entity_key = if discriminator == Some(&issue_sighash[..]) {
+    IssueEntityArgsV0::try_from_slice(&ixn.data[8..]).map(|args| args.entity_key)
   } else {
-    let issue_entity = IssueDataOnlyEntityArgsV0::try_from_slice(&ixn.data[8..]).map_err(|e| {
-      error!("Failed to decode instruction: {:?}", e);
-      Status::BadRequest
-    })?;
-    let keystr = bs58::encode(&issue_entity.entity_key).into_string();
-    info!("key: {:?}", keystr);
-    PublicKey::from_str(&keystr).map_err(|e| {
-      error!("failed to parse pubkey: {:?}", e);
-      Status::BadRequest
-    })?
-  };
+    IssueDataOnlyEntityArgsV0::try_from_slice(&ixn.data[8..]).map(|args| args.entity_key)
+  }
+  .map_err(|e| {
+    error!("Failed to decode instruction: {:?}", e);
+    Status::BadRequest
+  })?;
+  let pubkey = mainnet_entity_key(&entity_key).ok_or_else(|| {
+    error!("Entity key is not a canonical mainnet key");
+    Status::BadRequest
+  })?;
   info!("pubkey: {:?}", pubkey.to_string());
 
   // Verify the ecc signature against the message
@@ -206,6 +199,30 @@ async fn verify<'a>(verify: Json<VerifyRequest<'a>>) -> Result<Json<VerifyResult
   }))
 }
 
+/// The mainnet key `entity_key` encodes, when it is that key's canonical encoding. The program
+/// keys an entity by these raw bytes, so any other encoding of the same key would be a second
+/// entity.
+fn mainnet_entity_key(entity_key: &[u8]) -> Option<PublicKey> {
+  let keystr = bs58::encode(entity_key).into_string();
+  PublicKey::from_str(&keystr)
+    .ok()
+    .filter(|pubkey| pubkey.network == Network::MainNet && pubkey.to_string() == keystr)
+}
+
+/// Read-only signers follow the writable signers in the account keys, and the runtime requires
+/// the fee payer to be writable, so a read-only signer is never the fee payer and no instruction
+/// can debit it.
+fn is_read_only_signer(message: &VersionedMessage, key: &Pubkey) -> bool {
+  let header = message.header();
+  let num_signers = usize::from(header.num_required_signatures);
+  let read_only_signers =
+    num_signers.saturating_sub(usize::from(header.num_readonly_signed_accounts))..num_signers;
+  matches!(
+    message.static_account_keys().iter().position(|k| k == key),
+    Some(index) if read_only_signers.contains(&index)
+  )
+}
+
 #[launch]
 fn rocket() -> _ {
   rocket::build().mount("/", routes![health, verify])
@@ -218,4 +235,465 @@ pub fn sighash(namespace: &str, name: &str) -> [u8; 8] {
   sighash
     .copy_from_slice(&anchor_lang::solana_program::hash::hash(preimage.as_bytes()).to_bytes()[..8]);
   sighash
+}
+
+#[cfg(test)]
+mod tests {
+  use std::sync::Once;
+
+  use helium_crypto::{KeyTag, KeyType, Keypair as EccKeypair, Sign};
+  use rocket::{http::ContentType, local::blocking::Client};
+  use solana_sdk::{
+    hash::{hash, Hash},
+    instruction::{AccountMeta, Instruction},
+    message::{
+      v0::{self, MessageAddressTableLookup},
+      Message, MessageHeader,
+    },
+    signature::{keypair_from_seed, write_keypair_file, Keypair},
+  };
+
+  use super::*;
+
+  // An RSA entity key issued on mainnet.
+  const RSA_ENTITY_KEY: &str = "1trSusewwjw41wwqDPiqphgiKrzqgzcyA81QLzNcpQxu17SY1yUiUQ6Muw1BvE3gYN4f5hpLafNorgX752h9md9CzrzkcVMfcY9pZKktWyXCnPRTzNerqPWhbU5NPMLdZdoQJYFi4sJncHH9eCXnLa3CasLpotEqH9ZkQ35tzyL66WmDvDNpUxvppB8jENZ3uSZWJ72x1f4WcFCm2uKX2QR849MyBFw9f6Njusk9Yatzf737X4sPoU7G6AyPkNaeLQ4yvAct5KHncmZWz6xCCTCB1Qc92CRPu7p5rG4TA3NV7hiVmn7DeRL7JDcn5WTr4wtXFfAT8ykr1UN7v7yrj8EbvwjZ2L3yvmAzyyYFJQoh19";
+
+  static WRITE_VERIFIER_KEYPAIR: Once = Once::new();
+
+  // The handler reads its keypair from ANCHOR_WALLET, so every test writes the same one there.
+  fn verifier() -> Keypair {
+    let keypair = keypair_from_seed(&[7; 32]).expect("derive verifier keypair");
+    WRITE_VERIFIER_KEYPAIR.call_once(|| {
+      let path = env::temp_dir().join(format!("ecc-sig-verifier-test-{}.json", std::process::id()));
+      write_keypair_file(&keypair, &path).expect("write verifier keypair");
+      env::set_var("ANCHOR_WALLET", &path);
+    });
+    keypair
+  }
+
+  fn gateway(seed: u8) -> EccKeypair {
+    EccKeypair::generate_from_entropy(KeyTag::default(), &[seed; 32])
+      .expect("derive gateway keypair")
+  }
+
+  // The gateway whose signature every request carries.
+  fn signing_gateway() -> EccKeypair {
+    gateway(9)
+  }
+
+  // The canonical entity key bytes: version byte, key, checksum.
+  fn entity_key(gateway: &EccKeypair) -> Vec<u8> {
+    bs58::decode(gateway.public_key().to_string())
+      .into_vec()
+      .expect("decode gateway key")
+  }
+
+  fn issue_data(gateway: &EccKeypair) -> Vec<u8> {
+    issue_data_for(entity_key(gateway))
+  }
+
+  fn issue_data_for(entity_key: Vec<u8>) -> Vec<u8> {
+    let mut data = sighash("global", "issue_data_only_entity_v0").to_vec();
+    data.extend(
+      IssueDataOnlyEntityArgsV0 { entity_key }
+        .try_to_vec()
+        .expect("serialize issue args"),
+    );
+    data
+  }
+
+  fn hem_ix(payer: &Pubkey, data: &[u8]) -> Instruction {
+    Instruction::new_with_bytes(
+      Pubkey::from_str("hemjuPXBpNvggtaUnN1MwT3wrdhttKEfosTcc2P9Pg8").expect("parse program id"),
+      data,
+      vec![
+        AccountMeta::new(*payer, true),
+        AccountMeta::new_readonly(verifier().pubkey(), true),
+      ],
+    )
+  }
+
+  fn issue_ix(payer: &Pubkey, gateway: &EccKeypair) -> Instruction {
+    hem_ix(payer, &issue_data(gateway))
+  }
+
+  fn compute_limit() -> Instruction {
+    ComputeBudgetInstruction::set_compute_unit_limit(200_000)
+  }
+
+  fn compute_price() -> Instruction {
+    ComputeBudgetInstruction::set_compute_unit_price(1)
+  }
+
+  fn transaction(fee_payer: &Pubkey, instructions: &[Instruction]) -> VersionedTransaction {
+    let message = Message::new(instructions, Some(fee_payer));
+    VersionedTransaction {
+      signatures: vec![Signature::default(); usize::from(message.header.num_required_signatures)],
+      message: VersionedMessage::Legacy(message),
+    }
+  }
+
+  // A request carrying a valid signature from `signing_gateway`.
+  fn request(transaction: &VersionedTransaction) -> String {
+    request_signed_by(transaction, &signing_gateway())
+  }
+
+  fn request_signed_by(transaction: &VersionedTransaction, gateway: &EccKeypair) -> String {
+    let msg = b"add gateway";
+    format!(
+      r#"{{"transaction":"{}","msg":"{}","signature":"{}"}}"#,
+      hex::encode(bincode::serialize(transaction).expect("serialize transaction")),
+      hex::encode(msg),
+      hex::encode(gateway.sign(msg).expect("sign msg")),
+    )
+  }
+
+  // The shape clients send, so only the fee payer and the `payer` account vary.
+  fn issue_request(fee_payer: &Pubkey, payer: &Pubkey) -> String {
+    request(&transaction(
+      fee_payer,
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(payer, &signing_gateway()),
+      ],
+    ))
+  }
+
+  fn post(body: String) -> Status {
+    Client::tracked(rocket())
+      .expect("build client")
+      .post("/verify")
+      .header(ContentType::JSON)
+      .body(body)
+      .dispatch()
+      .status()
+  }
+
+  // The transaction the handler returns for a request it accepts.
+  fn post_for_transaction(body: String) -> VersionedTransaction {
+    let client = Client::tracked(rocket()).expect("build client");
+    let response = client
+      .post("/verify")
+      .header(ContentType::JSON)
+      .body(body)
+      .dispatch();
+    assert_eq!(response.status(), Status::Ok);
+    let json: rocket::serde::json::Value = response.into_json().expect("read response");
+    let transaction = json["transaction"].as_str().expect("transaction field");
+    bincode::deserialize(&hex::decode(transaction).expect("decode transaction"))
+      .expect("deserialize transaction")
+  }
+
+  #[test]
+  fn signs_as_a_read_only_signer() {
+    let owner = Pubkey::new_unique();
+    let signed = post_for_transaction(issue_request(&owner, &owner));
+    let verifier = verifier().pubkey();
+    let slot = signed
+      .message
+      .static_account_keys()
+      .iter()
+      .position(|k| *k == verifier)
+      .expect("verifier key");
+    assert!(signed.signatures[slot].verify(verifier.as_ref(), &signed.message.serialize()));
+  }
+
+  #[test]
+  fn keeps_the_fee_payer_signature() {
+    let fee_payer = Keypair::new();
+    let mut tx = transaction(
+      &fee_payer.pubkey(),
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&fee_payer.pubkey(), &signing_gateway()),
+      ],
+    );
+    tx.signatures[0] = fee_payer.sign_message(&tx.message.serialize());
+    let signed = post_for_transaction(request(&tx));
+    assert_eq!(signed.signatures[0], tx.signatures[0]);
+  }
+
+  #[test]
+  fn refuses_to_be_the_fee_payer() {
+    let verifier = verifier().pubkey();
+    assert_eq!(
+      post(issue_request(&verifier, &verifier)),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_to_be_a_writable_signer() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      post(issue_request(&owner, &verifier().pubkey())),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_an_issue_sent_to_another_program() {
+    let owner = Pubkey::new_unique();
+    let issue = Instruction {
+      program_id: Pubkey::new_unique(),
+      ..issue_ix(&owner, &signing_gateway())
+    };
+    assert_eq!(
+      post(request(&transaction(
+        &owner,
+        &[compute_limit(), compute_price(), issue],
+      ))),
+      Status::BadRequest
+    );
+  }
+
+  fn shape_status(instructions: &[Instruction]) -> Status {
+    post(request(&transaction(&Pubkey::new_unique(), instructions)))
+  }
+
+  #[test]
+  fn refuses_another_instruction_in_place_of_the_compute_unit_limit() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        issue_ix(&owner, &gateway(10)),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_another_instruction_in_place_of_the_compute_unit_price() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        compute_limit(),
+        issue_ix(&owner, &gateway(10)),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_heap_frame_request_in_place_of_the_compute_unit_limit() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        ComputeBudgetInstruction::request_heap_frame(32 * 1024),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_compute_unit_limit_data_sent_to_another_program() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        Instruction::new_with_bytes(Pubkey::new_unique(), &compute_limit().data, vec![]),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_second_compute_unit_limit_in_place_of_the_price() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        compute_limit(),
+        compute_limit(),
+        issue_ix(&owner, &signing_gateway()),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_program_id_index_past_the_account_keys() {
+    let owner = Pubkey::new_unique();
+    let mut transaction = transaction(
+      &owner,
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ],
+    );
+    let VersionedMessage::Legacy(message) = &mut transaction.message else {
+      unreachable!("transaction() builds a legacy message")
+    };
+    message.instructions[2].program_id_index = 200;
+    assert_eq!(post(request(&transaction)), Status::BadRequest);
+  }
+
+  #[test]
+  fn refuses_a_program_id_loaded_from_a_lookup_table() {
+    let owner = Pubkey::new_unique();
+    let message = v0::Message {
+      header: MessageHeader {
+        num_required_signatures: 2,
+        num_readonly_signed_accounts: 1,
+        num_readonly_unsigned_accounts: 1,
+      },
+      account_keys: vec![owner, verifier().pubkey(), compute_budget::id()],
+      recent_blockhash: Hash::default(),
+      instructions: vec![
+        CompiledInstruction::new_from_raw_parts(2, compute_limit().data, vec![]),
+        CompiledInstruction::new_from_raw_parts(2, compute_price().data, vec![]),
+        // Index 3 is the first key the lookup table loads.
+        CompiledInstruction::new_from_raw_parts(3, issue_data(&signing_gateway()), vec![0, 1]),
+      ],
+      address_table_lookups: vec![MessageAddressTableLookup {
+        account_key: Pubkey::new_unique(),
+        writable_indexes: vec![],
+        readonly_indexes: vec![0],
+      }],
+    };
+    let transaction = VersionedTransaction {
+      signatures: vec![Signature::default(); 2],
+      message: VersionedMessage::V0(message),
+    };
+    assert_eq!(post(request(&transaction)), Status::BadRequest);
+  }
+
+  #[test]
+  fn refuses_an_instruction_after_the_issue() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+        issue_ix(&owner, &gateway(10)),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_missing_compute_budget_instruction() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[compute_price(), issue_ix(&owner, &signing_gateway())]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_issue_data_shorter_than_a_discriminator() {
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[compute_limit(), compute_price(), hem_ix(&owner, &[1, 2, 3])]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_transaction_missing_its_signature_slots() {
+    let owner = Pubkey::new_unique();
+    let mut unsigned = transaction(
+      &owner,
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&owner, &signing_gateway()),
+      ],
+    );
+    unsigned.signatures.clear();
+    assert_eq!(post(request(&unsigned)), Status::BadRequest);
+  }
+
+  #[test]
+  fn refuses_a_testnet_entity_key() {
+    let owner = Pubkey::new_unique();
+    let testnet_gateway = EccKeypair::generate_from_entropy(
+      KeyTag {
+        network: Network::TestNet,
+        key_type: KeyType::Ed25519,
+      },
+      &[11; 32],
+    )
+    .expect("derive testnet gateway keypair");
+    let transaction = transaction(
+      &owner,
+      &[
+        compute_limit(),
+        compute_price(),
+        issue_ix(&owner, &testnet_gateway),
+      ],
+    );
+    assert_eq!(
+      post(request_signed_by(&transaction, &testnet_gateway)),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn refuses_a_non_canonical_encoding_of_the_signing_key() {
+    // The signing key's bytes with one byte appended, under a valid checksum.
+    let canonical = entity_key(&signing_gateway());
+    let mut payload = canonical[..canonical.len() - 4].to_vec();
+    payload.push(0);
+    let checksum = hash(hash(&payload).as_ref()).to_bytes();
+    payload.extend_from_slice(&checksum[..4]);
+
+    let owner = Pubkey::new_unique();
+    assert_eq!(
+      shape_status(&[
+        compute_limit(),
+        compute_price(),
+        hem_ix(&owner, &issue_data_for(payload)),
+      ]),
+      Status::BadRequest
+    );
+  }
+
+  #[test]
+  fn accepts_mainnet_entity_keys_of_every_type_seen_on_chain() {
+    // One issued entity key per key type in recent mainnet issue transactions.
+    for key in [
+      "11vaz66ZZngjVxMw8hYVDGKdTRytXxg7rbzjPLo4YRQ7fbRziPA",
+      "13hdUHnVjzu9pc5YjUa4uqfT1ASULC6rMKWKJ33MZaTtxpgW79b",
+      RSA_ENTITY_KEY,
+    ] {
+      let bytes = bs58::decode(key).into_vec().expect("decode entity key");
+      assert!(mainnet_entity_key(&bytes).is_some(), "{key}");
+    }
+  }
+
+  fn message_with_read_only_account(key: &Pubkey) -> VersionedMessage {
+    VersionedMessage::Legacy(Message::new(
+      &[Instruction::new_with_bytes(
+        Pubkey::new_unique(),
+        &[],
+        vec![AccountMeta::new_readonly(*key, false)],
+      )],
+      Some(&Pubkey::new_unique()),
+    ))
+  }
+
+  #[test]
+  fn a_read_only_non_signer_is_not_a_read_only_signer() {
+    let key = Pubkey::new_unique();
+    assert!(!is_read_only_signer(
+      &message_with_read_only_account(&key),
+      &key
+    ));
+  }
+
+  #[test]
+  fn an_absent_key_is_not_a_read_only_signer() {
+    let message = message_with_read_only_account(&Pubkey::new_unique());
+    assert!(!is_read_only_signer(&message, &Pubkey::new_unique()));
+  }
 }

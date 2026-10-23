@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import {
   carrierKey,
@@ -133,7 +133,7 @@ export async function run(args: any = process.argv) {
     instructions,
     signers: [],
     payer: provider.wallet.publicKey,
-    commitment: "confirmed",
+    commitment: "finalized",
     multisig: argv.multisig ? new PublicKey(argv.multisig) : undefined,
   });
 }

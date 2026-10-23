@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program } from "@anchor-lang/core";
 import {
   PROGRAM_ID as CIRCUIT_BREAKER_PROGRAM_ID,
   accountWindowedBreakerKey,
@@ -32,6 +32,7 @@ import {
 } from "@solana/web3.js";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { PositionWithMeta, SubDao } from "../sdk/types";
+import { createClaimWindow } from "./claimWindow";
 
 const DAO = daoKey(HNT_MINT)[0];
 
@@ -124,9 +125,12 @@ export const formPositionClaims = async ({
         const { lastClaimedEpoch, claimedEpochsBitmap } =
           delegatedPosition.account;
         const epoch = lastClaimedEpoch.add(new BN(1));
-        const epochsCount = isDecayed
-          ? decayedEpoch.sub(epoch).add(new BN(1)).toNumber()
-          : currentEpoch.sub(epoch).toNumber();
+        // claim_rewards_v1 fails EpochNotOver for the current epoch, so the
+        // last claimable epoch is the one before it.
+        const lastEpoch = isDecayed
+          ? BN.min(decayedEpoch, currentEpoch.sub(new BN(1)))
+          : currentEpoch.sub(new BN(1));
+        const epochsCount = lastEpoch.sub(epoch).add(new BN(1)).toNumber();
 
         const epochsToClaim = Array.from(
           { length: epochsCount > 0 ? epochsCount : 0 },
@@ -140,6 +144,8 @@ export const formPositionClaims = async ({
             })
         );
 
+        const claimWindow = createClaimWindow();
+
         // Chunk size is 128 because we want each chunk to correspond to the 128 bits in bitmap
         for (const chunk of chunks(epochsToClaim, 128)) {
           const subDaoEpochInfoKeys = chunk.map(
@@ -150,16 +156,53 @@ export const formPositionClaims = async ({
             connection: connNoCache,
             keys: subDaoEpochInfoKeys,
           });
-          bucketedEpochsByPosition[position.pubkey.toBase58()].push(
+          const daoEpochInfoAccounts = await getMultipleAccounts({
+            connection: connNoCache,
+            keys: chunk.map(
+              (epoch) =>
+                daoEpochInfoKey(subDaoAcc.dao, epoch.mul(new BN(EPOCH_LENGTH)))[0]
+            ),
+          });
+          const chunkInstructions = (
             await Promise.all(
               chunk.map((epoch, index) => {
-                const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index]!;
-                const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
-                  "subDaoEpochInfoV0",
-                  subDaoEpochInfoAccount?.data
-                );
+                let hntRewardsIssued = false;
+                const decision = claimWindow.decide(epoch.toNumber(), () => {
+                  const subDaoEpochInfoAccount = subDaoEpochInfoAccounts[index];
+                  if (!subDaoEpochInfoAccount)
+                    return { subDaoEpochInfo: null, daoEpochInfo: null };
+                  const subDaoEpochInfoData = hsdProgram.coder.accounts.decode(
+                    "subDaoEpochInfoV0",
+                    subDaoEpochInfoAccount.data
+                  );
+                  hntRewardsIssued = subDaoEpochInfoData.hntRewardsIssued.gt(
+                    new BN(0)
+                  );
+                  const daoEpochInfoAccount = daoEpochInfoAccounts[index];
+                  const daoEpochInfoData =
+                    subDaoEpochInfoData.rewardsIssuedAt &&
+                    hntRewardsIssued &&
+                    daoEpochInfoAccount
+                      ? hsdProgram.coder.accounts.decode(
+                          "daoEpochInfoV0",
+                          daoEpochInfoAccount.data
+                        )
+                      : null;
+                  return {
+                    subDaoEpochInfo: {
+                      rewardsIssued: !!subDaoEpochInfoData.rewardsIssuedAt,
+                      hntRewardsIssued,
+                    },
+                    daoEpochInfo: daoEpochInfoData && {
+                      doneIssuingRewards: !!daoEpochInfoData.doneIssuingRewards,
+                      delegationRewardsIssued:
+                        !daoEpochInfoData.delegationRewardsIssued.isZero(),
+                    },
+                  };
+                });
+                if (decision !== "claim") return null;
 
-                if (subDaoEpochInfoData.hntRewardsIssued.gt(new BN(0))) {
+                if (hntRewardsIssued) {
                   return hsdProgram.methods
                     .claimRewardsV1({
                       epoch,
@@ -237,6 +280,26 @@ export const formPositionClaims = async ({
                 }
               })
             )
+          ).filter(truthy);
+          if (chunkInstructions.length > 0) {
+            bucketedEpochsByPosition[position.pubkey.toBase58()].push(
+              chunkInstructions
+            );
+          }
+        }
+        const { skipped: skippedEpochs, dropped: droppedEpochs } = claimWindow;
+        if (skippedEpochs.length > 0) {
+          const skipped = skippedEpochs
+            .map(({ epoch, reason }) => `${epoch} ${reason}`)
+            .join(", ");
+          const dropped =
+            droppedEpochs.length > 0
+              ? `; dropped epochs [${droppedEpochs.join(
+                  ", "
+                )}] past the claim window`
+              : "";
+          console.warn(
+            `formPositionClaims: position ${position.pubkey.toBase58()} skipped epochs [${skipped}]; last_claimed_epoch stops at the first one${dropped}`
           );
         }
       }

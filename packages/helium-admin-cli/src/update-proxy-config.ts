@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init as initProxy, proxyConfigKey } from "@helium/nft-proxy-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import fs from "fs";

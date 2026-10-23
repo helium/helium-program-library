@@ -1,7 +1,7 @@
 name: Release Program to Mainnet
 
 env:
-  SOLANA_CLI_VERSION: 2.1.6
+  SOLANA_CLI_VERSION: 4.3.2
 
 on:
   push:
@@ -232,9 +232,10 @@ jobs:
     outputs:
       buffer: ${{ steps.deploy-buffers.outputs.buffer }}
       idl-buffer: ${{ steps.deploy-buffers.outputs.idl-buffer }}
+      anchor-sha256: ${{ steps.anchor-cli.outputs.anchor-sha256 }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: ./.github/actions/setup-anchor/
         # Neither this job nor its actions call `toml`, and the install runs third-party build
         # scripts on the VM that later writes the deployer key. Any workflow in the cache scope
@@ -242,9 +243,28 @@ jobs:
         with:
           toml-cli: false
           cache: false
+      # `propose` runs this Anchor CLI instead of a second install, which would sit in the
+      # section turnstyle serializes. `plan` and `wait` run workspace JavaScript, and that code
+      # can upload or replace an `anchor-cli` artifact, so `propose` checks the binary against
+      # the hash this job takes. That check is the guard, not the name. Without `overwrite`, a
+      # v4 artifact name is immutable: an `anchor-cli` that `plan` uploads first would fail this
+      # upload loudly. It could also fail a re-run of this job after a later step fails, so
+      # `overwrite` is set.
+      - name: Hash the Anchor CLI
+        id: anchor-cli
+        run: |
+          ANCHOR_SHA256=$(sha256sum ~/.cargo/bin/anchor | cut -d' ' -f1)
+          echo "Anchor CLI hash: $ANCHOR_SHA256"
+          echo "anchor-sha256=${ANCHOR_SHA256}" >> "$GITHUB_OUTPUT"
+      - name: Store the Anchor CLI
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: anchor-cli
+          path: ~/.cargo/bin/anchor
+          overwrite: true
       # `upload-artifact` drops the common `./target/` prefix of the two paths.
       - name: Download the build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: build
           path: ./target/
@@ -259,7 +279,8 @@ jobs:
             echo "::error::build artifact hash ${ACTUAL} does not match '${EXPECTED}' from the build job"
             exit 1
           fi
-      # On a failure before the authority transfer, this closes the buffer it made.
+      # On a failure before the authority transfer, this closes the buffer it made. The IDL
+      # buffer stays with the deployer key until `propose`.
       - uses: ./.github/actions/deploy-buffers/
         id: deploy-buffers
         with:
@@ -334,6 +355,45 @@ jobs:
     environment: mainnet-deploy
     timeout-minutes: 30
     steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Any workflow in the cache scope can write a cache entry first, so this job installs the
+      # Solana CLI fresh. `set-idl-buffer-authority` runs only `anchor`.
+      - uses: ./.github/actions/setup-solana/
+        with:
+          cache: false
+      # The Anchor CLI `buffers` installed. A fresh install here would add minutes to every
+      # release in the section turnstyle serializes.
+      - name: Download the Anchor CLI
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: anchor-cli
+          path: ${{ runner.temp }}/anchor-cli/
+      # `plan` and `wait` run workspace JavaScript and can replace the artifact. The hash comes
+      # from `buffers`, which runs none.
+      - name: Check the Anchor CLI against the hash taken in buffers
+        env:
+          ANCHOR_DIR: ${{ runner.temp }}/anchor-cli
+          EXPECTED: ${{ needs.buffers.outputs.anchor-sha256 }}
+        run: |
+          ACTUAL=$(sha256sum "${ANCHOR_DIR}/anchor" | cut -d' ' -f1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Anchor CLI hash ${ACTUAL} does not match '${EXPECTED}' from the buffers job"
+            exit 1
+          fi
+          # Artifacts do not keep file modes.
+          chmod +x "${ANCHOR_DIR}/anchor"
+          echo "$ANCHOR_DIR" >> "$GITHUB_PATH"
+      # Right before the proposal, so a run that stops earlier (the `wait` skip, a failure)
+      # leaves an IDL buffer the deployer key owns and the sweep can close.
+      - uses: ./.github/actions/set-idl-buffer-authority/
+        with:
+          network: ${{ secrets.SOLANA_DEPLOY_URL }}
+          program: ${{ needs.build.outputs.program-name }}
+          program-id: ${{ needs.build.outputs.program-id }}
+          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
+          buffer-authority: ${{ secrets.MULTISIG_VAULT }}
+          idl-buffer: ${{ needs.buffers.outputs.idl-buffer }}
       - name: Squads program upgrade
         uses: helium/squads-program-upgrade@58eb5cf41491c163e857e6ee3dcedb97a2859733 # v0.5.0
         with:

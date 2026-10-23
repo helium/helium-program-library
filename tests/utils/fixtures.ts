@@ -1,11 +1,11 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import {
   createAtaAndMint,
   createAtaAndTransfer,
   createMint,
   HNT_PYTH_PRICE_FEED,
-  sendMultipleInstructions,
+  sendInstructions,
   toBN,
 } from "@helium/spl-utils";
 import {
@@ -137,7 +137,8 @@ export const initTestMaker = async (
   program: Program<HeliumEntityManager>,
   provider: anchor.AnchorProvider,
   rewardableEntityConfig: PublicKey,
-  dao: PublicKey
+  dao: PublicKey,
+  canopyDepth = 0
 ): Promise<{
   authority: PublicKey;
   makerKeypair: Keypair;
@@ -149,7 +150,7 @@ export const initTestMaker = async (
   const makerKeypair = Keypair.generate();
   const merkle = Keypair.generate();
   // Testing -- small tree
-  const space = getConcurrentMerkleTreeAccountSize(3, 8);
+  const space = getConcurrentMerkleTreeAccountSize(3, 8, canopyDepth);
   const name = random(10);
 
   const maker = makerKey(dao, name)[0];
@@ -212,14 +213,8 @@ export const initTestMaker = async (
     maker
   );
 
-  await sendMultipleInstructions(
-    provider,
-    [
-      [createMerkle, initialize],
-      [setTree, approve],
-    ],
-    [[merkle], [makerKeypair]]
-  );
+  await sendInstructions(provider, [createMerkle, initialize], [merkle]);
+  await sendInstructions(provider, [setTree, approve], [makerKeypair]);
 
   return {
     maker: maker!,
@@ -291,7 +286,8 @@ export const initWorld = async (
   epochRewards?: number,
   subDaoEpochRewards?: number,
   registrar?: PublicKey,
-  hntMint?: PublicKey
+  hntMint?: PublicKey,
+  canopyDepth?: number
 ): Promise<{
   dao: {
     mint: PublicKey;
@@ -358,7 +354,8 @@ export const initWorld = async (
     hemProgram,
     provider,
     rewardableEntityConfig.rewardableEntityConfig,
-    dao.dao
+    dao.dao,
+    canopyDepth
   );
 
   return {

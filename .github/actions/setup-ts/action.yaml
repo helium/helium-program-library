@@ -15,8 +15,13 @@ runs:
     - name: Get pnpm store directory
       shell: bash
       run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-    - uses: actions/cache@v4
-      name: Cache pnpm store
+    # Restore and save are split for the same reason as the turbo cache below and the `target/`
+    # cache in build-anchor: only develop and master save, so a lockfile-changing PR does not park a
+    # 600 MB store under its own ref, where no other ref can restore it. The tests.yaml jobs that
+    # skip this action restore the same key, so the store is held once.
+    - uses: actions/cache/restore@v4
+      name: Restore pnpm store
+      id: cache-pnpm-store
       with:
         path: ${{ env.STORE_PATH }}
         key: pnpm-store-${{ runner.os }}-${{ hashFiles('./pnpm-lock.yaml') }}
@@ -36,6 +41,12 @@ runs:
           turbo-${{ runner.os }}-
     - run: pnpm install --frozen-lockfile
       shell: bash
+    - uses: actions/cache/save@v4
+      name: Save pnpm store
+      if: steps.cache-pnpm-store.outputs.cache-hit != 'true' && (github.ref_name == 'develop' || github.ref_name == 'master')
+      with:
+        path: ${{ env.STORE_PATH }}
+        key: pnpm-store-${{ runner.os }}-${{ hashFiles('./pnpm-lock.yaml') }}
     - name: Build packages (skip apps that need runtime env vars)
       run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
       shell: bash

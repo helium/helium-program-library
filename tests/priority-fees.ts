@@ -542,9 +542,10 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
     });
     return { connection, wallet: { publicKey: feePayer } } as any;
   };
-  // Enough unique transfers to overflow one tx and force reuse on later txs.
+  // Enough unique transfers to overflow one tx under both v0 (1232 bytes) and
+  // v1 (64 accounts) and force reuse on later txs.
   const manyTransfers = () =>
-    Array.from({ length: 60 }, () =>
+    Array.from({ length: 200 }, () =>
       SystemProgram.transfer({
         fromPubkey: feePayer,
         toPubkey: Keypair.generate().publicKey,
@@ -565,7 +566,8 @@ describe("batchInstructionsToTxsWithPriorityFee", () => {
     const txs = await batchInstructionsToTxsWithPriorityFee(
       provider,
       manyTransfers(),
-      { useFirstEstimateForAll: true }
+      // A keypair fee payer, so the first tx gets a sim-derived limit.
+      { useFirstEstimateForAll: true, signing: { feePayer: "keypair" } }
     );
     expect(txs.length).to.be.greaterThan(2);
     // First tx keeps its own sim-derived limit; every later tx — including the

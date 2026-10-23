@@ -1,5 +1,5 @@
-import { Idl, IdlAccounts } from "@coral-xyz/anchor";
-import { AllAccountsMap } from "@coral-xyz/anchor/dist/cjs/program/namespace/types";
+import { Idl, IdlAccounts } from "@anchor-lang/core";
+import { AllAccountsMap } from "@anchor-lang/core/dist/cjs/program/namespace/types";
 import { UseAccountState, useAccount } from "@helium/account-fetch-cache-hooks";
 import { PublicKey } from "@solana/web3.js";
 import { useIdl } from "./useIdl";

@@ -11,19 +11,13 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { canonical } from "./idl-account.mjs";
+
 /** Entity kinds whose shape *is* a type. A difference here is a changed type. */
 const TYPE_KINDS = new Set(["arg", "field", "type", "variant"]);
 
-const canonical = (value) => {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${key}:${canonical(value[key])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
-};
+/** A key-order-free string for a shape; an absent value reads as "null". */
+const shapeOf = (value) => JSON.stringify(canonical(value)) ?? "null";
 
 const withoutKeys = (value, keys) =>
   Object.fromEntries(
@@ -38,7 +32,7 @@ const withoutKeys = (value, keys) =>
 const entities = (idl) => {
   const found = new Map();
   const add = (kind, name, shape, docs) =>
-    found.set(name, { kind, shape: canonical(shape), docs: canonical(docs) });
+    found.set(name, { kind, shape: shapeOf(shape), docs: shapeOf(docs) });
 
   // `metadata.version` tracks the crate version, not the interface: a version
   // bump alone must not read as an IDL difference.
@@ -139,7 +133,8 @@ const entities = (idl) => {
  *   account flags, discriminators).
  */
 export const idlDiff = (base, head) => {
-  const before = entities(base ?? {});
+  // A new program has no base entities, so every head entity is an addition.
+  const before = base == null ? new Map() : entities(base);
   const after = entities(head);
 
   const added = [];
@@ -225,8 +220,9 @@ export const combinedIdlsLevel = (levels) => {
 };
 
 /**
- * The whole answer the changeset bot and the backstop need: a level hint per
- * changed program, and the one `@helium/idls` level that covers them all.
+ * The whole answer the backstop needs, and the changeset bot that part 2 adds
+ * later will need: a level hint per changed program, and the one `@helium/idls`
+ * level that covers them all.
  *
  * @param {{ programs: string[], readIdl: (program: string, side: "base" | "head") => object | null }} input
  *   `readIdl` returns null for a base that does not exist, which marks a new

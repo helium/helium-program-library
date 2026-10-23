@@ -95,8 +95,8 @@ test("a changed arg type is a changed type: minor plus the breaking flag", () =>
     {
       kind: "arg",
       name: "instruction initialize_account_windowed_breaker_v0 arg window_size_seconds",
-      from: '{index:0,type:"u64"}',
-      to: '{index:0,type:"i64"}',
+      from: '{"index":0,"type":"u64"}',
+      to: '{"index":0,"type":"i64"}',
     },
   ]);
   assert.deepEqual(diff.added, []);
@@ -139,13 +139,28 @@ test("a program with no base IDL is new: every entity is an addition", () => {
   const diff = idlDiff(null, fixture());
 
   assert.deepEqual(diff.removed, []);
-  assert.equal(
-    diff.added.some(
-      ({ name }) => name === "instruction burn_v0" || name === "address",
-    ),
-    true,
-  );
+  assert.deepEqual(diff.changed, []);
+  assert.deepEqual(diff.other, []);
+  const added = diff.added.map(({ name }) => name);
+  assert.equal(added.includes("instruction burn_v0"), true);
+  assert.equal(added.includes("address"), true);
+  assert.equal(added.includes("metadata"), true);
   assert.deepEqual(idlsLevel(diff), { level: "minor", breaking: false });
+  assert.equal(programLevel(diff), "minor");
+});
+
+test("a new account is a minor program level", () => {
+  const head = fixture();
+  head.accounts.push({
+    name: "NewAccountV0",
+    discriminator: [8, 8, 8, 8, 8, 8, 8, 8],
+  });
+
+  const diff = idlDiff(fixture(), head);
+
+  assert.deepEqual(diff.added, [
+    { kind: "account", name: "account NewAccountV0" },
+  ]);
   assert.equal(programLevel(diff), "minor");
 });
 
@@ -207,6 +222,23 @@ test("diffPrograms answers for every program asked, and names @helium/idls once"
   assert.deepEqual(result.programs[0].diff.added, [
     { kind: "instruction", name: "instruction remove_mint_authority_v0" },
   ]);
+});
+
+test("a field type with its keys in another order is no difference", () => {
+  const withType = (type) => {
+    const idl = fixture();
+    idl.types
+      .find((t) => t.name === "AccountWindowedCircuitBreakerV0")
+      .type.fields.find((f) => f.name === "authority").type = type;
+    return idl;
+  };
+  const base = withType({ defined: { name: "ThresholdType", generics: [] } });
+  const head = withType({ defined: { generics: [], name: "ThresholdType" } });
+
+  const diff = idlDiff(base, head);
+
+  assert.deepEqual(diff.changed, []);
+  assert.equal(idlsLevel(diff), null);
 });
 
 test("reordered struct fields and instruction args are changed types", () => {

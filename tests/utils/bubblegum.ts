@@ -1,4 +1,4 @@
-import { convertIdlToCamelCase } from "@coral-xyz/anchor/dist/cjs/idl";
+import { convertIdlToCamelCase } from "@anchor-lang/core/dist/cjs/idl";
 
 /**
  * Program IDL in camelCase format in order to be used in JS/TS.

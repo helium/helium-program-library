@@ -4,17 +4,16 @@ use anchor_spl::{
   token::{Mint, Token, TokenAccount},
 };
 use helium_sub_daos::DaoV0;
-use shared_utils::try_from;
 use tuktuk_program::{
   tuktuk::{
     self,
     cpi::{accounts::DequeueTaskV0, dequeue_task_v0},
     program::Tuktuk,
   },
-  TaskQueueAuthorityV0, TaskV0,
+  TaskQueueAuthorityV0,
 };
 
-use crate::{auto_top_off_seeds, queue_authority_seeds, state::*};
+use crate::{auto_top_off_seeds, queue_authority_seeds, rent_refund_account, state::*, task_names};
 
 #[derive(Accounts)]
 pub struct CloseAutoTopOffV0<'info> {
@@ -91,7 +90,7 @@ pub struct CloseAutoTopOffV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
+pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, CloseAutoTopOffV0<'info>>) -> Result<()> {
   let auto_top_off = ctx.accounts.auto_top_off.load()?;
   let queue_authority_bump = auto_top_off.queue_authority_bump;
   let remaining_hnt_balance = ctx.accounts.hnt_account.amount;
@@ -102,22 +101,28 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
     &[auto_top_off_seeds!(delegated_data_credits, authority, bump)];
   drop(auto_top_off);
   let queue_authority_seeds: &[&[&[u8]]] = &[queue_authority_seeds!(queue_authority_bump)];
+  let rent_refund_candidates = [
+    ctx.accounts.authority.to_account_info(),
+    ctx.accounts.rent_refund.to_account_info(),
+    ctx.accounts.task_queue.to_account_info(),
+  ];
   if !ctx.accounts.next_task.data_is_empty()
     && ctx.accounts.next_task.key() != ctx.accounts.auto_top_off.key()
+    && task_names(&ctx.accounts.next_task, &ctx.accounts.auto_top_off.key())?
   {
-    let next_task = try_from!(Account<TaskV0>, ctx.accounts.next_task)?;
     // Dequeue DC topoff task
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_task,
+      &rent_refund_candidates,
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: if next_task.rent_refund == ctx.accounts.rent_refund.key() {
-          ctx.accounts.rent_refund.to_account_info()
-        } else {
-          ctx.accounts.task_queue.to_account_info()
-        },
+        rent_refund,
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       queue_authority_seeds,
@@ -126,19 +131,23 @@ pub fn handler(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
   // Dequeue HNT topoff task
   if !ctx.accounts.next_hnt_task.data_is_empty()
     && ctx.accounts.next_hnt_task.key() != ctx.accounts.auto_top_off.key()
+    && task_names(
+      &ctx.accounts.next_hnt_task,
+      &ctx.accounts.auto_top_off.key(),
+    )?
   {
-    let next_hnt_task = try_from!(Account<TaskV0>, ctx.accounts.next_hnt_task)?;
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_hnt_task,
+      &rent_refund_candidates,
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_hnt_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: if next_hnt_task.rent_refund == ctx.accounts.rent_refund.key() {
-          ctx.accounts.rent_refund.to_account_info()
-        } else {
-          ctx.accounts.task_queue.to_account_info()
-        },
+        rent_refund,
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       queue_authority_seeds,

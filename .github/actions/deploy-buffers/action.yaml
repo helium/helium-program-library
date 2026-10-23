@@ -1,11 +1,13 @@
 # Writes the buffers `plan-deploy` asked for. It holds the deployer key and runs only the
 # Solana and Anchor CLIs, so no workspace JavaScript runs next to the key.
-# IDL buffers have no reuse. Each run writes a new one.
+# A vault-owned IDL buffer that holds the build IDL is reused. Otherwise the run writes a new
+# one, and the deployer key keeps it until the caller runs `set-idl-buffer-authority` right
+# before the proposal.
 #
 # The caller runs `plan-deploy` first and skips this action on its `skip`. The caller
 # installs the Solana and Anchor CLIs first (`setup-anchor` does it).
 name: "Deploy Buffers"
-description: "Writes or reuses the program buffer and writes the IDL buffer"
+description: "Writes or reuses the program buffer and the IDL buffer"
 inputs:
   network:
     description: "Solana RPC URL"
@@ -20,19 +22,19 @@ inputs:
     description: "The keypair to use for buffer creation"
     required: true
   buffer-authority:
-    description: "The Squads vault. It receives the buffer authorities"
+    description: "The Squads vault. It receives the program buffer and program IDL authorities"
     required: true
   reused-buffer:
-    description: "The vault buffer `plan-deploy` found. Empty writes a new program buffer."
+    description: "The vault buffer `plan-deploy` found. Empty looks again, then writes a new program buffer."
     required: false
     default: ""
 
 outputs:
   buffer:
     description: "The program buffer address, reused or new"
-    value: ${{ inputs.reused-buffer || steps.write-program-buffer.outputs.buffer }}
+    value: ${{ inputs.reused-buffer || steps.find-vault-buffer.outputs.buffer || steps.write-program-buffer.outputs.buffer }}
   idl-buffer:
-    description: "The idl buffer address"
+    description: "The idl buffer address, reused or new"
     value: ${{ steps.write-idl-buffer.outputs.idl-buffer }}
 
 runs:
@@ -77,10 +79,63 @@ runs:
         AUTHORITY: ${{ inputs.buffer-authority }}
         NETWORK: ${{ inputs.network }}
 
+    # In the mainnet release, "Re-run failed jobs" keeps the plan job's old empty
+    # `reused-buffer` output. Look again, so a buffer an earlier attempt handed to the vault is
+    # reused, not paid for twice. The lookup runs only the Solana CLI.
+    - uses: ./.github/actions/find-vault-buffer/
+      id: find-vault-buffer
+      if: inputs.reused-buffer == ''
+      with:
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        buffer-authority: ${{ inputs.buffer-authority }}
+
+    # The program buffer is written before `write-idl-buffer` runs, so a missing IDL account
+    # stops the run here, before it pays for a program buffer.
+    - name: Require the IDL account
+      shell: bash
+      run: |
+        if ! anchor idl fetch "$PROGRAM_ID" --provider.cluster "$NETWORK" > /dev/null 2>&1; then
+          echo "::error title=$PROGRAM has no IDL account on the target cluster::anchor idl fetch failed for $PROGRAM_ID. The Squads step upgrades an IDL account that exists. Run anchor idl init once, then re-run."
+          exit 1
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+
+    # `write-idl-buffer` checks the program IDL authority too, but after the program buffer is
+    # written. A wrong authority stops the run here, before it pays for a program buffer.
+    - name: Require a program IDL authority this run can use
+      uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        shell: bash
+        command: |
+          set -euo pipefail
+          KEYPAIR_FILE=$(mktemp ./deploy-keypair.XXXXXX.json)
+          trap 'rm -f "$KEYPAIR_FILE"' EXIT
+          chmod 600 "$KEYPAIR_FILE"
+          echo "$DEPLOY_KEYPAIR" > "$KEYPAIR_FILE"
+          CURRENT=$(anchor idl authority "$PROGRAM_ID" --provider.cluster "$NETWORK")
+          DEPLOYER=$(solana-keygen pubkey "$KEYPAIR_FILE")
+          if ! grep -qF "$AUTHORITY" <<<"$CURRENT" && ! grep -qF "$DEPLOYER" <<<"$CURRENT"; then
+            echo "::error title=$PROGRAM IDL authority::The program IDL authority is not the vault or the deployer key: $CURRENT"
+            exit 1
+          fi
+          echo "Program IDL authority: $CURRENT"
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        AUTHORITY: ${{ inputs.buffer-authority }}
+        DEPLOY_KEYPAIR: ${{ inputs.keypair }}
+
     # On a failure before the authority transfer, this action closes the buffer it made.
     - uses: ./.github/actions/write-program-buffer/
       id: write-program-buffer
-      if: inputs.reused-buffer == ''
+      if: inputs.reused-buffer == '' && steps.find-vault-buffer.outputs.buffer == ''
       with:
         network: ${{ inputs.network }}
         program: ${{ inputs.program }}
@@ -88,8 +143,19 @@ runs:
         program-id: ${{ inputs.program-id }}
         buffer-authority: ${{ inputs.buffer-authority }}
 
-    # The IDL buffer goes after the program buffer: once the vault owns it, only a multisig
-    # proposal can close it, so a failed program buffer write must not leave one behind.
+    # "Re-run all jobs" after a failed Squads step finds the IDL buffer the vault took in the
+    # failed attempt, so it is reused, not left stranded. The lookup runs only the Solana and
+    # Anchor CLIs.
+    - uses: ./.github/actions/find-vault-idl-buffer/
+      id: find-vault-idl-buffer
+      with:
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        program-id: ${{ inputs.program-id }}
+        buffer-authority: ${{ inputs.buffer-authority }}
+
+    # The IDL buffer goes after the program buffer, so a failed program buffer write leaves no
+    # IDL buffer for the sweep to close.
     - uses: ./.github/actions/write-idl-buffer/
       id: write-idl-buffer
       with:
@@ -98,6 +164,7 @@ runs:
         keypair: ${{ inputs.keypair }}
         program-id: ${{ inputs.program-id }}
         buffer-authority: ${{ inputs.buffer-authority }}
+        reused-idl-buffer: ${{ steps.find-vault-idl-buffer.outputs.idl-buffer }}
 
     - name: Summarize the new buffer
       if: steps.write-program-buffer.outputs.buffer != ''

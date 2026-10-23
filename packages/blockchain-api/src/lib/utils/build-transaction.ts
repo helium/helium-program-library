@@ -13,9 +13,11 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   populateMissingDraftInfo,
   prependComputeBudgetIxs,
+  resolveTxVersion,
   tableComputeUnitsForInstructions,
   toVersionedTx,
   withPriorityFees,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import BN from "bn.js";
 import { env } from "@/lib/env";
@@ -110,7 +112,7 @@ export async function buildVersionedTransaction({
       computeUnits: tableComputeUnitLimit,
       // The wallet signs this tx and may append guard ixs (Lighthouse) that
       // load more account data than a sim-derived limit allows.
-      deriveLoadedAccountsDataSizeLimit: false,
+      signing: WALLET_SIGNED,
     });
   } catch (error) {
     console.warn(
@@ -132,7 +134,7 @@ export async function buildVersionedTransaction({
 
   let tx: VersionedTransaction;
   try {
-    tx = toVersionedTx(
+    tx = await toVersionedTx(
       await populateMissingDraftInfo(
         connection,
         {
@@ -140,6 +142,10 @@ export async function buildVersionedTransaction({
           addressLookupTables,
           instructions: instructionsWithFees,
           recentBlockhash: (await blockhashPromise).blockhash,
+          // Browser wallets sign these (squads and batched builds included).
+          version: await resolveTxVersion(connection, {
+            signing: WALLET_SIGNED,
+          }),
         },
         "finalized",
       ),

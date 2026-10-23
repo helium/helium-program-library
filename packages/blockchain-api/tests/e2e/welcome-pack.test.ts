@@ -1,4 +1,4 @@
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@anchor-lang/core";
 import { init as initWelcomePack } from "@helium/welcome-pack-sdk";
 import { init as initLd, recipientKey } from "@helium/lazy-distributor-sdk";
 import { init as initMiniFanout } from "@helium/mini-fanout-sdk";

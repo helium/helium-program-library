@@ -30,8 +30,8 @@ runs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-    # Key layout: build-<os>-<anchor version>-<anchor sha>-v0002-<devnet>-<testing>-<program>-<hash of programs/>.
+        key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
+    # Key layout: build-<os>-<anchor version>-<anchor sha>-solana-<cli version>-v0003-<devnet>-<testing>-<program>-<hash of programs/>.
     # The `programs/` hash is last so that everything identifying the build flavour sits in the
     # restore-keys prefix. A PR that touches `programs/**` can never hit the exact key, and with no
     # fallback it paid a cold 14 min build: 24 of 30 runs did. The prefix hands it the newest
@@ -47,9 +47,9 @@ runs:
       with:
         path: |
           ./target/
-        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock') }}
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock', 'Cargo.toml') }}
         restore-keys: |
-          build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-
+          build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-
     # A job that only consumes the build takes it from an artifact the run's own `build` job
     # uploaded, so the `needs: build` legs do not each restore (and on a prefix hit rebuild) the
     # same `target/`.
@@ -61,14 +61,28 @@ runs:
         path: ./target
     # The programs refuse to compile when TESTING is set without HELIUM_TEST_BUILD, so a
     # test build carries both.
+    # cargo-build-sbf defaults to v0 up to the 4.3.0 release and to v3 from 4.3.2. Bankrun cannot
+    # load v3, and the SBPFv3 move belongs to the 4.4 PR, so the arch is pinned here. `anchor build`
+    # hands its cargo args to the IDL's `cargo test` too, which rejects `--arch`, so the SBF build
+    # skips the IDL and `anchor idl build` writes it per program.
     - run: |
-        ARGS=()
-        if [ -n "$PROGRAM" ]; then ARGS+=(-p "$PROGRAM"); fi
-        if [ "$DEVNET" = "true" ]; then ARGS+=(-- --features devnet); fi
+        set -euo pipefail
+        FEATURES=()
+        if [ "$DEVNET" = "true" ]; then FEATURES=(--features devnet); fi
         if [ "$TESTING_BUILD" = "true" ]; then
           export TESTING=true HELIUM_TEST_BUILD=true
         fi
-        ~/.cargo/bin/anchor build "${ARGS[@]}"
+        if [ -n "$PROGRAM" ]; then
+          ~/.cargo/bin/anchor build --no-idl -p "$PROGRAM" -- --arch v0 "${FEATURES[@]}"
+          PROGRAMS=("$PROGRAM")
+        else
+          ~/.cargo/bin/anchor build --no-idl -- --arch v0 "${FEATURES[@]}"
+          mapfile -t PROGRAMS < <(~/.cargo/bin/anchor keys list | cut -d: -f1)
+        fi
+        mkdir -p target/idl target/types
+        for P in "${PROGRAMS[@]}"; do
+          ~/.cargo/bin/anchor idl build -p "$P" -o "target/idl/$P.json" -t "target/types/$P.ts" -- "${FEATURES[@]}"
+        done
       if: inputs.target-artifact == '' && steps.cache-anchor-build.outputs.cache-hit != 'true'
       shell: bash
       env:
@@ -85,4 +99,4 @@ runs:
       with:
         path: |
           ./target/
-        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-v0002-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock') }}
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock', 'Cargo.toml') }}

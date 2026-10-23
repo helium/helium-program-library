@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { entityCreatorKey } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
@@ -147,7 +147,7 @@ const transferCompressedCollectable = async (
   const tree = await ConcurrentMerkleTreeAccount.fromAccountAddress(
     conn,
     merkleTree,
-    "confirmed"
+    "finalized"
   );
 
   const canopyHeight = tree.getCanopyDepth();

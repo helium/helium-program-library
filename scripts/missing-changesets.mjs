@@ -1,17 +1,18 @@
 /**
  * Which changed names the PR's added changesets do not cover, per side.
  *
- * The changeset bot's fixed step. The npm side takes the changed packages
- * (`changed-packages.mjs`) plus `@helium/idls` when the IDL diff names it; the
- * program side takes the changed programs (`changed-programs.mjs`). A name is
- * covered when a changeset the PR adds names it. An empty changeset covers
- * every npm package and no program: it is changesets' own "no release" mark,
- * and programs have `none` instead.
+ * The fixed step of the changeset bot that part 2 adds later. The npm side
+ * takes the changed packages (`changed-packages.mjs`) plus `@helium/idls` when
+ * the IDL diff names it; the program side takes the changed programs
+ * (`changed-programs.mjs`). A name is covered when a changeset the PR adds
+ * names it. An empty changeset covers every npm package and no program: it is
+ * changesets' own "no release" mark, and programs have `none` instead.
  */
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { run } from "./changed-programs.mjs";
 
 const USAGE =
   "Usage: node scripts/missing-changesets.mjs <base> [head] --packages <json> --programs <json> [--idl-diff <json>]";
@@ -19,7 +20,8 @@ const USAGE =
 export const IDLS_PACKAGE = "@helium/idls";
 
 const FRONT_MATTER = /^---\n([\s\S]*?)---\n?([\s\S]*)$/;
-const ENTRY = /^(["']?)([^"':]+)\1:\s*(\w+)\s*$/;
+// One `name: level` front matter line.
+export const ENTRY = /^(["']?)([^"':]+)\1:\s*(\w+)\s*$/;
 const LEVELS = ["major", "minor", "patch", "none"];
 // An npm package name or a program directory name. A name like `__proto__`
 // fails it, so it cannot reach the releases object as a key.
@@ -105,14 +107,8 @@ export const missingChangesets = ({
 
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 
-const run = (command, args) =>
-  execFileSync(command, args, {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
-
 /** The changesets the PR adds under one directory, read from the head tree. */
-const addedChangesets = (base, head, dir) =>
+export const addedChangesets = (base, head, dir) =>
   run("git", [
     "diff",
     "--name-only",

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import axios from "axios";
 import os from "os";
 import yargs from "yargs/yargs";

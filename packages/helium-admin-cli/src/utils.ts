@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { idlAddress } from "@coral-xyz/anchor/dist/cjs/idl";
+import * as anchor from "@anchor-lang/core";
+import { idlAddress } from "@anchor-lang/core/dist/cjs/idl";
 import {
   bulkSendTransactions,
   createAtaAndMintInstructions,
@@ -560,7 +560,7 @@ export async function sendInstructionsOrCreateProposal({
           console.log("Created lookup table since ix too big", lut.toBase58());
           await tx.sign([walletSigner!]);
           const sent = await provider.connection.sendTransaction(tx);
-          await provider.connection.confirmTransaction(sent, "confirmed");
+          await provider.connection.confirmTransaction(sent, "finalized");
           console.log(`Added tx ${idx}`, sent);
 
           await AddressLookupTableProgram.closeLookupTable({
@@ -769,7 +769,7 @@ export async function sendInstructionsOrSquadsV4({
   multisig?: PublicKey;
   addressLookupTableAddresses?: PublicKey[];
 }): Promise<string | undefined> {
-  if (!multisig) {
+  if (!multisigPda) {
     return await sendInstructions(
       provider,
       await withPriorityFees({

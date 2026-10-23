@@ -13,8 +13,9 @@ use tuktuk_program::{
 };
 
 use crate::{
-  errors::ErrorCode, queue_authority_seeds, schedule_impl, schedule_task_v0::ScheduleTaskV0,
-  state::*, MiniFanoutShareArgV0, ScheduleTaskArgsV0, MAX_SHARES,
+  errors::ErrorCode, queue_authority_seeds, rent_refund_account, schedule_impl,
+  schedule_task_v0::ScheduleTaskV0, state::*, task_names, task_runs, MiniFanoutShareArgV0,
+  ScheduleTaskArgsV0, MAX_SHARES,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -68,7 +69,10 @@ pub struct UpdateMiniFanoutV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -> Result<()> {
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, UpdateMiniFanoutV0<'info>>,
+  args: UpdateMiniFanoutArgsV0,
+) -> Result<()> {
   let mini_fanout = &mut ctx.accounts.mini_fanout;
   if let Some(shares) = args.shares {
     require_gte!(shares.len(), 1, ErrorCode::InvalidShares);
@@ -102,32 +106,51 @@ pub fn handler(ctx: Context<UpdateMiniFanoutV0>, args: UpdateMiniFanoutArgsV0) -
     &ctx.accounts.system_program.to_account_info(),
     mini_fanout,
   )?;
-  if !ctx.accounts.next_task.data_is_empty() && ctx.accounts.next_task.key() != mini_fanout.key() {
+  let rent_refund_candidates = [
+    ctx.accounts.task_rent_refund.to_account_info(),
+    ctx.accounts.payer.to_account_info(),
+    ctx.accounts.task_queue.to_account_info(),
+  ];
+  if !ctx.accounts.next_task.data_is_empty()
+    && ctx.accounts.next_task.key() != mini_fanout.key()
+    && task_names(&ctx.accounts.next_task, &mini_fanout.key())?
+  {
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_task,
+      &rent_refund_candidates,
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
+        rent_refund,
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(mini_fanout)],
     ))?;
   }
-  // Only a fanout that queues a pre task ever owned the account in that slot, so only it
-  // may close one. Anything else there belongs to whoever queued it.
+  // Only a fanout that stores a pre task dequeues one, and only a task whose transaction equals
+  // that pre task.
   if mini_fanout.pre_task.is_some()
     && !ctx.accounts.next_pre_task.data_is_empty()
     && ctx.accounts.next_pre_task.key() != mini_fanout.key()
+    && task_runs(&ctx.accounts.next_pre_task, &mini_fanout.pre_task)?
   {
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_pre_task,
+      &rent_refund_candidates,
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_pre_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.task_rent_refund.to_account_info(),
+        rent_refund,
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(mini_fanout)],

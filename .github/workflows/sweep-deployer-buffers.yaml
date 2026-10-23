@@ -1,12 +1,14 @@
 name: Sweep Deployer Buffers
 
 env:
-  SOLANA_CLI_VERSION: 2.1.6
+  SOLANA_CLI_VERSION: 4.3.2
 
 # A release run closes its own program buffer and IDL buffer when it fails or is cancelled
 # before the authority transfer. A runner that dies there runs no close step, and the
-# buffer stays with the deployer key. The reuse scan in `plan-deploy` lists vault buffers
-# only, so no later run sees it. A runner that dies during `anchor idl write-buffer` leaves
+# buffer stays with the deployer key. The mainnet release also keeps its IDL buffer with the
+# deployer key until right before the proposal, so a run that stops earlier (the `wait`
+# skip, a failure in `wait`) leaves it there. The reuse scan in `plan-deploy` lists vault
+# buffers only, so no later run sees it. A runner that dies during `anchor idl write-buffer` leaves
 # an IDL buffer whose address was never printed. This sweep closes every mainnet program
 # buffer (BPF upgradeable loader) and every Anchor IDL buffer the deployer key still owns,
 # and returns the rent to it.
@@ -41,21 +43,31 @@ jobs:
           toml-cli: false
           cache: false
 
-      - name: Stop while a release runs
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          RUNNING=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release-program.yaml --limit 100 --json status --jq '[.[] | select(.status != "completed")] | length')
-          if [ "$RUNNING" -gt 0 ]; then
-            echo "::error::${RUNNING} release runs are not complete. Re-run the sweep after they finish."
-            exit 1
-          fi
-
       - name: Close the deployer's buffers
         env:
+          # The release run list.
+          GH_TOKEN: ${{ github.token }}
           DEPLOY_KEYPAIR: ${{ secrets.DEPLOYER_KEYPAIR }}
           NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
         run: |
+          # A release that starts after the sweep starts writes a buffer the deployer owns, so
+          # the check runs once here and again before each close. Inside the loops stdin is
+          # the buffer list; `gh` must not read it.
+          stop_while_a_release_runs() {
+            local running
+            running=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release-program.yaml --limit 100 --json status --jq '[.[] | select(.status != "completed")] | length' < /dev/null)
+            if [ "$running" -gt 0 ]; then
+              echo "::notice::${running} release runs are not complete. The sweep stops; re-run it after they finish."
+              echo "- ${running} release runs are not complete. The sweep stopped." >> "$GITHUB_STEP_SUMMARY"
+              if [ "${FAILED:-0}" -gt 0 ]; then
+                echo "::error::${FAILED} deployer program or IDL buffers not listed or not closed, see the run summary"
+                exit 1
+              fi
+              exit 0
+            fi
+          }
+          stop_while_a_release_runs
+
           trap 'rm -f ./deploy-keypair.json' EXIT
           echo "$DEPLOY_KEYPAIR" > ./deploy-keypair.json && chmod 600 ./deploy-keypair.json
           DEPLOYER=$(solana-keygen pubkey ./deploy-keypair.json)
@@ -79,6 +91,7 @@ jobs:
           else
             while read -r BUFFER LAMPORTS; do
               SOL=$(awk -v l="$LAMPORTS" 'BEGIN { printf "%.9f", l / 1e9 }')
+              stop_while_a_release_runs
               set +e
               CLOSE_OUT=$(solana program close "$BUFFER" --keypair ./deploy-keypair.json --url "$NETWORK" 2>&1)
               EXIT_CODE=$?
@@ -148,6 +161,7 @@ jobs:
                 echo "- The IDL account \`$BUFFER\` of \`$PROGRAM\` has the deployer as its authority. Not closed." >> "$GITHUB_STEP_SUMMARY"
                 continue
               fi
+              stop_while_a_release_runs
               set +e
               # stdin is the buffer list; the CLI must not read it.
               CLOSE_OUT=$(anchor idl close "$PROGRAM_ID" --idl-address "$BUFFER" --provider.cluster "$NETWORK" --provider.wallet ./deploy-keypair.json < /dev/null 2>&1)

@@ -1,6 +1,6 @@
 import { createAtaAndMint, createMint } from "@helium/spl-utils";
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import { AccountLayout, getAssociatedTokenAddress } from "@solana/spl-token";
 import { ComputeBudgetProgram, Keypair, PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";

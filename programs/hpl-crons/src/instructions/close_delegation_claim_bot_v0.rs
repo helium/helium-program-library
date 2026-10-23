@@ -1,17 +1,16 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, TokenAccount};
 use helium_sub_daos::DelegatedPositionV0;
-use shared_utils::try_from;
 use tuktuk_program::{
   tuktuk::{
     cpi::{accounts::DequeueTaskV0, dequeue_task_v0},
     program::Tuktuk,
   },
-  TaskQueueAuthorityV0, TaskQueueV0, TaskV0,
+  TaskQueueAuthorityV0, TaskQueueV0,
 };
 use voter_stake_registry::state::PositionV0;
 
-use crate::DelegationClaimBotV0;
+use crate::{rent_refund_account, task_names, DelegationClaimBotV0};
 
 #[derive(Accounts)]
 pub struct CloseDelegationClaimBotV0<'info> {
@@ -66,15 +65,23 @@ pub struct CloseDelegationClaimBotV0<'info> {
   pub tuktuk_program: Program<'info, Tuktuk>,
 }
 
-pub fn handler(ctx: Context<CloseDelegationClaimBotV0>) -> Result<()> {
-  if !ctx.accounts.next_task.data_is_empty() {
-    let next_task = ctx.accounts.next_task.to_account_info();
-    let task = try_from!(Account<TaskV0>, next_task)?;
-    let rent_refund_acc = if task.rent_refund == ctx.accounts.task_queue.key() {
-      ctx.accounts.task_queue.to_account_info()
-    } else {
-      ctx.accounts.rent_refund.to_account_info()
-    };
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, CloseDelegationClaimBotV0<'info>>,
+) -> Result<()> {
+  if !ctx.accounts.next_task.data_is_empty()
+    && task_names(
+      &ctx.accounts.next_task,
+      &ctx.accounts.delegation_claim_bot.key(),
+    )?
+  {
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_task,
+      &[
+        ctx.accounts.rent_refund.to_account_info(),
+        ctx.accounts.task_queue.to_account_info(),
+      ],
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
@@ -82,7 +89,7 @@ pub fn handler(ctx: Context<CloseDelegationClaimBotV0>) -> Result<()> {
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: rent_refund_acc,
+        rent_refund,
       },
       &[&["queue_authority".as_bytes(), &[ctx.bumps.queue_authority]]],
     ))?;

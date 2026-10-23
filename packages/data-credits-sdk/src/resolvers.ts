@@ -1,7 +1,7 @@
 import { ataResolver, combineResolvers } from "@helium/anchor-resolvers";
 import { heliumSubDaosResolvers } from "@helium/helium-sub-daos-sdk";
 import { resolveIndividual } from "@helium/anchor-resolvers";
-import { AnchorProvider } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@anchor-lang/core";
 import { circuitBreakerResolvers } from "@helium/circuit-breaker-sdk";
 import { HNT_PYTH_PRICE_FEED } from "@helium/spl-utils";
 import { delegatedDataCreditsKey } from "./pdas";

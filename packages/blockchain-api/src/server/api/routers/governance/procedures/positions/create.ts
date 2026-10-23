@@ -58,6 +58,7 @@ import {
   buildBatchedTransactions,
   getAutomationRentLamports,
   getMissingEpochInfoRentLamports,
+  getCurrentSeasonEnd,
   DELEGATED_POSITION_SPACE,
   DELEGATION_CLAIM_TASK_SPACE,
   POSITION_SPACE,
@@ -198,10 +199,15 @@ export const create = publicProcedure.governance.createPosition.handler(
       const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
       const endTs = new BN(currTs + lockupPeriodsInDays * SECS_PER_DAY);
 
-      const expirationTs =
-        [...(proxyConfig.seasons || [])]
-          .reverse()
-          .find((season) => new BN(currTs).gte(season.start))?.end || endTs;
+      const expirationTs = getCurrentSeasonEnd(
+        proxyConfig.seasons || [],
+        new BN(currTs),
+      );
+      if (!expirationTs) {
+        throw errors.BAD_REQUEST({
+          message: "No valid expiration timestamp found",
+        });
+      }
 
       const [subDaoEpochInfo] = subDaoEpochInfoKey(delegateSubDaoK, currTs);
       const [endSubDaoEpochInfoKey] = subDaoEpochInfoKey(

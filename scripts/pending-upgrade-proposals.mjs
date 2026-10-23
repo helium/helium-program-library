@@ -35,9 +35,11 @@ const IDL_IX_TAG = Buffer.from([
 ]);
 // The IDL instruction variant byte after the tag. Account 2 is SetBuffer's
 // authority and Close's sol_destination.
+const IDL_CREATE = 0;
 const IDL_SET_BUFFER = 3;
 const IDL_SET_AUTHORITY = 4;
 const IDL_CLOSE = 5;
+const IDL_RESIZE = 6;
 // The `getMultipleAccounts` limit.
 const BATCH = 100;
 
@@ -71,7 +73,22 @@ const upgradeBuffer = (message, programId, multisigPda, spill) => {
     new PublicKey(BPF_LOADER_UPGRADEABLE),
   )[0].toBase58();
   const vault = multisig.getVaultPda({ multisigPda, index: 0 })[0].toBase58();
-  const isExactIdl = (ix) => {
+  const setBufferAt = message.instructions.findIndex(
+    (ix) =>
+      key(ix.programIdIndex) === programId.toBase58() &&
+      IDL_IX_TAG.equals(Buffer.from(ix.data).subarray(0, 8)) &&
+      Buffer.from(ix.data)[8] === IDL_SET_BUFFER,
+  );
+  const setBuffer =
+    setBufferAt === -1 ? undefined : message.instructions[setBufferAt];
+  // A Close or Resize only prepares the IDL account the SetBuffer then sets:
+  // the same account, before the SetBuffer. Without a SetBuffer it matches
+  // nothing this workflow writes.
+  const preparesSetBuffer = (ix, at) =>
+    setBuffer !== undefined &&
+    at < setBufferAt &&
+    key(ix.accountIndexes[0]) === key(setBuffer.accountIndexes[1]);
+  const isExactIdl = (ix, at) => {
     const data = Buffer.from(ix.data);
     if (
       key(ix.programIdIndex) !== programId.toBase58() ||
@@ -81,25 +98,29 @@ const upgradeBuffer = (message, programId, multisigPda, spill) => {
     }
     const variant = data[8];
     if (variant === IDL_SET_AUTHORITY) return false;
-    if (variant === IDL_SET_BUFFER || variant === IDL_CLOSE) {
-      return key(ix.accountIndexes[2]) === vault;
+    if (variant === IDL_SET_BUFFER) return key(ix.accountIndexes[2]) === vault;
+    if (variant === IDL_CLOSE) {
+      return key(ix.accountIndexes[2]) === vault && preparesSetBuffer(ix, at);
     }
-    return true;
+    if (variant === IDL_RESIZE) return preparesSetBuffer(ix, at);
+    // Create's account 1 is the IDL account it creates for the SetBuffer.
+    if (variant === IDL_CREATE) {
+      return (
+        setBuffer !== undefined &&
+        at < setBufferAt &&
+        key(ix.accountIndexes[1]) === key(setBuffer.accountIndexes[1])
+      );
+    }
+    return false;
   };
   const exact = message.instructions.every(
-    (ix) =>
+    (ix, at) =>
       (isUpgrade(ix) &&
         key(ix.accountIndexes[0]) === programData &&
         key(ix.accountIndexes[2]) === buffer &&
         key(ix.accountIndexes[3]) === spill.toBase58() &&
         key(ix.accountIndexes[6]) === vault) ||
-      isExactIdl(ix),
-  );
-  const setBuffer = message.instructions.find(
-    (ix) =>
-      key(ix.programIdIndex) === programId.toBase58() &&
-      IDL_IX_TAG.equals(Buffer.from(ix.data).subarray(0, 8)) &&
-      Buffer.from(ix.data)[8] === IDL_SET_BUFFER,
+      isExactIdl(ix, at),
   );
   const idlBuffer = setBuffer
     ? (key(setBuffer.accountIndexes[0]) ?? null)

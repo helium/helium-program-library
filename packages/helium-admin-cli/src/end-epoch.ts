@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import * as client from "@helium/distributor-oracle";
 import {
   init as initHem,
@@ -334,7 +334,7 @@ export async function run(args: any = process.argv) {
           provider.connection,
           Buffer.from(signed.serialize()),
           { skipPreflight: true },
-          "confirmed"
+          "finalized"
         );
       } catch (err: any) {
         errors.push(`Failed to distribute iot op funds: ${err}`);
@@ -413,7 +413,7 @@ export async function run(args: any = process.argv) {
             provider.connection,
             Buffer.from(signed.serialize()),
             { skipPreflight: true },
-            "confirmed"
+            "finalized"
           );
         } catch (err: any) {
           errors.push(
