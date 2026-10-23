@@ -13,9 +13,10 @@ permissions:
   contents: read
 
 # In this workflow the deployer key reaches `buffers` and `propose` only, and neither installs
-# the workspace. The key is a `mainnet-deploy` environment secret: only a job that names that
-# environment, on a `program-*` tag or master, can read it. The sweep workflow holds it too.
-# `@sqds/multisig` runs in `plan` and `wait`, which hold no key and no write token.
+# the workspace. The key must exist only as a `mainnet-deploy` environment secret, never as a
+# repository secret: the environment admits `program-*` tags and master, so only those runs of
+# a job that names it can read the key. The sweep workflow holds it too. `@sqds/multisig` runs
+# in `plan` and `wait`, which name no environment and hold no key and no write token.
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -184,7 +185,6 @@ jobs:
   plan:
     needs: [build, release]
     runs-on: ubuntu-latest
-    environment: mainnet-deploy
     permissions:
       contents: read
     timeout-minutes: 30
@@ -294,7 +294,6 @@ jobs:
   wait:
     needs: [build, buffers]
     runs-on: ubuntu-latest
-    environment: mainnet-deploy
     # Turnstyle lists this workflow's runs.
     permissions:
       contents: read
