@@ -1,4 +1,4 @@
-import { BN } from "@coral-xyz/anchor";
+import { BN } from "@anchor-lang/core";
 import { TASK_QUEUE, useTaskQueue } from "@helium/automation-hooks";
 import {
   daoKey,
@@ -180,10 +180,18 @@ export const useCreatePosition = ({
           );
           const currTs = Number(unixTime) + registrarAcc.timeOffset.toNumber();
           const endTs = new BN(currTs + lockupPeriodsInDays * SECS_PER_DAY);
-          const expirationTs =
-            [...(proxyConfig.seasons || [])]
-              .reverse()
-              .find((season) => new BN(currTs).gte(season.start))?.end || endTs;
+          // delegate_v0 unwraps the current season, so refuse to build
+          // without one.
+          const expirationTs = [...(proxyConfig.seasons || [])]
+            .reverse()
+            .find(
+              (season) =>
+                new BN(currTs).gte(season.start) &&
+                new BN(currTs).lt(season.end)
+            )?.end;
+          if (!expirationTs) {
+            throw new Error("No current season");
+          }
 
           const [subDaoEpochInfo] = subDaoEpochInfoKey(subDao.pubkey, currTs);
           const [endSubDaoEpochInfoKey] = subDaoEpochInfoKey(

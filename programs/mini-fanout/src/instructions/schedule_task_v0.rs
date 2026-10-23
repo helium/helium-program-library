@@ -4,6 +4,7 @@ use anchor_lang::{prelude::*, InstructionData};
 use anchor_spl::token::spl_token;
 use chrono::{DateTime, Utc};
 use clockwork_cron::Schedule;
+use shared_utils::try_from;
 use tuktuk_program::{
   tuktuk::{
     self,
@@ -11,11 +12,12 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::{QueueTaskArgsV0, TransactionSourceV0, TriggerV0},
-  CompiledTransactionV0, TaskQueueAuthorityV0,
+  CompiledTransactionV0, TaskQueueAuthorityV0, TaskV0,
 };
 
 use crate::{
-  distribute_v0::__client_accounts_distribute_v0::DistributeV0, queue_authority_seeds, state::*,
+  distribute_v0::__client_accounts_distribute_v0::DistributeV0, errors::ErrorCode,
+  queue_authority_seeds, state::*,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -75,6 +77,51 @@ pub struct ScheduleTaskV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
+/// The largest task account these instructions decode.
+const MAX_TASK_LEN: usize = 2048;
+
+/// True when `task` holds a compiled transaction whose accounts include `key`.
+/// False for a task larger than `MAX_TASK_LEN`, which is not decoded.
+pub fn task_names(task: &AccountInfo, key: &Pubkey) -> Result<bool> {
+  if task.data_len() > MAX_TASK_LEN {
+    return Ok(false);
+  }
+  let task = try_from!(Account<TaskV0>, task)?;
+  Ok(matches!(
+    &task.transaction,
+    TransactionSourceV0::CompiledV0(transaction) if transaction.accounts.contains(key)
+  ))
+}
+
+/// True when the transaction of `task` equals `pre_task`, the pre task the fanout stores.
+/// False for a task larger than `MAX_TASK_LEN`, which is not decoded.
+pub fn task_runs(task: &AccountInfo, pre_task: &Option<TransactionSourceV0>) -> Result<bool> {
+  if task.data_len() > MAX_TASK_LEN {
+    return Ok(false);
+  }
+  let task = try_from!(Account<TaskV0>, task)?;
+  Ok(Some(&task.transaction).try_to_vec()? == pre_task.try_to_vec()?)
+}
+
+/// The account that `task` names as its rent refund: one of `candidates`, or a writable account
+/// in `remaining_accounts`.
+pub fn rent_refund_account<'info>(
+  task: &AccountInfo,
+  candidates: &[AccountInfo<'info>],
+  remaining_accounts: &[AccountInfo<'info>],
+) -> Result<AccountInfo<'info>> {
+  let rent_refund = try_from!(Account<TaskV0>, task)?.rent_refund;
+  if let Some(account) = candidates.iter().find(|a| a.key() == rent_refund) {
+    return Ok(account.clone());
+  }
+  let account = remaining_accounts
+    .iter()
+    .find(|a| a.key() == rent_refund)
+    .ok_or(ErrorCode::RentRefundAccountMissing)?;
+  require!(account.is_writable, ErrorCode::RentRefundAccountNotWritable);
+  Ok(account.clone())
+}
+
 pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransactionV0> {
   // Construct the transaction to call distributeV0 on this program
   let mut distribute_accounts = DistributeV0 {
@@ -113,18 +160,23 @@ pub fn get_task_ix(mini_fanout: &Account<MiniFanoutV0>) -> Result<CompiledTransa
 }
 
 pub fn get_next_time(mini_fanout: &MiniFanoutV0) -> Result<i64> {
-  let schedule = Schedule::from_str(&mini_fanout.schedule)
-    .map_err(|_| crate::errors::ErrorCode::InvalidDataIncrease)?;
-  let ts = Clock::get().unwrap().unix_timestamp;
+  next_time_after(&mini_fanout.schedule, Clock::get()?.unix_timestamp)
+}
+
+/// The first time of `schedule` after the unix timestamp `ts`.
+fn next_time_after(schedule: &str, ts: i64) -> Result<i64> {
+  let schedule = Schedule::from_str(schedule).map_err(|_| ErrorCode::InvalidSchedule)?;
   let now = &DateTime::<Utc>::from_naive_utc_and_offset(
-    DateTime::from_timestamp(ts, 0).unwrap().naive_utc(),
+    DateTime::from_timestamp(ts, 0)
+      .ok_or(ErrorCode::InvalidSchedule)?
+      .naive_utc(),
     Utc,
   );
   Ok(
     schedule
       .after(now)
       .next()
-      .ok_or(crate::errors::ErrorCode::InvalidDataIncrease)?
+      .ok_or(ErrorCode::InvalidSchedule)?
       .timestamp(),
   )
 }
@@ -203,4 +255,29 @@ pub fn schedule_impl(ctx: &mut ScheduleTaskV0, args: ScheduleTaskArgsV0) -> Resu
 pub fn handler(ctx: Context<ScheduleTaskV0>, args: ScheduleTaskArgsV0) -> Result<()> {
   let ctx = ctx.accounts;
   schedule_impl(ctx, args)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // 2023-11-14, after the only time of the schedule below.
+  const TS: i64 = 1_700_000_000;
+
+  #[test]
+  fn next_time_after_returns_the_next_time_of_the_schedule() {
+    assert_eq!(next_time_after("0 0 * * * *", TS).unwrap(), 1_700_002_800);
+  }
+
+  #[test]
+  fn next_time_after_rejects_a_schedule_with_no_future_time() {
+    let err = next_time_after("0 0 0 1 1 * 2000", TS).unwrap_err();
+    assert_eq!(err, ErrorCode::InvalidSchedule.into());
+  }
+
+  #[test]
+  fn next_time_after_rejects_a_schedule_that_does_not_parse() {
+    let err = next_time_after("not a schedule", TS).unwrap_err();
+    assert_eq!(err, ErrorCode::InvalidSchedule.into());
+  }
 }

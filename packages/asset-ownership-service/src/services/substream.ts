@@ -81,6 +81,8 @@ export const setupSubstream = async (
 
   let isConnecting = false;
   let currentAttemptCount = 0;
+  let failedBlock: number | undefined;
+  let failedBlockCount = 0;
   let staleAttemptCount = 0;
   let reconnectTimeoutId: NodeJS.Timeout | null = null;
   let shouldRestart = false;
@@ -339,16 +341,15 @@ export const setupSubstream = async (
                   console.log("Trees updated");
                   shouldRestart = true;
                   restartCursor = cursor;
-                  await cursorManager.updateCursor({
-                    cursor,
-                    block: block?.toString() || "unknown",
-                    force: true,
-                  });
                 }
               }
 
               await dbTx.commit();
               server.customMetrics.blocksProcessedCounter.inc();
+              if (block === failedBlock) {
+                failedBlock = undefined;
+                failedBlockCount = 0;
+              }
             } catch (err) {
               await dbTx.rollback();
               server.customMetrics.transactionFailureCounter.inc();
@@ -356,6 +357,17 @@ export const setupSubstream = async (
                 `Failed to process block ${block}, rolled back:`,
                 err
               );
+              // Rethrow so this block's cursor is never recorded; reconnect
+              // resumes from the last committed block and retries it.
+              shouldRestart = false;
+              restartCursor = undefined;
+              if (block === failedBlock) {
+                failedBlockCount++;
+              } else {
+                failedBlock = block;
+                failedBlockCount = 1;
+              }
+              throw err;
             }
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             outputTransactions = null as any;
@@ -461,12 +473,22 @@ export const setupSubstream = async (
         return;
       }
 
-      handleReconnect(currentAttemptCount + 1);
+      // currentAttemptCount resets on the first block of every connect, so a
+      // block that always fails needs its own backoff.
+      let blockRetryDelay: number | undefined;
+      if (failedBlockCount > 0) {
+        blockRetryDelay = Math.min(60_000, 2000 * 2 ** (failedBlockCount - 1));
+        console.log(
+          `Retrying failed block ${failedBlock} (failure ${failedBlockCount}) in ${blockRetryDelay}ms`
+        );
+      }
+      handleReconnect(currentAttemptCount + 1, blockRetryDelay);
     }
   };
 
   const handleReconnect = async (
-    nextAttempt: number = currentAttemptCount + 1
+    nextAttempt: number = currentAttemptCount + 1,
+    minDelay = 0
   ) => {
     if (reconnectTimeoutId) {
       clearTimeout(reconnectTimeoutId);
@@ -474,7 +496,11 @@ export const setupSubstream = async (
 
     const baseDelay = 1000;
     const MIN_DELAY = 2000;
-    const delay = Math.max(MIN_DELAY, baseDelay * Math.pow(2, nextAttempt - 1));
+    const computedDelay = Math.max(
+      MIN_DELAY,
+      baseDelay * Math.pow(2, nextAttempt - 1)
+    );
+    const delay = Math.max(computedDelay, minDelay);
 
     reconnectTimeoutId = setTimeout(() => {
       reconnectTimeoutId = null;

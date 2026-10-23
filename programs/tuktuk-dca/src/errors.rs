@@ -31,4 +31,10 @@ pub enum ErrorCode {
 
   #[msg("The run must supply the task the next order is queued into")]
   MissingNextTask,
+
+  #[msg("The rent refund of the task is not an account of the instruction")]
+  RentRefundAccountMissing,
+
+  #[msg("The rent refund of the task is not writable")]
+  RentRefundAccountNotWritable,
 }

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { ThresholdType } from "@helium/circuit-breaker-sdk";
 import {
   init as initHem,

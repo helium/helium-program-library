@@ -17,3 +17,7 @@ export const MOBILE_MINT = process.env.MOBILE_MINT
 export const IOT_MINT = process.env.IOT_MINT
   ? new PublicKey(process.env.IOT_MINT)
   : new PublicKey("iotEVVZLEywoTn1QdwNPddxPWszn3zFhEot3MfL9fns");
+// Devnet deploys tuktuk-dca at a different id from mainnet. Unset uses the SDK default.
+export const TUKTUK_DCA_PROGRAM_ID = process.env.TUKTUK_DCA_PROGRAM_ID
+  ? new PublicKey(process.env.TUKTUK_DCA_PROGRAM_ID)
+  : undefined;

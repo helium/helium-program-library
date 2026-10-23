@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { AccountFetchCache } from "@helium/account-fetch-cache";
 import { init as initNftProxy } from "@helium/nft-proxy-sdk";
 import {
@@ -47,7 +47,7 @@ async function getSolanaUnixTimestamp(
     const conn = provider.connection;
     new AccountFetchCache({
       connection: conn,
-      commitment: "confirmed",
+      commitment: "finalized",
       extendConnection: true,
     });
     const orgProgram = await initOrg(provider);
@@ -197,13 +197,13 @@ async function getSolanaUnixTimestamp(
 
     for (const tx of txs) {
       const fullDraft = await populateMissingDraftInfo(conn, tx);
-      const versionedTx = toVersionedTx(fullDraft);
+      const versionedTx = await toVersionedTx(fullDraft);
       const signed = await provider.wallet.signTransaction(versionedTx);
       await sendAndConfirmWithRetry(
         conn,
         Buffer.from(signed.serialize()),
         { skipPreflight: true },
-        "confirmed"
+        "finalized"
       );
     }
 

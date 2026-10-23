@@ -23,6 +23,7 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import {
   init as initTuktuk,
@@ -226,18 +227,19 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
     ).instruction();
     instructions.push(setRecipientIx);
 
-    const txs = (
-      await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-        addressLookupTableAddresses: [
-          process.env.SOLANA_CLUSTER === "devnet"
-            ? HELIUM_COMMON_LUT_DEVNET
-            : HELIUM_COMMON_LUT,
-        ],
-        commitment: "finalized",
-        // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-        deriveLoadedAccountsDataSizeLimit: false,
-      })
-    ).map((tx) => toVersionedTx(tx));
+    const txs = await Promise.all(
+      (
+        await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+          addressLookupTableAddresses: [
+            process.env.SOLANA_CLUSTER === "devnet"
+              ? HELIUM_COMMON_LUT_DEVNET
+              : HELIUM_COMMON_LUT,
+          ],
+          commitment: "finalized",
+          signing: WALLET_SIGNED,
+        })
+      ).map((tx) => toVersionedTx(tx)),
+    );
 
     const tag = generateTransactionTag({
       type: TRANSACTION_TYPES.ADD_SPLIT,

@@ -1,6 +1,11 @@
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { init as hplCronsInit, TASK_QUEUE_ID } from "@helium/hpl-crons-sdk";
-import { batchParallelInstructions, Status, truthy } from "@helium/spl-utils";
+import {
+  batchParallelInstructions,
+  Status,
+  truthy,
+  WALLET_SIGNED,
+} from "@helium/spl-utils";
 import {
   customSignerKey,
   nextAvailableTaskIds,
@@ -203,6 +208,7 @@ export const useRelinquishVote = (proposal: PublicKey) => {
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
+            signing: WALLET_SIGNED,
           });
         }
       }

@@ -3,6 +3,7 @@ import {
   HNT_MINT,
   Status,
   batchSequentialParallelInstructions,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { useAsyncCallback } from "react-async-hook";
@@ -56,6 +57,7 @@ export const useClaimAllPositionsRewards = () => {
             triesRemaining: 10,
             extraSigners: [],
             maxSignatureBatch,
+            signing: WALLET_SIGNED,
           });
         }
       }

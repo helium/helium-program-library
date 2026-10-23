@@ -270,7 +270,7 @@ export class AccountFetchCache {
         .then(async () => {
           const instructions = args[0].instructions
             ? args[0].instructions
-            : await getInstructions(connection, args[0]);
+            : await getInstructions(connection, args[0].message);
           return self.requeryMissing(instructions);
         })
         .then(async (unchanged) => {

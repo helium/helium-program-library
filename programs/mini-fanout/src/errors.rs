@@ -30,4 +30,8 @@ pub enum ErrorCode {
   MissingFreeTask,
   #[msg("Fanout balance is below the current rent-exempt minimum; top it up")]
   BelowRentExempt,
+  #[msg("The rent refund of the task is not an account of the instruction")]
+  RentRefundAccountMissing,
+  #[msg("The rent refund of the task is not writable")]
+  RentRefundAccountNotWritable,
 }

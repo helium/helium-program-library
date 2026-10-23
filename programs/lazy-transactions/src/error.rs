@@ -16,4 +16,10 @@ pub enum ErrorCode {
 
   #[msg("Transaction has already been executed")]
   TransactionAlreadyExecuted,
+
+  #[msg("Signer seeds do not derive a valid program address")]
+  InvalidSignerSeeds,
+
+  #[msg("Signer seeds derive an address this transaction does not use")]
+  UnusedSignerSeeds,
 }

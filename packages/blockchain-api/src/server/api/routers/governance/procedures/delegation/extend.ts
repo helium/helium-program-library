@@ -12,9 +12,7 @@ import {
 } from "@/lib/utils/build-transaction";
 import {
   delegatedPositionKey,
-  getLockupEffectiveEndTs,
   init as initHsd,
-  subDaoEpochInfoKey,
 } from "@helium/helium-sub-daos-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
@@ -27,7 +25,9 @@ import {
 import BN from "bn.js";
 import {
   requirePositionOwnership,
+  extendExpirationAccounts,
   getCurrentSeasonEnd,
+  lockupEffectiveEndTs,
   getLockupKind,
   LockupKind,
 } from "../helpers";
@@ -116,7 +116,7 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
       });
     }
 
-    const lockupEnd = getLockupEffectiveEndTs(positionAcc.lockup);
+    const lockupEnd = lockupEffectiveEndTs(positionAcc.lockup);
     const newExpirationTs = BN.min(seasonEnd, lockupEnd);
 
     if (delegatedPositionAcc.expirationTs.gte(newExpirationTs)) {
@@ -129,33 +129,32 @@ export const extend = publicProcedure.governance.extendDelegation.handler(
       };
     }
 
-    const oldExpirationTs = delegatedPositionAcc.expirationTs;
-
-    const oldSubDaoEpochInfo = subDaoEpochInfoKey(
-      delegatedPositionAcc.subDao,
-      oldExpirationTs
-    )[0];
-    const newSubDaoEpochInfo = subDaoEpochInfoKey(
-      delegatedPositionAcc.subDao,
-      newExpirationTs
-    )[0];
-    const genesisEndSubDaoEpochInfo = subDaoEpochInfoKey(
-      delegatedPositionAcc.subDao,
-      positionAcc.genesisEnd.lt(now) ? newExpirationTs : positionAcc.genesisEnd
-    )[0];
+    const subDaoAcc = await hsdProgram.account.subDaoV0.fetch(
+      delegatedPositionAcc.subDao
+    );
 
     const instructions: TransactionInstruction[] = [];
 
     instructions.push(
       await hsdProgram.methods
         .extendExpirationTsV0()
-        .accountsPartial({
-          position: positionPubkey,
-          subDao: delegatedPositionAcc.subDao,
-          oldClosingTimeSubDaoEpochInfo: oldSubDaoEpochInfo,
-          closingTimeSubDaoEpochInfo: newSubDaoEpochInfo,
-          genesisEndSubDaoEpochInfo,
-        })
+        .accountsStrict(
+          extendExpirationAccounts({
+            wallet: walletPubkey,
+            position: positionPubkey,
+            positionMint: positionMintPubkey,
+            lockupEndTs: lockupEnd,
+            genesisEndTs: positionAcc.genesisEnd,
+            registrar: positionAcc.registrar,
+            proxyConfig: registrar.proxyConfig,
+            dao: subDaoAcc.dao,
+            delegatedPosition: delegatedPosKey,
+            subDao: delegatedPositionAcc.subDao,
+            now,
+            expirationTs: delegatedPositionAcc.expirationTs,
+            seasonEndTs: seasonEnd,
+          })
+        )
         .instruction()
     );
 

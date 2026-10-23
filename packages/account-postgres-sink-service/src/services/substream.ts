@@ -39,7 +39,7 @@ interface IOutputAccount {
 
 export const setupSubstream = async (
   server: FastifyInstance,
-  configs: IConfig[]
+  configs: IConfig[],
 ) => {
   if (!SUBSTREAM_API_KEY) throw new Error("SUBSTREAM_API_KEY undefined");
   if (!SUBSTREAM_URL) throw new Error("SUBSTREAM_URL undefined");
@@ -54,7 +54,7 @@ export const setupSubstream = async (
         .map((config) => `owner:${config.programId}`)
         .join(" || ")}`,
     ],
-    substream.modules!.modules
+    substream.modules!.modules,
   );
 
   let isConnecting = false;
@@ -63,7 +63,11 @@ export const setupSubstream = async (
   let reconnectTimeoutId: NodeJS.Timeout | null = null;
   let gcIntervalId: NodeJS.Timeout | undefined;
   let hasAttemptedCursorReset = false;
-  let pendingReconnect: { startBlock?: number } | null = null;
+  let activeStream: AbortController | null = null;
+  // Block a cursor reset restarts from. Any connect that finds no cursor uses
+  // it until a cursor is written, so a reconnect racing the reset cannot skip
+  // ahead to the latest slot.
+  let pendingRecoveryBlock: number | undefined;
 
   const cursorManager = CursorManager(
     "account_sink",
@@ -74,7 +78,7 @@ export const setupSubstream = async (
 
       if (staleAttemptCount > MAX_RECONNECT_ATTEMPTS) {
         console.error(
-          `Substream failed to recover from stale cursor after ${MAX_RECONNECT_ATTEMPTS} attempts.`
+          `Substream failed to recover from stale cursor after ${MAX_RECONNECT_ATTEMPTS} attempts.`,
         );
         process.exit(1);
       }
@@ -82,26 +86,50 @@ export const setupSubstream = async (
       if (!isConnecting && !reconnectTimeoutId) {
         handleReconnect(staleAttemptCount);
       }
-    }
+    },
   );
-  const pluginsByAccountTypeByProgram = await getPluginsByAccountTypeByProgram(
-    configs
-  );
+  const pluginsByAccountTypeByProgram =
+    await getPluginsByAccountTypeByProgram(configs);
 
   await Cursor.sync({ alter: true });
+
+  const RECONNECT_DELAY_MS = 5_000;
+
+  // Keeps at most one pending reconnect timer.
+  const scheduleConnect = (
+    delay: number,
+    attempt: number,
+    startBlock?: number,
+  ) => {
+    if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
+    reconnectTimeoutId = setTimeout(() => {
+      reconnectTimeoutId = null;
+      connect(attempt, startBlock).catch((err) => {
+        console.error("Reconnect failed:", err);
+        process.exit(1);
+      });
+    }, delay);
+  };
 
   const connect = async (attemptCount = 1, overrideStartBlock?: number) => {
     currentAttemptCount = attemptCount;
 
     if (attemptCount >= MAX_RECONNECT_ATTEMPTS) {
       console.error(
-        `Substream failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts.`
+        `Substream failed to connect after ${MAX_RECONNECT_ATTEMPTS} attempts.`,
       );
       process.exit(1);
     }
 
     if (isConnecting) return;
     isConnecting = true;
+
+    // A stale-cursor reconnect can start while the previous stream is still
+    // open. Abort it; the old loop checks the signal before each write so
+    // only one loop writes accounts and cursors.
+    activeStream?.abort();
+    const stream = new AbortController();
+    activeStream = stream;
 
     try {
       // Fresh token on each connection to survive token expiry across reconnects
@@ -131,8 +159,9 @@ export const setupSubstream = async (
       console.log("Connected to Substream");
       const startBlock = cursor
         ? undefined
-        : overrideStartBlock ??
-          (await provider.connection.getSlot("finalized"));
+        : (overrideStartBlock ??
+          pendingRecoveryBlock ??
+          (await provider.connection.getSlot("finalized")));
       const request = createRequest({
         substreamPackage: substream,
         outputModule: MODULE,
@@ -145,13 +174,16 @@ export const setupSubstream = async (
       console.log(
         `Substream: Streaming from ${
           cursor ? `cursor ${cursor}` : `block ${startBlock}`
-        }`
+        }`,
       );
 
       isConnecting = false;
       let hasReceivedBlock = false;
 
-      for await (const response of streamBlocks(transport, request)) {
+      for await (const response of streamBlocks(transport, request, {
+        signal: stream.signal,
+      })) {
+        if (stream.signal.aborted) return;
         const message = response.message;
 
         if (message.case === "fatalError") {
@@ -160,6 +192,7 @@ export const setupSubstream = async (
           if (cursor && !hasAttemptedCursorReset) {
             hasAttemptedCursorReset = true;
             const existingCursor = await cursorManager.getLatestCursor();
+            if (stream.signal.aborted) return;
             const blockStr = existingCursor?.getDataValue("block") as
               | string
               | undefined;
@@ -168,15 +201,21 @@ export const setupSubstream = async (
             console.log(
               `Cursor incompatible with finalBlocksOnly. Resetting and restarting from ${
                 isNaN(recoveryBlock) ? "latest block" : `block ${recoveryBlock}`
-              }...`
+              }...`,
             );
 
+            const recoveryStartBlock = isNaN(recoveryBlock)
+              ? undefined
+              : recoveryBlock;
+            pendingRecoveryBlock = recoveryStartBlock;
             await Cursor.destroy({ where: { service: "account_sink" } });
+            if (stream.signal.aborted) return;
             cursorManager.stopStalenessCheck();
             isConnecting = false;
-            pendingReconnect = {
-              startBlock: isNaN(recoveryBlock) ? undefined : recoveryBlock,
-            };
+            console.log(
+              `Waiting ${RECONNECT_DELAY_MS / 1000}s before planned reconnect...`,
+            );
+            scheduleConnect(RECONNECT_DELAY_MS, 1, recoveryStartBlock);
             return;
           }
 
@@ -253,6 +292,13 @@ export const setupSubstream = async (
                 });
               }
 
+              // An abort after this check can still commit, but the
+              // transaction already holds the row locks from its upserts, so
+              // the newer stream's writes to those rows wait and win.
+              if (stream.signal.aborted) {
+                await t.rollback();
+                return;
+              }
               await t.commit();
             } catch (err) {
               await t.rollback();
@@ -268,13 +314,19 @@ export const setupSubstream = async (
             global.gc();
           }
 
+          if (stream.signal.aborted) return;
+          // Force the first write after a reset so the recovery block can
+          // be cleared once a cursor is persisted.
           await cursorManager.updateCursor({
             cursor,
             block: block?.toString() || "unknown",
-            force: hasAccountChanges,
+            force: hasAccountChanges || pendingRecoveryBlock !== undefined,
           });
+          pendingRecoveryBlock = undefined;
         }
       }
+
+      if (stream.signal.aborted) return;
 
       // Stream ended normally (server closed gracefully), reconnect
       cursorManager.stopStalenessCheck();
@@ -286,12 +338,16 @@ export const setupSubstream = async (
       isConnecting = false;
       handleReconnect(1);
     } catch (err) {
+      // A newer connection replaced this one and owns the shared state.
+      if (stream.signal.aborted) return;
+
       cursorManager.stopStalenessCheck();
       if (gcIntervalId) {
         clearInterval(gcIntervalId);
         gcIntervalId = undefined;
       }
       await cursorManager.flushCursor();
+      if (stream.signal.aborted) return;
       console.log("Substream connection error:", err);
       isConnecting = false;
 
@@ -301,6 +357,7 @@ export const setupSubstream = async (
       if (isCursorIncompat && !hasAttemptedCursorReset) {
         hasAttemptedCursorReset = true;
         const existingCursor = await cursorManager.getLatestCursor();
+        if (stream.signal.aborted) return;
         const blockStr = existingCursor?.getDataValue("block") as
           | string
           | undefined;
@@ -309,13 +366,19 @@ export const setupSubstream = async (
         console.log(
           `Cursor incompatible with finalBlocksOnly. Resetting and restarting from ${
             isNaN(recoveryBlock) ? "latest block" : `block ${recoveryBlock}`
-          }...`
+          }...`,
         );
 
+        const recoveryStartBlock = isNaN(recoveryBlock)
+          ? undefined
+          : recoveryBlock;
+        pendingRecoveryBlock = recoveryStartBlock;
         await Cursor.destroy({ where: { service: "account_sink" } });
-        pendingReconnect = {
-          startBlock: isNaN(recoveryBlock) ? undefined : recoveryBlock,
-        };
+        if (stream.signal.aborted) return;
+        console.log(
+          `Waiting ${RECONNECT_DELAY_MS / 1000}s before planned reconnect...`,
+        );
+        scheduleConnect(RECONNECT_DELAY_MS, 1, recoveryStartBlock);
         return;
       }
 
@@ -326,16 +389,10 @@ export const setupSubstream = async (
         const exhaustedDelay = 15_000 + Math.random() * 5_000;
         console.log(
           `Resource exhausted, waiting ${Math.round(
-            exhaustedDelay / 1000
-          )}s before reconnect...`
+            exhaustedDelay / 1000,
+          )}s before reconnect...`,
         );
-        reconnectTimeoutId = setTimeout(() => {
-          reconnectTimeoutId = null;
-          connect(currentAttemptCount + 1).catch((err) => {
-            console.error("Reconnect failed:", err);
-            process.exit(1);
-          });
-        }, exhaustedDelay);
+        scheduleConnect(exhaustedDelay, currentAttemptCount + 1);
         return;
       }
 
@@ -344,38 +401,17 @@ export const setupSubstream = async (
   };
 
   const handleReconnect = async (
-    nextAttempt: number = currentAttemptCount + 1
+    nextAttempt: number = currentAttemptCount + 1,
   ) => {
-    if (reconnectTimeoutId) {
-      clearTimeout(reconnectTimeoutId);
-    }
-
     const baseDelay = 1000;
     const MIN_DELAY = 2000;
     const delay = Math.max(MIN_DELAY, baseDelay * Math.pow(2, nextAttempt - 1));
 
-    reconnectTimeoutId = setTimeout(() => {
-      reconnectTimeoutId = null;
-      console.log(
-        `Attempting to reconnect (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`
-      );
-      connect(nextAttempt).catch((err) => {
-        console.error("Fatal reconnect error:", err);
-        process.exit(1);
-      });
-    }, delay);
+    console.log(
+      `Reconnecting in ${delay / 1000}s (attempt ${nextAttempt} of ${MAX_RECONNECT_ATTEMPTS})...`,
+    );
+    scheduleConnect(delay, nextAttempt);
   };
 
-  const RECONNECT_DELAY_MS = 5_000;
-
   await connect();
-  while (pendingReconnect) {
-    const { startBlock } = pendingReconnect;
-    pendingReconnect = null;
-    console.log(
-      `Waiting ${RECONNECT_DELAY_MS / 1000}s before planned reconnect...`
-    );
-    await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
-    await connect(1, startBlock);
-  }
 };

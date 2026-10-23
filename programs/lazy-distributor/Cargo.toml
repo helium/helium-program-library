@@ -1,6 +1,6 @@
 [package]
 name = "lazy-distributor"
-version = "0.3.10"
+version = "0.3.12"
 # Trigger deployment - timestamp: 03-31-2025 #3
 description = "Created with Anchor"
 edition = "2021"
@@ -33,3 +33,6 @@ solana-security-txt = { workspace = true }
 solana-program = { workspace = true }
 default-env = { workspace = true }
 tuktuk-program = { workspace = true }
+
+[dev-dependencies]
+spl-concurrent-merkle-tree = "0.4.0"

@@ -1,9 +1,10 @@
-import { Program } from "@coral-xyz/anchor";
+import { Program } from "@anchor-lang/core";
 import { PROGRAM_ID, init, proxyAssignmentKey } from "@helium/nft-proxy-sdk";
 import {
   Status,
   batchParallelInstructionsWithPriorityFee,
   truthy,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import { ProxyAssignment } from "@helium/voter-stake-registry-sdk";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
@@ -106,6 +107,7 @@ export const useUnassignProxies = () => {
               triesRemaining: 10,
               extraSigners: [],
               maxSignatureBatch,
+              signing: WALLET_SIGNED,
             }
           );
         }

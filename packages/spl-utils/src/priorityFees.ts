@@ -10,9 +10,13 @@ import {
 import { populateMissingDraftInfo, TransactionDraft } from "./draft";
 import { toVersionedTx } from "./transaction";
 import { MAX_COMPUTE_UNITS, tableComputeUnits } from "./computeUnitTable";
+import { hasWalletSigner, TransactionSigning } from "./txVersion";
 
 const MAX_RECENT_PRIORITY_FEE_ACCOUNTS = 128;
 export const MAX_PRIO_FEE = 2500000;
+
+// Headroom over simulated (or table-bounded) compute for runtime drift.
+export const DEFAULT_COMPUTE_SCALE_UP = 1.1;
 
 // Fallback loaded-accounts data size when simulation can't measure it —
 // same role the CU table plays for compute units. SIMD-0553 charges the
@@ -47,6 +51,46 @@ export const callerComputeBudgetTypes = (
       .filter((ix) => ix.programId.equals(ComputeBudgetProgram.programId))
       .map((ix) => ix.data[0])
   );
+
+// Whether the data-size limit is derived from simulation. Only a keypair fee
+// payer gets one: a wallet may append instructions after the tx is sized.
+// Without `signing` the limit is derived, as before `signing` existed.
+const derivesDataSizeLimit = ({
+  signing,
+  deriveLoadedAccountsDataSizeLimit,
+}: {
+  signing?: TransactionSigning;
+  deriveLoadedAccountsDataSizeLimit?: boolean;
+}): boolean =>
+  deriveLoadedAccountsDataSizeLimit ?? !(signing && hasWalletSigner(signing));
+
+// The ComputeBudget ixs a tx carries before its fees are known, with
+// placeholder values of the same encoded size. withPriorityFees simulates
+// under them and the batchers size each chunk with them, so a `signing`
+// changes both at once. A data-size ix is present when the caller sets a
+// limit, or when the limit is derived and compute units are simulated.
+export const prependPlaceholderComputeBudgetIxs = (
+  instructions: TransactionInstruction[],
+  {
+    computeUnits,
+    loadedAccountsDataSizeLimit,
+    ...derive
+  }: {
+    computeUnits?: number;
+    loadedAccountsDataSizeLimit?: number;
+    signing?: TransactionSigning;
+    deriveLoadedAccountsDataSizeLimit?: boolean;
+  }
+): TransactionInstruction[] =>
+  prependComputeBudgetIxs(instructions, {
+    computeUnits: computeUnits || MAX_COMPUTE_UNITS,
+    microLamports: 1,
+    loadedAccountsDataSizeLimit:
+      loadedAccountsDataSizeLimit ||
+      (!computeUnits && derivesDataSizeLimit(derive)
+        ? DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
+        : undefined),
+  });
 
 const isDataSizeExceededErr = (err: unknown): boolean =>
   JSON.stringify(err ?? "").includes("MaxLoadedAccountsDataSizeExceeded");
@@ -129,7 +173,7 @@ export async function estimatePrioritizationFee(
     });
 
     if (priorityFees.length < 1) {
-      return Math.max(basePriorityFee || 0, 1);
+      return Math.min(maxPriorityFee, Math.max(basePriorityFee || 0, 1));
     }
 
     // get max priority fee per slot (and sort by slot from old to new)
@@ -163,7 +207,10 @@ export async function estimatePrioritizationFee(
             recentFees[mid].prioritizationFee) /
           2;
 
-    return Math.max(basePriorityFee || 1, Math.ceil(medianFee));
+    return Math.min(
+      maxPriorityFee,
+      Math.max(basePriorityFee || 1, Math.ceil(medianFee))
+    );
   }
 }
 
@@ -263,21 +310,23 @@ export async function withPriorityFees({
   basePriorityFee,
   maxPriorityFee = MAX_PRIO_FEE,
   priorityFeeOptions,
-  computeScaleUp = 1.1,
+  computeScaleUp = DEFAULT_COMPUTE_SCALE_UP,
   // Explicit value pins the limit; when omitted it's derived from the
   // simulation's measured size, or left unset (runtime 64 MiB default) when
   // no simulation validated a ceiling.
   loadedAccountsDataSizeLimit,
-  // Set false for txs a wallet signs. Wallets (Phantom, Solflare) append
-  // guard ixs (Lighthouse, ~424 KiB of program data) after we size the tx;
-  // a sim-derived limit with 10% headroom then fails on-chain with
+  // Overrides the derivation `signing` implies. Wallets (Phantom, Solflare)
+  // append guard ixs (Lighthouse, ~424 KiB of program data) after we size the
+  // tx; a sim-derived limit with 10% headroom then fails on-chain with
   // MaxLoadedAccountsDataSizeExceeded. An explicit limit is still honored.
-  deriveLoadedAccountsDataSizeLimit = true,
+  deriveLoadedAccountsDataSizeLimit,
+  signing,
   ...rest
 }: {
   connection: Connection;
   computeUnits?: number;
   basePriorityFee?: number;
+  /** @deprecated Pass `signing`; a `wallet` fee payer gets no derived limit. */
   deriveLoadedAccountsDataSizeLimit?: boolean;
   // Headroom multiplier applied to the simulated CU consumption AND to the
   // sim-derived loaded-accounts-data-size request — one knob scales both.
@@ -285,6 +334,8 @@ export async function withPriorityFees({
   priorityFeeOptions?: any;
   maxPriorityFee?: number;
   loadedAccountsDataSizeLimit?: number;
+  // Who signs; decides whether the data-size limit is derived.
+  signing?: TransactionSigning;
 } & Partial<TransactionDraft>): Promise<TransactionInstruction[]> {
   // A caller's `computeUnits: 0` or `loadedAccountsDataSizeLimit: 0` is never
   // valid — 0 CU can't run, and a 0-byte data-size ix is rejected on-chain as
@@ -320,7 +371,7 @@ export async function withPriorityFees({
     // ComputeBudget ixs below.
     const simCeiling =
       loadedAccountsDataSizeLimit ??
-      (deriveLoadedAccountsDataSizeLimit
+      (derivesDataSizeLimit({ signing, deriveLoadedAccountsDataSizeLimit })
         ? DEFAULT_LOADED_ACCOUNTS_DATA_SIZE_LIMIT
         : undefined);
     // LUTs are needed to compile the sim tx; the blockhash is not —
@@ -345,14 +396,13 @@ export async function withPriorityFees({
       !callerComputeBudgetTypes(tx.instructions).has(
         COMPUTE_BUDGET_IX_DATA_SIZE
       );
-    const ixWithComputeUnits = prependComputeBudgetIxs(tx.instructions, {
-      computeUnits: MAX_COMPUTE_UNITS,
-      microLamports: 1,
-      loadedAccountsDataSizeLimit: simCeiling,
-    });
+    const ixWithComputeUnits = prependPlaceholderComputeBudgetIxs(
+      tx.instructions,
+      { loadedAccountsDataSizeLimit, signing, deriveLoadedAccountsDataSizeLimit }
+    );
     let budget = await estimateComputeBudget(
       connection,
-      toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),
+      await toVersionedTx({ ...tx, instructions: ixWithComputeUnits }),
       { computeScaleUp }
     );
     // Whether the sim that produced `budget` ran under our injected ceiling —
@@ -371,7 +421,7 @@ export async function withPriorityFees({
         // runtime 64 MiB default.
         budget = await estimateComputeBudget(
           connection,
-          toVersionedTx({
+          await toVersionedTx({
             ...tx,
             instructions: prependComputeBudgetIxs(tx.instructions, {
               computeUnits: MAX_COMPUTE_UNITS,

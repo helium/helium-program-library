@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { init } from "@helium/helium-entity-manager-sdk";
 import { init as initHsd } from "@helium/helium-sub-daos-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";

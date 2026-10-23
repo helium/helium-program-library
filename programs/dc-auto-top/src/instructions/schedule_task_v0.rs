@@ -8,6 +8,7 @@ use anchor_lang::{
 use anchor_spl::{associated_token, token::spl_token};
 use chrono::{DateTime, Utc};
 use clockwork_cron::Schedule;
+use shared_utils::try_from;
 use tuktuk_program::{
   tuktuk::{
     self,
@@ -15,10 +16,12 @@ use tuktuk_program::{
     program::Tuktuk,
   },
   types::{QueueTaskArgsV0, TransactionSourceV0, TriggerV0},
-  CompiledInstructionV0, CompiledTransactionV0, TaskQueueAuthorityV0,
+  CompiledInstructionV0, CompiledTransactionV0, TaskQueueAuthorityV0, TaskV0,
 };
 
-use crate::{queue_authority_seeds, state::*, ASSOCIATED_TOKEN_PROGRAM_ID, TESTING};
+use crate::{
+  errors::ErrorCode, queue_authority_seeds, state::*, ASSOCIATED_TOKEN_PROGRAM_ID, TESTING,
+};
 
 pub const HNT_PRICE_ORACLE: Pubkey = pubkey!("He5mhwVQQNvjFxqjEjFDb7enJWFwFJ7Rq7zknqBz89A5");
 
@@ -75,6 +78,41 @@ pub struct ScheduleTaskV0<'info> {
   pub hnt_task: UncheckedAccount<'info>,
   pub tuktuk_program: Program<'info, Tuktuk>,
   pub system_program: Program<'info, System>,
+}
+
+/// The largest task account these instructions decode.
+const MAX_TASK_LEN: usize = 2048;
+
+/// True when `task` holds a compiled transaction whose accounts include `key`.
+/// False for a task larger than `MAX_TASK_LEN`, which is not decoded.
+pub fn task_names(task: &AccountInfo, key: &Pubkey) -> Result<bool> {
+  if task.data_len() > MAX_TASK_LEN {
+    return Ok(false);
+  }
+  let task = try_from!(Account<TaskV0>, task)?;
+  Ok(matches!(
+    &task.transaction,
+    TransactionSourceV0::CompiledV0(transaction) if transaction.accounts.contains(key)
+  ))
+}
+
+/// The account that `task` names as its rent refund: one of `candidates`, or a writable account
+/// in `remaining_accounts`.
+pub fn rent_refund_account<'info>(
+  task: &AccountInfo,
+  candidates: &[AccountInfo<'info>],
+  remaining_accounts: &[AccountInfo<'info>],
+) -> Result<AccountInfo<'info>> {
+  let rent_refund = try_from!(Account<TaskV0>, task)?.rent_refund;
+  if let Some(account) = candidates.iter().find(|a| a.key() == rent_refund) {
+    return Ok(account.clone());
+  }
+  let account = remaining_accounts
+    .iter()
+    .find(|a| a.key() == rent_refund)
+    .ok_or(ErrorCode::RentRefundAccountMissing)?;
+  require!(account.is_writable, ErrorCode::RentRefundAccountNotWritable);
+  Ok(account.clone())
 }
 
 pub fn get_task_ix_dc(

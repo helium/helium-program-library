@@ -4,6 +4,7 @@ import {
   batchParallelInstructionsWithPriorityFee,
   fetchBackwardsCompatibleIdl,
   truthy,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import {
   ProxyAssignment,
@@ -304,6 +305,7 @@ export const useAssignProxies = () => {
               triesRemaining: 10,
               extraSigners: [],
               maxSignatureBatch,
+              signing: WALLET_SIGNED,
             }
           );
         }

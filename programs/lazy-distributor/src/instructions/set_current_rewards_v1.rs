@@ -1,13 +1,16 @@
 use anchor_lang::{
   prelude::{Pubkey, *},
   solana_program::{
+    hash::hash,
     instruction::Instruction,
     sysvar::instructions::{load_current_index_checked, load_instruction_at_checked, ID as IX_ID},
   },
   Discriminator,
 };
 use shared_utils::resize_to_fit;
-use tuktuk_program::verify_running_remote_task;
+use tuktuk_program::{
+  client::args::RunTaskV0, tuktuk, verify_running_remote_task, TaskV0, VerifyRunningRemoteTaskError,
+};
 
 use crate::{ed25519::*, error::ErrorCode, state::*, SetCurrentRewardsArgsV0};
 
@@ -123,16 +126,22 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
       ErrorCode::InvalidLazyDistributor
     );
   } else if discriminator == RemoteTaskTransactionV0::DISCRIMINATOR {
-    // The running task must be a RemoteV0 task signed by this oracle. tuktuk binds the signed
-    // message to that task and its accounts, and it has already verified the ed25519
-    // instruction against the task signer, so tuktuk's check is the authoritative one. The
-    // verify_ed25519_ix parse above only picks this branch and repeats that signer check.
-    // The oracle appends the task as the last remaining account.
-    let task_info = ctx
-      .remaining_accounts
-      .last()
-      .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?;
-    verify_running_remote_task(&ctx.accounts.sysvar_instructions, task_info, &signer)?;
+    // The running task must be a RemoteV0 task signed by this oracle, and the signed message must
+    // bind that task's key, its `queued_at`, the hashed accounts, this recipient and this
+    // `(oracle_index, current_rewards)`. The reasons are on the two helpers below.
+    let (task_key, task, run_task_ix) = running_remote_task(
+      &ctx.accounts.sysvar_instructions,
+      ctx.remaining_accounts,
+      &signer,
+    )?;
+    verify_remote_reward_binding(
+      &run_task_ix,
+      task_key,
+      task.queued_at,
+      &data,
+      &args,
+      ctx.accounts.recipient.key(),
+    )?;
   } else {
     return Err(error!(ErrorCode::InvalidDiscriminator));
   }
@@ -175,4 +184,489 @@ pub fn handler(ctx: Context<SetCurrentRewardsV1>, args: SetCurrentRewardsArgsV0)
   )?;
 
   Ok(())
+}
+
+/// Position of the task account in `run_task_v0`'s account list.
+const RUN_TASK_TASK_ACCOUNT: usize = 3;
+/// Number of named accounts `run_task_v0` takes ahead of its remaining accounts.
+const RUN_TASK_HEADER_ACCOUNTS: usize = 6;
+
+/// Finds the task `run_task_v0` is running among `remaining_accounts` and verifies it is a
+/// `RemoteV0` task signed by `signer`. Returns the task and the `run_task_v0` instruction.
+///
+/// The running task is the remaining account whose key is `run_task_v0`'s task account (account 3).
+fn running_remote_task(
+  sysvar_instructions: &AccountInfo,
+  remaining_accounts: &[AccountInfo],
+  signer: &Pubkey,
+) -> Result<(Pubkey, TaskV0, Instruction)> {
+  let index = load_current_index_checked(sysvar_instructions)?;
+  let run_task_ix = load_instruction_at_checked(index as usize, sysvar_instructions)?;
+  require_keys_eq!(
+    run_task_ix.program_id,
+    tuktuk::ID,
+    VerifyRunningRemoteTaskError::NotRunningAsTask
+  );
+  require!(
+    run_task_ix.data.starts_with(RunTaskV0::DISCRIMINATOR),
+    VerifyRunningRemoteTaskError::NotRunningAsTask
+  );
+  let running_task = run_task_ix
+    .accounts
+    .get(RUN_TASK_TASK_ACCOUNT)
+    .ok_or_else(|| error!(VerifyRunningRemoteTaskError::NotRunningAsTask))?
+    .pubkey;
+  let task_info = remaining_accounts
+    .iter()
+    .find(|account| account.key() == running_task)
+    .ok_or_else(|| error!(VerifyRunningRemoteTaskError::TaskMismatch))?;
+  let task = verify_running_remote_task(sysvar_instructions, task_info, signer)?;
+  Ok((running_task, task, run_task_ix))
+}
+
+/// Re-derives, from the oracle-signed `RemoteTaskTransactionV0`, that the signature authorizes this
+/// call's reward under the task `run_task_v0` is running.
+///
+/// tuktuk only binds a RemoteV0 oracle signature to a task and its accounts, via a
+/// `verification_hash` over the task key, its `queued_at`, and the account list `run_task_v0` was
+/// invoked with. It performs that binding only for a task it reads as RemoteV0; a task it runs as
+/// CompiledV0 gets no such check yet can leave its account reading as RemoteV0. This recomputes the
+/// same hash from the running task and requires it to equal the signed one, so a signature issued
+/// for any other task, or run over any other accounts, is rejected. It then requires the signed
+/// transaction to carry an instruction ending in this call's `(oracle_index, current_rewards)`, the
+/// trailing fields of every `set_current_rewards_wrapper_*` args, so the amount written is one the
+/// oracle signed rather than one the caller chose. That instruction must also reference the
+/// recipient this call writes, so the signed amount is bound to the account it is written to.
+fn verify_remote_reward_binding(
+  run_task_ix: &Instruction,
+  task_key: Pubkey,
+  task_queued_at: i64,
+  message: &[u8],
+  args: &SetCurrentRewardsArgsV0,
+  recipient: Pubkey,
+) -> Result<()> {
+  let remote_tx = RemoteTaskTransactionV0::try_deserialize(&mut &message[..])?;
+  let tx = &remote_tx.transaction;
+
+  // The number of accounts tuktuk hashes: one past the highest index any instruction references,
+  // over both account operands and the program id.
+  let max_index = tx
+    .instructions
+    .iter()
+    .flat_map(|ix| {
+      ix.accounts
+        .iter()
+        .copied()
+        .chain(std::iter::once(ix.program_id_index))
+    })
+    .max()
+    .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?;
+  let num_accounts = usize::from(max_index) + 1;
+
+  // `run_task_ix` is the current top-level instruction, `run_task_v0` (verified by
+  // `running_remote_task`), whose accounts are [crank_turner, rent_refund, task_queue, task,
+  // system_program, sysvar_instructions, ..remaining]. The signed verification hash is over the
+  // remaining accounts.
+  let hashed_accounts = run_task_ix
+    .accounts
+    .get(RUN_TASK_HEADER_ACCOUNTS..RUN_TASK_HEADER_ACCOUNTS + num_accounts)
+    .ok_or_else(|| error!(ErrorCode::InvalidRemoteTask))?;
+
+  // Each account is hashed as pubkey ++ writable ++ signer. Writability is derived from the
+  // account's position in the compiled ordering (writable signers, read-only signers, writable,
+  // read-only), and the signer byte is always 0. This is how the oracle produced the hash, so it
+  // matches by construction regardless of any runtime privilege escalation (e.g. an account that is
+  // also one of run_task_v0's named writable accounts).
+  let rw_signers = usize::from(tx.num_rw_signers);
+  let ro_signers = usize::from(tx.num_ro_signers);
+  let rw = usize::from(tx.num_rw);
+
+  let mut preimage = Vec::with_capacity(32 + 8 + num_accounts * 34);
+  preimage.extend_from_slice(task_key.as_ref());
+  preimage.extend_from_slice(&task_queued_at.to_le_bytes());
+  for (i, meta) in hashed_accounts.iter().enumerate() {
+    preimage.extend_from_slice(meta.pubkey.as_ref());
+    let writable =
+      i < rw_signers || (i >= rw_signers + ro_signers && i < rw_signers + ro_signers + rw);
+    preimage.push(u8::from(writable));
+    preimage.push(0u8);
+  }
+  require!(
+    hash(&preimage).to_bytes() == remote_tx.verification_hash,
+    ErrorCode::RemoteTaskHashMismatch
+  );
+
+  let mut authorized_reward = [0u8; 10];
+  authorized_reward[..2].copy_from_slice(&args.oracle_index.to_le_bytes());
+  authorized_reward[2..].copy_from_slice(&args.current_rewards.to_le_bytes());
+  require!(
+    tx.instructions.iter().any(|ix| {
+      ix.data.ends_with(&authorized_reward)
+        && ix
+          .accounts
+          .iter()
+          .any(|&idx| hashed_accounts.get(usize::from(idx)).map(|m| m.pubkey) == Some(recipient))
+    }),
+    ErrorCode::RemoteRewardNotSigned
+  );
+
+  Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use anchor_lang::solana_program::{
+    hash::hash,
+    instruction::{AccountMeta, Instruction},
+    sysvar::instructions::{
+      construct_instructions_data, BorrowedAccountMeta, BorrowedInstruction, ID as IX_ID,
+    },
+  };
+
+  use super::*;
+
+  const ORACLE_INDEX: u16 = 0;
+  const CURRENT_REWARDS: u64 = 5_000_000;
+
+  // A run_task_v0 instruction whose trailing accounts are the ones the reward task references. Only
+  // the account list matters to the binding; verify_running_remote_task validates the program and
+  // discriminator, which this unit exercises in isolation from.
+  fn run_task_ix(task: Pubkey, acc0: Pubkey, acc1: Pubkey) -> Instruction {
+    let mut accounts: Vec<AccountMeta> = vec![
+      AccountMeta::new(Pubkey::new_unique(), true), // crank_turner
+      AccountMeta::new(Pubkey::new_unique(), false), // rent_refund
+      AccountMeta::new(Pubkey::new_unique(), false), // task_queue
+      AccountMeta::new_readonly(task, false),       // task
+      AccountMeta::new_readonly(Pubkey::new_unique(), false), // system_program
+      AccountMeta::new_readonly(IX_ID, false),      // sysvar_instructions
+    ];
+    accounts.push(AccountMeta::new(acc0, false)); // writable, non-signer
+    accounts.push(AccountMeta::new_readonly(acc1, false)); // read-only
+    Instruction {
+      program_id: Pubkey::new_unique(),
+      accounts,
+      data: vec![0u8; 8],
+    }
+  }
+
+  fn sysvar_holding(ix: &Instruction) -> Vec<u8> {
+    let borrowed = BorrowedInstruction {
+      program_id: &ix.program_id,
+      accounts: ix
+        .accounts
+        .iter()
+        .map(|m| BorrowedAccountMeta {
+          pubkey: &m.pubkey,
+          is_signer: m.is_signer,
+          is_writable: m.is_writable,
+        })
+        .collect(),
+      data: &ix.data,
+    };
+    let mut data = construct_instructions_data(&[borrowed]);
+    // Current instruction index -> 0 (the run_task_v0 instruction above).
+    let end = data.len() - 2;
+    data[end..].copy_from_slice(&0u16.to_le_bytes());
+    data
+  }
+
+  // The oracle-signed message: one instruction referencing accounts [0, 1], whose data ends in
+  // (oracle_index, current_rewards), and a verification hash independently derived here the way
+  // tuktuk's run_task_v0 derives it.
+  fn signed_message(task: Pubkey, queued_at: i64, acc0: Pubkey, acc1: Pubkey) -> Vec<u8> {
+    let mut reward_ix_data = vec![0u8; 8]; // wrapper discriminator (unread)
+    reward_ix_data.extend_from_slice(&ORACLE_INDEX.to_le_bytes());
+    reward_ix_data.extend_from_slice(&CURRENT_REWARDS.to_le_bytes());
+
+    let mut preimage = Vec::new();
+    preimage.extend_from_slice(task.as_ref());
+    preimage.extend_from_slice(&queued_at.to_le_bytes());
+    // acc0 is in the writable region -> writable, acc1 is read-only. Neither is a signer.
+    preimage.extend_from_slice(acc0.as_ref());
+    preimage.extend_from_slice(&[1, 0]);
+    preimage.extend_from_slice(acc1.as_ref());
+    preimage.extend_from_slice(&[0, 0]);
+
+    let remote_tx = RemoteTaskTransactionV0 {
+      verification_hash: hash(&preimage).to_bytes(),
+      transaction: CompiledTransactionV0 {
+        num_rw_signers: 0,
+        num_ro_signers: 0,
+        num_rw: 1,
+        accounts: vec![],
+        instructions: vec![CompiledInstructionV0 {
+          program_id_index: 0,
+          accounts: vec![0, 1],
+          data: reward_ix_data,
+        }],
+        signer_seeds: vec![],
+      },
+    };
+    let mut message = Vec::new();
+    remote_tx
+      .try_serialize(&mut message)
+      .expect("serialize message");
+    message
+  }
+
+  struct Case {
+    task: Pubkey,
+    queued_at: i64,
+    acc0: Pubkey,
+    acc1: Pubkey,
+    task_arg: Pubkey,
+    recipient: Pubkey,
+    message: Vec<u8>,
+    args: SetCurrentRewardsArgsV0,
+  }
+
+  impl Case {
+    fn valid() -> Self {
+      let task = Pubkey::new_unique();
+      let queued_at = 42;
+      let acc0 = Pubkey::new_unique();
+      let acc1 = Pubkey::new_unique();
+      Case {
+        task,
+        queued_at,
+        acc0,
+        acc1,
+        task_arg: task,
+        // The signed instruction references accounts [0, 1]; the recipient is acc0.
+        recipient: acc0,
+        message: signed_message(task, queued_at, acc0, acc1),
+        args: SetCurrentRewardsArgsV0 {
+          oracle_index: ORACLE_INDEX,
+          current_rewards: CURRENT_REWARDS,
+        },
+      }
+    }
+
+    fn run(self) -> Result<()> {
+      let ix = run_task_ix(self.task, self.acc0, self.acc1);
+      verify_remote_reward_binding(
+        &ix,
+        self.task_arg,
+        self.queued_at,
+        &self.message,
+        &self.args,
+        self.recipient,
+      )
+    }
+  }
+
+  fn err_code(err: Error) -> u32 {
+    match err {
+      Error::AnchorError(e) => e.error_code_number,
+      _ => panic!("expected an anchor error"),
+    }
+  }
+
+  #[test]
+  fn accepts_reward_the_oracle_signed_for_this_task() {
+    Case::valid().run().expect("valid binding");
+  }
+
+  #[test]
+  fn rejects_a_signature_for_a_different_task() {
+    let mut case = Case::valid();
+    // The signature was issued for `case.task`; the task actually running is someone else's.
+    case.task_arg = Pubkey::new_unique();
+    let ix = run_task_ix(case.task_arg, case.acc0, case.acc1);
+    let err = verify_remote_reward_binding(
+      &ix,
+      case.task_arg,
+      case.queued_at,
+      &case.message,
+      &case.args,
+      case.recipient,
+    )
+    .expect_err("must reject a foreign task");
+    assert_eq!(
+      err_code(err),
+      ErrorCode::RemoteTaskHashMismatch as u32 + 6000
+    );
+  }
+
+  #[test]
+  fn rejects_a_run_over_different_accounts() {
+    let mut case = Case::valid();
+    // The reward's recipient (acc0) is swapped for an account the oracle never signed over.
+    case.acc0 = Pubkey::new_unique();
+    let err = case.run().expect_err("must reject swapped accounts");
+    assert_eq!(
+      err_code(err),
+      ErrorCode::RemoteTaskHashMismatch as u32 + 6000
+    );
+  }
+
+  #[test]
+  fn rejects_an_amount_the_oracle_did_not_sign() {
+    let mut case = Case::valid();
+    // Hash still matches (it does not cover the amount); the amount binding must catch this.
+    case.args.current_rewards = CURRENT_REWARDS + 1;
+    let err = case.run().expect_err("must reject an unsigned amount");
+    assert_eq!(
+      err_code(err),
+      ErrorCode::RemoteRewardNotSigned as u32 + 6000
+    );
+  }
+
+  #[test]
+  fn rejects_a_reward_written_to_an_unsigned_recipient() {
+    let mut case = Case::valid();
+    // The signed instruction references acc0/acc1; writing to any other recipient is not authorized,
+    // even though the amount matches and the account hash is valid.
+    case.recipient = Pubkey::new_unique();
+    let err = case.run().expect_err("must reject an unbound recipient");
+    assert_eq!(
+      err_code(err),
+      ErrorCode::RemoteRewardNotSigned as u32 + 6000
+    );
+  }
+
+  #[test]
+  fn run_task_v0_shape() {
+    use anchor_lang::ToAccountMetas;
+    use tuktuk_program::tuktuk::client::accounts::RunTaskV0;
+
+    let task = Pubkey::new_unique();
+    let metas = RunTaskV0 {
+      crank_turner: Pubkey::new_unique(),
+      rent_refund: Pubkey::new_unique(),
+      task_queue: Pubkey::new_unique(),
+      task,
+      system_program: Pubkey::new_unique(),
+      sysvar_instructions: Pubkey::new_unique(),
+    }
+    .to_account_metas(None);
+    assert_eq!(metas[RUN_TASK_TASK_ACCOUNT].pubkey, task);
+    assert_eq!(metas.len(), RUN_TASK_HEADER_ACCOUNTS);
+  }
+
+  const FREE_TASKS: usize = 6;
+
+  // A top-level instruction whose account 3 is `task_key`: tuktuk run_task_v0 unless the program
+  // or data say otherwise.
+  fn top_level_ix(program_id: Pubkey, data: &[u8], task_key: Pubkey) -> Instruction {
+    Instruction {
+      program_id,
+      accounts: (0..RUN_TASK_HEADER_ACCOUNTS)
+        .map(|i| {
+          AccountMeta::new_readonly(
+            if i == RUN_TASK_TASK_ACCOUNT {
+              task_key
+            } else {
+              Pubkey::new_unique()
+            },
+            false,
+          )
+        })
+        .collect(),
+      data: data.to_vec(),
+    }
+  }
+
+  // Runs `running_remote_task` with `top_level` as the current instruction and remaining accounts
+  // laid out as set_current_rewards_wrapper_v2 passes them: [approver, task, free_0..free_5].
+  fn find_running_task(
+    top_level: &Instruction,
+    task_key: Pubkey,
+    signer: Pubkey,
+  ) -> Result<(Pubkey, TaskV0)> {
+    use tuktuk_program::{TransactionSourceV0, TriggerV0};
+
+    let mut sysvar_data = sysvar_holding(top_level);
+    let mut sysvar_lamports = 0u64;
+    let sysvar_owner = Pubkey::default();
+    let sysvar = AccountInfo::new(
+      &IX_ID,
+      false,
+      false,
+      &mut sysvar_lamports,
+      &mut sysvar_data,
+      &sysvar_owner,
+      false,
+      0,
+    );
+
+    let mut task_data = Vec::new();
+    TaskV0 {
+      task_queue: Pubkey::new_unique(),
+      rent_amount: 0,
+      crank_reward: 0,
+      id: 0,
+      trigger: TriggerV0::Now,
+      rent_refund: Pubkey::new_unique(),
+      transaction: TransactionSourceV0::RemoteV0 {
+        url: "https://example.com".to_string(),
+        signer,
+      },
+      queued_at: 0,
+      bump_seed: 0,
+      free_tasks: FREE_TASKS as u8,
+      description: String::new(),
+    }
+    .try_serialize(&mut task_data)
+    .expect("serialize task");
+
+    let tuktuk_id = tuktuk::ID;
+    let system_id = Pubkey::default();
+    let keys: Vec<Pubkey> = (0..2 + FREE_TASKS).map(|_| Pubkey::new_unique()).collect();
+    let mut lamports = vec![0u64; keys.len()];
+    let mut datas: Vec<Vec<u8>> = (0..keys.len()).map(|_| Vec::new()).collect();
+    datas[1] = task_data;
+    let remaining: Vec<AccountInfo> = keys
+      .iter()
+      .zip(lamports.iter_mut())
+      .zip(datas.iter_mut())
+      .enumerate()
+      .map(|(i, ((key, lamports), data))| {
+        let (key, owner) = if i == 1 {
+          (&task_key, &tuktuk_id)
+        } else {
+          (key, &system_id)
+        };
+        AccountInfo::new(key, i == 0, i > 1, lamports, data, owner, false, 0)
+      })
+      .collect();
+
+    running_remote_task(&sysvar, &remaining, &signer).map(|(key, task, _)| (key, task))
+  }
+
+  // run_task_v0 hands each CPI the task's free-task accounts after the instruction's own, so the
+  // running task is not the last remaining account when the task has free tasks.
+  #[test]
+  fn finds_the_running_task_ahead_of_free_task_accounts() {
+    let task_key = Pubkey::new_unique();
+    let run_task = top_level_ix(tuktuk::ID, RunTaskV0::DISCRIMINATOR, task_key);
+    let (found, task) = find_running_task(&run_task, task_key, Pubkey::new_unique())
+      .unwrap_or_else(|err| panic!("finds the running task: {err:?}"));
+    assert_eq!(found, task_key);
+    assert_eq!(task.free_tasks as usize, FREE_TASKS);
+  }
+
+  #[test]
+  fn rejects_a_top_level_instruction_that_is_not_run_task_v0() {
+    use tuktuk_program::client::args::QueueTaskV0;
+
+    // Account 3 of the top-level instruction is not among the remaining accounts, so the shape
+    // check has to come before the task lookup.
+    for top_level in [
+      top_level_ix(Pubkey::new_unique(), &[0u8; 8], Pubkey::new_unique()),
+      top_level_ix(
+        Pubkey::new_unique(),
+        RunTaskV0::DISCRIMINATOR,
+        Pubkey::new_unique(),
+      ),
+      top_level_ix(tuktuk::ID, QueueTaskV0::DISCRIMINATOR, Pubkey::new_unique()),
+    ] {
+      let err =
+        find_running_task(&top_level, Pubkey::new_unique(), Pubkey::new_unique()).unwrap_err();
+      assert_eq!(
+        err,
+        Error::from(VerifyRunningRemoteTaskError::NotRunningAsTask)
+      );
+    }
+  }
 }

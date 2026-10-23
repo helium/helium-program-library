@@ -1,0 +1,34 @@
+# The one solana-verify pin. The release hash, the deploy skip and the daily hash check must
+# all come from the same binary, so every job installs it through this action.
+name: "Install Solana Verify"
+description: "Installs the pinned solana-verify to ~/.cargo/bin"
+inputs:
+  # Pinned: 0.5.0 was the newest release that built on the old rustc 1.85 pin; 0.5.1+
+  # pulls deps (solana-address, solana-system-interface) that require rustc 1.89.
+  # setup-anchor now pins 1.89.0, so rustc no longer holds this back. The bump waits
+  # for the SBPFv3 build, which also needs `--arch v3` and a new base image.
+  version:
+    description: "The solana-verify version"
+    required: false
+    default: "0.5.0"
+  cache:
+    description: "Restore and save the solana-verify cache"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/cache@v4
+      name: Cache Solana Verify
+      id: cache-solana-verify
+      if: inputs.cache == 'true'
+      with:
+        path: |
+          ~/.cargo/bin/solana-verify
+        key: cargo-${{ runner.os }}-solana-verify-${{ inputs.version }}
+    - run: cargo install solana-verify --version "$VERSION" --locked --force
+      if: steps.cache-solana-verify.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}

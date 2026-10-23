@@ -1,5 +1,65 @@
 # Change Log
 
+## 0.12.2
+
+### Patch Changes
+
+- [#1363](https://github.com/helium/helium-program-library/pull/1363) [`07e6c4c`](https://github.com/helium/helium-program-library/commit/07e6c4c62a62091d290a3b10437ce4d1bcc5b12f) Thanks [@bryzettler](https://github.com/bryzettler)! - The `lazy_distributor` IDL adds the error `InvalidMerkleTree`.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`ccd06d5`](https://github.com/helium/helium-program-library/commit/ccd06d5f39e90e9f1ef6630fe7608d02f57915c1) Thanks [@bryzettler](https://github.com/bryzettler)! - mini-fanout `schedule_task_v0` and `distribute_v0` fail with `InvalidSchedule` when the fanout's schedule does not parse or has no future time. Before, both cases failed with `InvalidDataIncrease`.
+
+## 0.12.1
+
+### Patch Changes
+
+- [#1354](https://github.com/helium/helium-program-library/pull/1354) [`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297) Thanks [@bryzettler](https://github.com/bryzettler)! - Each task dequeue in `dc_auto_top`, `hpl_crons`, `mini_fanout`, and `tuktuk_dca` now refunds the task's rent to the account the task names as its `rent_refund`. The handler selects that account from the writable accounts of the instruction, then from the remaining accounts, where it must be writable. The account lists of the instructions do not change. Each program has two new errors, `RentRefundAccountMissing` and `RentRefundAccountNotWritable`.
+
+  `@helium/hpl-crons-sdk` adds `taskRentRefund(tuktukProgram, task)`. It reads a task and returns its rent refund as one writable remaining account, or an empty list when the task does not exist.
+
+  The governance hooks and the admin CLI commands that close or restart a task append that account when the instruction does not have it.
+
+## 0.12.0
+
+### Minor Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0) Thanks [@bryzettler](https://github.com/bryzettler)! - Move from `@coral-xyz/anchor` to `@anchor-lang/core` 0.31.2, the package Anchor now publishes its TypeScript client under. When a transaction lands and then fails, `sendAndConfirm` and `sendAll` now throw a `SendTransactionError` that holds the program logs and the original error message. Errors from `simulate` now also hold the program logs. With `@solana/web3.js` 1.92 or later, 0.31.1 lost them. Preflight failures are unchanged. `sendAndConfirm` and `sendAll` now fetch the blockhash at `commitment` when `preflightCommitment` is not set. SDK functions typed on `Program` reject a `Program` built from `@coral-xyz/anchor`, so consumers must import `Program` from `@anchor-lang/core`. A provider or IDL from either package is accepted. A pnpm or npm override can alias `@coral-xyz/anchor@^0.31` to `npm:@anchor-lang/core@0.31.2`. This override puts third-party SDKs on the same 0.31.2 code. Under npm, or pnpm with `node-linker=hoisted`, the override installs a second copy of the module, and `setProvider` state and `instanceof` checks do not cross between the two package names. Under the default pnpm linker, both names load one copy.
+
+### Patch Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`b26c94b`](https://github.com/helium/helium-program-library/commit/b26c94b2447cdc03eb0b997e7efcae7ed2891325) Thanks [@bryzettler](https://github.com/bryzettler)! - Derive the data-only tree fee in helium-entity-manager's `issue_data_only_entity_v0` from the Rent sysvar at issue time: `ceil(Rent::get().minimum_balance(new_tree_space) / 2^new_tree_depth)`. The fee was `DataOnlyConfigV0.new_tree_fee_lamports`, fixed at DAO bootstrap under the old rent and changeable by no instruction, so as SIMD-0437 lowers rent it over-collects from onboarding wallets (69,215 stored vs 50,520 derived at mainnet rent in September 2026, about 10x at the last step) and strands the surplus in the tree escrow, whose only outflow is the exact rent reimbursement at tree rotation. The fee is priced at issue-time rent. If rent rises before rotation, the escrow's surplus covers the difference; if it does not, `update_data_only_tree_v0`'s reimbursement fails and issuance stops once the tree fills until the escrow is topped up. `new_tree_fee_lamports` and the `new_tree_fee_lamports` init argument keep their layout and are no longer read.
+
+## 0.11.33
+
+### Patch Changes
+
+- [#1340](https://github.com/helium/helium-program-library/pull/1340) [`6382fde`](https://github.com/helium/helium-program-library/commit/6382fde9a155564851b6096a2bc698759b4c4977) Thanks [@madninja](https://github.com/madninja)! - Add `close_carrier_v0` and `close_incentive_program_v0` to `mobile-entity-manager`, and fix `swap_carrier_stake` to record the escrow it moves the stake to.
+
+  A carrier had no way to release its stake. `revoke_carrier_v0` only sets `approved = false`, and `swap_carrier_stake` is a collateral migration rather than a release: it returns the legacy DNT stake and posts `CARRIER_STAKE_AMOUNT` of HNT in the same instruction, so the collateral posted never falls.
+
+  `close_carrier_v0` transfers the escrow out, closes it, and closes the `CarrierV0`. It is signed by `sub_dao.authority`, matching approve and revoke, while `destination` is constrained to a token account owned by `carrier.update_authority`, so retiring a carrier cannot move its stake anywhere the carrier does not control. `!carrier.approved` is required. Close every `IncentiveEscrowProgramV0` under a carrier before the carrier itself: they are reached through the `CarrierV0` and cannot be closed once it is gone.
+
+  `close_incentive_program_v0` retires an incentive escrow program whose window has passed, signed by `issuing_authority`.
+
+  `swap_carrier_stake` previously left `carrier.escrow` naming the account it had just closed, which put the new stake beyond the reach of any instruction that resolves the escrow through that field. It now records the new escrow.
+
+## 0.11.32
+
+### Patch Changes
+
+- [#1332](https://github.com/helium/helium-program-library/pull/1332) [`d5f9a16`](https://github.com/helium/helium-program-library/commit/d5f9a167e99ee6797c31e0b91359d7993cb06305) Thanks [@madninja](https://github.com/madninja)! - Run a DCA's swap through tuktuk-dca rather than as an instruction `run_task_v0` invokes directly. `run_task_v0` reads the return data slot after each instruction it invokes and, when the program it invoked is the one that set it, requires the bytes to be a `RunTaskReturnV0`; a Jupiter route sets its own eight-byte out-amount, so a route invoked directly fails the run with `BorshIoError` after the swap has already executed. The new `swap_v0` CPIs a callee pinned by address, which makes the swap program a child whose return data `run_task_v0` ignores, leaving `check_repay_v0` as the only return the run makes. Adds the `swap_v0` instruction.
+
+## 0.11.31
+
+### Patch Changes
+
+- [#1328](https://github.com/helium/helium-program-library/pull/1328) [`5c26876`](https://github.com/helium/helium-program-library/commit/5c2687630c4dcd0e926b8aca82b30b3cc4daca80) Thanks [@madninja](https://github.com/madninja)! - Reject trailing instructions re-labelled as signer seeds in lazy-transactions `execute_transaction_v0`. Every caller-supplied signer seed set must derive an address the transaction actually uses, and seeds that do not derive a program address are a typed error rather than a panic. Adds the `InvalidSignerSeeds` and `UnusedSignerSeeds` error codes.
+
+## 0.11.30
+
+### Patch Changes
+
+- [#1323](https://github.com/helium/helium-program-library/pull/1323) [`74910dc`](https://github.com/helium/helium-program-library/commit/74910dcea4a8991b64479fa6c8f8181064b525c5) Thanks [@madninja](https://github.com/madninja)! - Bind the lazy-distributor RemoteV0 reward path to the running task and the signed reward. `set_current_rewards_v1` recomputes the tuktuk verification hash over the running task, its `queued_at`, and `run_task_v0`'s account list and requires it to equal the oracle-signed hash, then requires the signed transaction to carry an instruction ending in this call's `(oracle_index, current_rewards)`. A signature issued for another task, run over other accounts, or paired with a different amount is rejected. Adds the `RemoteTaskHashMismatch` and `RemoteRewardNotSigned` error codes.
+
 ## 0.11.29
 
 ### Patch Changes

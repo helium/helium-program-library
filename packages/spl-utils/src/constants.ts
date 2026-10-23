@@ -27,7 +27,7 @@ export const HELIUM_COMMON_LUT_DEVNET = new PublicKey(
 );
 
 export const HELIUM_COMMON_LUT = new PublicKey(
-  "43eY9L2spbM2b1MPDFFBStUiFGt29ziZ1nc1xbpzsfVt"
+  "Gfnhg9cf97YGLxvHK785zuK5GKEuBw8Y1W1YPo1i3QjL"
 );
 
 export const HNT_PRICE_FEED_ID =

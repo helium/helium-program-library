@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { BN, Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { BN, Program } from "@anchor-lang/core";
 import {
   customSignerKey,
   init as initTuktuk,
@@ -43,6 +43,7 @@ import {
   DCA_TEST_URL,
   runAllTasks as runAllTasksUtil,
   setDcaServerRepayBps,
+  setDcaServerSkipLend,
 } from "./utils/dca-test-server";
 import { expectAnchorError } from "./utils/expectAnchorError";
 import { ensureTuktukDcaIdl } from "./utils/fixtures";
@@ -169,7 +170,9 @@ describe("tuktuk-dca", () => {
     await createAtaAndMint(
       provider,
       hntMint,
-      new BN(100_00000000 * 100), // Mint 10,000 HNT for testing
+      // The suite swaps ~4,600 USDC in all. Its HNT output grows as the oracle
+      // price falls: at $0.40 it needs ~11,400 HNT.
+      new BN(100_000_00000000), // 100,000 HNT
       swapPayer,
     );
 
@@ -303,6 +306,8 @@ describe("tuktuk-dca", () => {
     // A fresh authority per test, so each one gets its own DCA at `dcaIndex` whether or not the
     // test before it left its DCA open.
     let dcaAuthority: Keypair;
+    // Pays the DCA's rent and queues its task. The wallet does unless a suite below sets one.
+    let rentPayer: Keypair | undefined;
 
     beforeEach(async () => {
       dcaAuthority = Keypair.generate();
@@ -368,7 +373,7 @@ describe("tuktuk-dca", () => {
         })
         .accountsPartial({
           core: {
-            rentPayer: me,
+            rentPayer: rentPayer?.publicKey ?? me,
             dcaPayer: me,
             authority: dcaAuthority.publicKey,
             inputMint: usdcMint,
@@ -385,7 +390,7 @@ describe("tuktuk-dca", () => {
             queueAuthorityKey()[0],
           )[0],
         })
-        .signers([dcaAuthority])
+        .signers(rentPayer ? [dcaAuthority, rentPayer] : [dcaAuthority])
         .rpc({ skipPreflight: true });
 
       console.log("DCA initialized", dca.toBase58());
@@ -395,7 +400,22 @@ describe("tuktuk-dca", () => {
     });
 
     async function runAllTasks() {
-      await runAllTasksUtil(provider, tuktukProgram, taskQueue, crankTurner);
+      return runAllTasksUtil(provider, tuktukProgram, taskQueue, crankTurner);
+    }
+
+    /** The deepest `Program … invoke [n]` any program reached in this transaction. */
+    async function maxCpiDepth(signature: string): Promise<number> {
+      const tx = await provider.connection.getTransaction(signature, {
+        maxSupportedTransactionVersion: 1,
+        commitment: "confirmed",
+      });
+      const logs = tx?.meta?.logMessages ?? [];
+      expect(logs.length, `no logs for ${signature}`).to.be.greaterThan(0);
+      return Math.max(
+        ...logs
+          .filter((l) => l.includes(" invoke ["))
+          .map((l) => Number(l.split("invoke [")[1].replace("]", ""))),
+      );
     }
 
     it("executes a full DCA swap cycle through multiple runs", async () => {
@@ -467,7 +487,27 @@ describe("tuktuk-dca", () => {
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // Run all tasks
-        await runAllTasks();
+        const runSignatures = await runAllTasks();
+
+        // A DCA run spends CPI stack frames, and the runtime allows five. Here the wrapped
+        // callee is the token program, which calls nothing further, so the run bottoms out at
+        // three: run_task_v0, then swap_v0, then the token program. Mainnet spends two more,
+        // because a Jupiter route is three frames deep on its own (Jupiter, the AMM, the token
+        // program) where this stand-in is one -- which puts the real chain at the limit with
+        // nothing to spare. A frame added anywhere on this side is therefore a frame the real
+        // route does not have, so this number is pinned rather than bounded.
+        // An empty list would make the loop below a no-op and the assertion vacuous.
+        expect(
+          runSignatures.length,
+          "no task ran, so the depth assertion would assert nothing",
+        ).to.be.greaterThan(0);
+        for (const signature of runSignatures) {
+          expect(
+            await maxCpiDepth(signature),
+            `CPI depth changed for ${signature}. Mainnet runs this chain two frames deeper, ` +
+              `and the runtime limit is five, so any increase here overflows a real route.`,
+          ).to.equal(3);
+        }
 
         // Verify state after swap
         const dcaAccountNow = await program.account.dcaV0.fetchNullable(dca);
@@ -554,6 +594,100 @@ describe("tuktuk-dca", () => {
       expect(dcaAccount).to.be.null;
     });
 
+    const lamportsOf = (account: PublicKey) =>
+      provider.connection.getBalance(account);
+
+    // What tuktuk leaves in a task: the rent exemption for its data, and its crank reward.
+    const lamportsHeldBy = async (taskAddress: PublicKey) => {
+      const { data } = (await provider.connection.getAccountInfo(taskAddress))!;
+      const { crankReward } = tuktukProgram.coder.accounts.decode(
+        "taskV0",
+        data,
+      );
+      return (
+        (await provider.connection.getMinimumBalanceForRentExemption(
+          data.length,
+        )) + Number(crankReward.toString())
+      );
+    };
+
+    // The wallet holds more lamports than a number carries exactly, so the payer here is a
+    // keypair whose balance can be compared to the lamport.
+    describe("with a rent payer other than the wallet", () => {
+      before(async () => {
+        rentPayer = Keypair.generate();
+        await sendInstructions(provider, [
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: rentPayer.publicKey,
+            lamports: LAMPORTS_PER_SOL,
+          }),
+        ]);
+      });
+
+      after(() => {
+        rentPayer = undefined;
+      });
+
+      it("refunds the task to the payer that queued it", async () => {
+        const payer = rentPayer!.publicKey;
+        const { rentRefund } = await tuktukProgram.account.taskV0.fetch(task);
+        expect(rentRefund.toBase58()).to.equal(payer.toBase58());
+        const taskLamports = await lamportsHeldBy(task);
+        expect(await lamportsOf(task)).to.equal(taskLamports);
+        // That payer is also the DCA's rent refund, so the close pays it the rent of the DCA
+        // and of its input account as well.
+        const closed =
+          taskLamports +
+          (await lamportsOf(dca)) +
+          (await lamportsOf(inputAccount));
+        const before = await lamportsOf(payer);
+        const queueBefore = await lamportsOf(taskQueue);
+
+        await program.methods
+          .closeDcaV0()
+          .accountsPartial({
+            dca,
+            authority: dcaAuthority.publicKey,
+          })
+          .signers([dcaAuthority])
+          .rpc({ skipPreflight: true });
+
+        expect(await provider.connection.getAccountInfo(task)).to.equal(null);
+        expect(await program.account.dcaV0.fetchNullable(dca)).to.equal(null);
+        expect(await lamportsOf(payer)).to.equal(before + closed);
+        expect(await lamportsOf(taskQueue)).to.equal(queueBefore);
+      });
+    });
+
+    it("refunds a task that a run returned to the task queue", async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await runAllTasks();
+      const { nextTask } = await program.account.dcaV0.fetch(dca);
+      expect(nextTask.toBase58()).to.not.equal(task.toBase58());
+      const { rentRefund } = await tuktukProgram.account.taskV0.fetch(nextTask);
+      expect(rentRefund.toBase58()).to.equal(
+        taskQueue.toBase58(),
+        "the run should have returned a task that refunds to the task queue",
+      );
+      const taskLamports = await lamportsHeldBy(nextTask);
+      expect(await lamportsOf(nextTask)).to.equal(taskLamports);
+      const before = await lamportsOf(taskQueue);
+
+      await program.methods
+        .closeDcaV0()
+        .accountsPartial({
+          dca,
+          authority: dcaAuthority.publicKey,
+        })
+        .signers([dcaAuthority])
+        .rpc({ skipPreflight: true });
+
+      expect(await provider.connection.getAccountInfo(nextTask)).to.equal(null);
+      expect(await program.account.dcaV0.fetchNullable(dca)).to.equal(null);
+      expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
+    });
+
     it("refuses a close that sends the input somewhere other than the authority's account", async () => {
       const stranger = Keypair.generate().publicKey;
       await createAtaAndMint(provider, usdcMint, new BN(0), stranger);
@@ -583,6 +717,68 @@ describe("tuktuk-dca", () => {
           .accountsPartial({ dca })
           .rpc(),
         "InvalidCpiContext",
+      );
+    });
+
+    // swap_v0 runs only as a CPI from the DCA's own run_task_v0, the same binding
+    // check_repay_v0 carries. Called directly it must refuse on the binding, not on state.
+    it("refuses a swap called outside a tuktuk task run", async () => {
+      await expectAnchorError(
+        program.methods
+          .swapV0({ data: Buffer.from([]) })
+          .accountsPartial({ dca })
+          .rpc(),
+        "InvalidCpiContext",
+      );
+    });
+
+    // swap_v0 runs only in the window lend_v0 opens. The server leaves lend_v0 and
+    // check_repay_v0 out of this run, so the swap is alone in the task and swap_v0's own guard
+    // is the one that refuses it; with check_repay_v0 present its guard would refuse first.
+    describe("when the swap runs without a lend", () => {
+      before(() => {
+        setDcaServerSkipLend(true);
+      });
+
+      after(() => {
+        setDcaServerSkipLend(false);
+      });
+
+      it("refuses the swap", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Sent raw rather than through runAllTasks, which reports a failed run without the
+        // logs the error name is read from. The crank turner pays, as it does there.
+        const runTaskIxs = await runTask({
+          program: tuktukProgram,
+          task,
+          crankTurner: crankTurner.publicKey,
+        });
+        const tx = new Transaction().add(
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+          ...runTaskIxs,
+        );
+        tx.recentBlockhash = (
+          await provider.connection.getLatestBlockhash("confirmed")
+        ).blockhash;
+        tx.feePayer = crankTurner.publicKey;
+        tx.sign(crankTurner);
+        await expectAnchorError(
+          provider.connection.sendRawTransaction(tx.serialize()),
+          "LendNotCalled",
+        );
+      });
+    });
+
+    // swap_v0 forwards instruction data it does not interpret, so the callee is pinned by
+    // address rather than taken from that data. A TESTING build pins a different program than
+    // mainnet does, so the pin itself is what this asserts, not which program it names.
+    it("refuses a swap against a program other than the pinned one", async () => {
+      await expectAnchorError(
+        program.methods
+          .swapV0({ data: Buffer.from([]) })
+          .accountsPartial({ dca, swapProgram: SystemProgram.programId })
+          .rpc(),
+        "ConstraintAddress",
       );
     });
 

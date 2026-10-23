@@ -1,11 +1,12 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { calculateFundingForAdditionalDuration } from "@/lib/utils/automation-helpers";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   HELIUM_COMMON_LUT,
   HELIUM_COMMON_LUT_DEVNET,
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import {
   PublicKey,
@@ -55,7 +56,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
       recipientRentLamports,
       pdaWalletRentLamports,
       ataRentLamports,
-      taskReturnAccountRentLamports,
+      taskReturnAccountFundingLamports,
       minCrankReward,
       cronJob,
       pdaWallet,
@@ -74,7 +75,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
         pdaWalletRentLamports,
         additionalDuration,
         ataRentLamports,
-        taskReturnAccountRentLamports,
+        taskReturnAccountFundingLamports,
       });
 
     // Note: recipient rent is already included in pdaWalletFundingLamports via the shortfall calculation
@@ -140,18 +141,19 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
     }
 
     // Build and serialize transactions
-    const vtxs = (
-      await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-        addressLookupTableAddresses: [
-          process.env.SOLANA_CLUSTER?.trim() === "devnet"
-            ? HELIUM_COMMON_LUT_DEVNET
-            : HELIUM_COMMON_LUT,
-        ],
-        commitment: "finalized",
-        // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-        deriveLoadedAccountsDataSizeLimit: false,
-      })
-    ).map((tx) => toVersionedTx(tx));
+    const vtxs = await Promise.all(
+      (
+        await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+          addressLookupTableAddresses: [
+            process.env.SOLANA_CLUSTER?.trim() === "devnet"
+              ? HELIUM_COMMON_LUT_DEVNET
+              : HELIUM_COMMON_LUT,
+          ],
+          commitment: "finalized",
+          signing: WALLET_SIGNED,
+        })
+      ).map((tx) => toVersionedTx(tx)),
+    );
 
     // Add Jito tip if needed for mainnet bundles
     const useJito = shouldUseJitoBundle(vtxs.length, getCluster());

@@ -11,6 +11,19 @@ pub use state::*;
 
 declare_id!("topqqzQZroCyRrgyM5zVq6xkFDVnfF13iixSjajydgU");
 
+// A TESTING build substitutes test values for production ones, so it must never be
+// mistaken for a deployable program on any cluster. TESTING on its own can arrive from an
+// inherited environment; HELIUM_TEST_BUILD is set only by a build that means to be a test
+// build. A deployable program refuses to compile when the two disagree.
+#[cfg(all(not(feature = "no-entrypoint"), not(feature = "idl-build"), not(test)))]
+const _: () = {
+  if option_env!("TESTING").is_some() && option_env!("HELIUM_TEST_BUILD").is_none() {
+    panic!(
+      "TESTING is set without HELIUM_TEST_BUILD; a deployable program must not use test values. A deliberate test build sets both."
+    );
+  }
+};
+
 #[cfg(not(feature = "no-entrypoint"))]
 security_txt! {
   name: "Data Credits Auto Top",
@@ -47,14 +60,16 @@ pub mod dc_auto_top {
     instructions::top_off_hnt_v0::handler(ctx)
   }
 
-  pub fn update_auto_top_off_v0(
-    ctx: Context<UpdateAutoTopOffV0>,
+  pub fn update_auto_top_off_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, UpdateAutoTopOffV0<'info>>,
     args: UpdateAutoTopOffArgsV0,
   ) -> Result<()> {
     instructions::update_auto_top_off_v0::handler(ctx, args)
   }
 
-  pub fn close_auto_top_off_v0(ctx: Context<CloseAutoTopOffV0>) -> Result<()> {
+  pub fn close_auto_top_off_v0<'info>(
+    ctx: Context<'_, '_, '_, 'info, CloseAutoTopOffV0<'info>>,
+  ) -> Result<()> {
     instructions::close_auto_top_off_v0::handler(ctx)
   }
 
@@ -65,7 +80,7 @@ pub mod dc_auto_top {
     instructions::initialize_auto_top_off_v0::handler(ctx, args)
   }
 
-  pub fn close_dca_v0(ctx: Context<CloseDcaV0>) -> Result<()> {
+  pub fn close_dca_v0<'info>(ctx: Context<'_, '_, '_, 'info, CloseDcaV0<'info>>) -> Result<()> {
     instructions::close_dca_v0::handler(ctx)
   }
 

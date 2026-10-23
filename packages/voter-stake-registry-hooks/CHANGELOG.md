@@ -1,5 +1,64 @@
 # Change Log
 
+## 0.14.2
+
+### Patch Changes
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`b0c7cd1`](https://github.com/helium/helium-program-library/commit/b0c7cd1d09cc7c0023fd025eff9413b1df5e55dc) Thanks [@bryzettler](https://github.com/bryzettler)! - `formPositionClaims` now skips epochs the program would reject (not over, rewards not issued, or no delegation rewards), so the other claims land; closing a delegation still needs every epoch up to the close bound claimed. Claims stop 128 epochs past the first skipped epoch, since the on-chain claim bitmap cannot reach further, and each skipped epoch is logged. `useExtendDelegation` and the extend and change branches of `useDelegatePositions` now build the closing, genesis-end and season accounts the program expects, using the registrar's time offset. `useCreatePosition` throws when no season covers the current time instead of building a delegation that cannot land.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`f00868f`](https://github.com/helium/helium-program-library/commit/f00868faa24137e6101e9e191f75c5d01e0866a4) Thanks [@bryzettler](https://github.com/bryzettler)! - `useDelegatePositions` now sends the reward claims for expired delegations. Before, it sent an empty batch. It also closes each expired delegation against its own sub-DAO, not the sub-DAO at the filtered index. `useExtendDelegation` no longer passes the helium-sub-daos IDL to the proxy and VSR programs.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`a2a1e16`](https://github.com/helium/helium-program-library/commit/a2a1e168668b8f3d5b5a00bcae72fdc12dc42c71) Thanks [@bryzettler](https://github.com/bryzettler)! - `HeliumVsrStateProvider` now recomputes position metadata when `now` or the proxy config changes. Before, decay, delegation expiry and the current season stayed stale until the positions changed.
+
+- [#1364](https://github.com/helium/helium-program-library/pull/1364) [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973) Thanks [@bryzettler](https://github.com/bryzettler)! - Declare wallet signing with `signing: WALLET_SIGNED` on every priority-fee batcher call, in place of the `version: 0` and `deriveLoadedAccountsDataSizeLimit: false` pins. Behaviour change: these hooks pinned only `version: 0` and still derived a loaded-accounts data size limit; they no longer derive one, so a wallet that appends guard instructions cannot push them past the limit: `useAssignProxies`, `useClaimAllPositionsRewards`, `useClaimPositionRewards`, `useDelegatePosition` (3 calls), `useUnassignProxies`, `useUndelegatePosition`.
+
+- Updated dependencies [[`07e6c4c`](https://github.com/helium/helium-program-library/commit/07e6c4c62a62091d290a3b10437ce4d1bcc5b12f), [`ccd06d5`](https://github.com/helium/helium-program-library/commit/ccd06d5f39e90e9f1ef6630fe7608d02f57915c1), [`c0235ed`](https://github.com/helium/helium-program-library/commit/c0235ed8d17e48cd9177dcfd3635352bde70582c), [`6a22e08`](https://github.com/helium/helium-program-library/commit/6a22e08060b9470ae65a8a447c22157f436e7973)]:
+  - @helium/idls@0.12.2
+  - @helium/spl-utils@0.15.0
+  - @helium/automation-hooks@0.14.2
+  - @helium/circuit-breaker-sdk@0.12.1
+  - @helium/helium-react-hooks@0.12.1
+  - @helium/helium-sub-daos-sdk@0.13.1
+  - @helium/hpl-crons-sdk@0.15.1
+  - @helium/voter-stake-registry-sdk@0.13.1
+
+## 0.14.1
+
+### Patch Changes
+
+- [#1354](https://github.com/helium/helium-program-library/pull/1354) [`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297) Thanks [@bryzettler](https://github.com/bryzettler)! - Each task dequeue in `dc_auto_top`, `hpl_crons`, `mini_fanout`, and `tuktuk_dca` now refunds the task's rent to the account the task names as its `rent_refund`. The handler selects that account from the writable accounts of the instruction, then from the remaining accounts, where it must be writable. The account lists of the instructions do not change. Each program has two new errors, `RentRefundAccountMissing` and `RentRefundAccountNotWritable`.
+
+  `@helium/hpl-crons-sdk` adds `taskRentRefund(tuktukProgram, task)`. It reads a task and returns its rent refund as one writable remaining account, or an empty list when the task does not exist.
+
+  The governance hooks and the admin CLI commands that close or restart a task append that account when the instruction does not have it.
+
+- Updated dependencies [[`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297), [`5130be3`](https://github.com/helium/helium-program-library/commit/5130be3537db5c7d75b366eb6b52bbbfd728e297)]:
+  - @helium/spl-utils@0.14.1
+  - @helium/hpl-crons-sdk@0.15.0
+  - @helium/idls@0.12.1
+  - @helium/automation-hooks@0.14.1
+
+## 0.14.0
+
+### Minor Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0) Thanks [@bryzettler](https://github.com/bryzettler)! - Move from `@coral-xyz/anchor` to `@anchor-lang/core` 0.31.2, the package Anchor now publishes its TypeScript client under. When a transaction lands and then fails, `sendAndConfirm` and `sendAll` now throw a `SendTransactionError` that holds the program logs and the original error message. Errors from `simulate` now also hold the program logs. With `@solana/web3.js` 1.92 or later, 0.31.1 lost them. Preflight failures are unchanged. `sendAndConfirm` and `sendAll` now fetch the blockhash at `commitment` when `preflightCommitment` is not set. SDK functions typed on `Program` reject a `Program` built from `@coral-xyz/anchor`, so consumers must import `Program` from `@anchor-lang/core`. A provider or IDL from either package is accepted. A pnpm or npm override can alias `@coral-xyz/anchor@^0.31` to `npm:@anchor-lang/core@0.31.2`. This override puts third-party SDKs on the same 0.31.2 code. Under npm, or pnpm with `node-linker=hoisted`, the override installs a second copy of the module, and `setProvider` state and `instanceof` checks do not cross between the two package names. Under the default pnpm linker, both names load one copy.
+
+### Patch Changes
+
+- [#1345](https://github.com/helium/helium-program-library/pull/1345) [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283) Thanks [@bryzettler](https://github.com/bryzettler)! - `@helium/spl-utils` now builds v1 transactions when the node and a keypair-backed signer support them. Wallet adapters stay on v0 unless a per-call `version` forces a version. `HPL_TX_VERSION=v0` forces v0. `HPL_TX_VERSION=v1` skips node detection, but a signer without v1 support still gets v0. Any `HPL_TX_VERSION` value other than `v0`, `v1` or `auto` throws. `sendInstructions` falls back to v0 when the instructions exceed the v1 limits, and takes an optional `version`. The batchers pick v1 or v0 for each transaction. Both batchers now throw when a single instruction group fits in no transaction version, instead of sending an oversize transaction. The `executeRemoteTxn` family, `executeBig`, `BigInstructionResult`, `sendMultipleInstructions` and `createNft` are no longer exported; `createNft` moved to the tests. `stringToTransaction` and `bufferToTransaction` are deprecated. `createAtaAndMint` and `createAtaAndTransfer` now honour only `commitment` from their `ConfirmOptions`. `mintTo`, `createMint` and `createAtaAndMint` now send through `sendInstructions` with preflight skipped. `@helium/sus` now simulates and prices v1 transactions. `TransactionCompletionQueue` now removes its websocket signature subscription when a confirmation wait resolves, fails or times out, instead of leaving it open on the shared connection. `bulkSendTransactions` and `bulkSendRawTransactions` no longer resend a transaction with an unsigned required signer until expiry. They send the signed ones, then throw "Missing signature for public key …". When an on-chain failure or blockhash expiry ends the call first, its error also names the missing signers found so far. `@helium/distributor-oracle` `minRent` now rejects, and does not cache, a rent of 0 from an RPC error body.
+
+- Updated dependencies [[`9f99b45`](https://github.com/helium/helium-program-library/commit/9f99b458c442cd11909e7fccb4db33f373c33c8b), [`0888cd5`](https://github.com/helium/helium-program-library/commit/0888cd5ccae217e3b4c07e18459cc9f6ef2dbfc0), [`d308316`](https://github.com/helium/helium-program-library/commit/d308316cdbfe442dab0490dd535630d97a7540b8), [`6f11300`](https://github.com/helium/helium-program-library/commit/6f11300031422e9468dc9c0ad813fad9eaa76d3c), [`b26c94b`](https://github.com/helium/helium-program-library/commit/b26c94b2447cdc03eb0b997e7efcae7ed2891325), [`a9b1301`](https://github.com/helium/helium-program-library/commit/a9b13019bb52e8e9015f3fcfaabb4308c8aeddc6), [`4dbe762`](https://github.com/helium/helium-program-library/commit/4dbe762512abea5d53f4ca59d96385a158c7f283)]:
+  - @helium/account-fetch-cache@0.11.17
+  - @helium/automation-hooks@0.14.0
+  - @helium/circuit-breaker-sdk@0.12.0
+  - @helium/helium-react-hooks@0.12.0
+  - @helium/helium-sub-daos-sdk@0.13.0
+  - @helium/hpl-crons-sdk@0.14.0
+  - @helium/idls@0.12.0
+  - @helium/spl-utils@0.14.0
+  - @helium/voter-stake-registry-sdk@0.13.0
+
 ## 0.13.0
 
 ### Minor Changes

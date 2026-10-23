@@ -1,27 +1,37 @@
 name: Tests
 
+# A push to develop is a cache seed run, not a test run: only the `build` job runs, so that a PR
+# into develop can restore a `testing=true` `target/` cache and the base IDLs its merge commit will
+# be diffed against. Every other job carries
+#   if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
+# to opt out of that run. The gate is a job-level `if:` and never a workflow-level `paths` filter,
+# so a required check can never sit pending.
 on:
   push:
     branches:
       - master
+      - develop
   pull_request:
     branches:
       - master
       - develop
+permissions:
+  contents: read
 env:
-  SOLANA_CLI_VERSION: 2.1.6
+  SOLANA_CLI_VERSION: 4.3.2
 
 jobs:
   test-rust-lint:
     name: Test Rust Lint
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/setup/
-      # Every other job takes its compiler from setup-anchor's `rustup default 1.85.0`; this one
+      # Every other job takes its compiler from setup-anchor's `rustup default 1.89.0`; this one
       # does not run setup-anchor, so without a version here it takes whatever the runner image
-      # ships and the gate drifts away from the code. It cannot simply reuse 1.85.0: the clippy
+      # ships and the gate drifts away from the code. It cannot simply reuse 1.89.0: the clippy
       # flags below name lints that only exist in a later release, and an unknown lint is itself
       # an error under `-D warnings`. Bump this deliberately, and expect new lints when you do.
       - run: rustup install 1.98.0 --component clippy,rustfmt --profile minimal && rustup default 1.98.0
@@ -34,7 +44,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo fmt -- --check
       # or_fun_call is on because `ok_or(error!(..))` builds the error on the success path too,
@@ -42,101 +52,146 @@ jobs:
       # never frees, so errors that are never returned still consume it.
       - run: cargo clippy --all-targets -- -D warnings -D clippy::or_fun_call -A clippy::result_large_err -A clippy::too_many_arguments -A clippy::uninlined-format-args -A clippy::manual_is_multiple_of -A ambiguous_glob_reexports -A unexpected-cfgs
 
-  check-idls-changeset:
-    name: Check @helium/idls Changeset
-    if: github.event_name == 'pull_request'
+  check-release-bumps:
+    name: Check Version Bumps and Changesets
+    # A develop-to-master release PR carries every change since the last release, after
+    # `changeset version` has consumed the changesets, so the job runs only on PRs into develop.
+    # A Version Packages PR into develop passes because it changes no src/.
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: scripts/check-release-bumps.sh ${{ github.event.pull_request.base.sha }}
+
+  backstop:
+    name: Release Declaration
+    # The backstop behind the changeset bot that part 2 adds later. It reads the bot's own rule
+    # (`scripts/missing-changesets.mjs`) and does not care who wrote the file,
+    # so it runs on drafts and on forks, where the bot cannot: a fork's token
+    # is read-only, so its author reads the fix from this failure.
+    # Skipped on the heads that carry releases rather than declare them: the
+    # two release PRs, the Promotion PR (head develop) and the back-merge PR
+    # (head master). Not a required check.
+    # A fork can name its branch anything, so the skips apply to this repository's heads only.
+    # Anyone with push access can name a branch `changeset-release/` or `program-release/`, so
+    # those skips also need a bot author. Only a GitHub App or the Actions token opens a PR as a
+    # bot. `develop` and `master` already exist, so no one can open a new branch with that name.
+    # The head IDLs come from `build`'s artifact, the same `anchor build` the develop seed saves
+    # the base IDLs from. If `build` fails, this job is skipped and does not report. That is
+    # acceptable while it is not a required check; add a cold-build fallback before making it one.
+    needs: build
+    if: >-
+      github.event_name == 'pull_request'
+      && (github.event.pull_request.head.repo.full_name != github.repository
+        || (github.head_ref != 'develop'
+          && github.head_ref != 'master'
+          && !(github.event.pull_request.user.type == 'Bot'
+            && (startsWith(github.head_ref, 'changeset-release/')
+              || startsWith(github.head_ref, 'program-release/')))))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Detect changed programs
-        id: changed
-        run: |
-          BASE=${{ github.event.pull_request.base.sha }}
-          DIRS=$(git diff --name-only "$BASE"...HEAD | grep -E '^programs/[^/]+/(src/|Cargo\.toml)' | cut -d/ -f2 | sort -u | tr '\n' ' ')
-          echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
-          if [ -z "$DIRS" ]; then
-            echo "No program source changes; skipping."
-          else
-            echo "Changed programs: $DIRS"
-          fi
-      - uses: ./.github/actions/setup-anchor/
-        if: steps.changed.outputs.dirs != ''
-      - uses: actions/cache@v4
-        if: steps.changed.outputs.dirs != ''
-        name: Cache Cargo registry + index
+      # The merge commit's first parent is the base the PR is actually merged onto.
+      - name: Base commit
+        id: base
+        run: echo "sha=$(git rev-parse HEAD^1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-      - name: Require an @helium/idls changeset when the generated IDL changes
-        if: steps.changed.outputs.dirs != ''
-        # @helium/idls has no src/ of its own -- it compiles the generated
-        # target/types, which is gitignored. Changesets tooling only diffs
-        # packages/, so IDL changes never trigger an idls bump on their own
-        # and the published package silently goes stale. Internal-only logic
-        # changes don't alter the IDL, so build the IDL at base and head
-        # (anchor idl build parses the source; no BPF build) and require a
-        # changeset only when the generated IDL actually differs.
+          node-version-file: .node-version
+      - name: Changed packages and programs
+        id: changed
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
         run: |
-          set -e
-          BASE=${{ github.event.pull_request.base.sha }}
-          DIRS="${{ steps.changed.outputs.dirs }}"
-          mkdir -p /tmp/idl-head /tmp/idl-base
-          for dir in $DIRS; do
-            name=$(echo "$dir" | tr '-' '_')
-            ~/.cargo/bin/anchor idl build -p "$name" > "/tmp/idl-head/$name.json"
-          done
-          git checkout --detach "$BASE"
-          DIFFERING=""
-          for dir in $DIRS; do
-            name=$(echo "$dir" | tr '-' '_')
-            if [ ! -d "programs/$dir" ]; then
-              DIFFERING="$DIFFERING $name(new-program)"
-              continue
-            fi
-            if ! ~/.cargo/bin/anchor idl build -p "$name" > "/tmp/idl-base/$name.json"; then
-              DIFFERING="$DIFFERING $name(base-idl-build-failed)"
-              continue
-            fi
-            # metadata.version tracks the crate version, not the interface --
-            # a version bump alone shouldn't demand an idls republish.
-            if ! diff <(jq -S 'del(.metadata.version)' "/tmp/idl-base/$name.json") \
-                      <(jq -S 'del(.metadata.version)' "/tmp/idl-head/$name.json") > "/tmp/$name.idl.diff"; then
-              DIFFERING="$DIFFERING $name"
-              echo "=== IDL diff for $name ==="
-              cat "/tmp/$name.idl.diff"
-            fi
-          done
-          git checkout -
-          if [ -z "$DIFFERING" ]; then
-            echo "Program sources changed but generated IDLs are identical; no @helium/idls bump needed."
-            exit 0
+          node scripts/changed-packages.mjs "$BASE_SHA" > "$RUNNER_TEMP/packages.json"
+          node scripts/changed-programs.mjs "$BASE_SHA" > "$RUNNER_TEMP/programs.json"
+          echo "programs=$(jq -r 'map(.name) | join(" ")' "$RUNNER_TEMP/programs.json")" >> "$GITHUB_OUTPUT"
+
+      # A program's IDL moves with its own source or with a workspace crate
+      # whose types it embeds, so every changed program is diffed, and only a
+      # moved IDL makes `@helium/idls` a changed package. Every step is skipped
+      # when no program changed.
+      - name: Diff the IDLs
+        id: idl-diff
+        uses: ./.github/actions/idl-diff/
+        with:
+          programs: ${{ steps.changed.outputs.programs }}
+          base-sha: ${{ steps.base.outputs.sha }}
+          target-artifact: anchor-build
+
+      - name: Every changed package and program declares a release
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          IDL_DIFF: ${{ steps.idl-diff.outputs.diff-file }}
+        run: |
+          args=(--packages "$RUNNER_TEMP/packages.json" --programs "$RUNNER_TEMP/programs.json")
+          if [ -n "$IDL_DIFF" ]; then
+            args+=(--idl-diff "$IDL_DIFF")
           fi
-          echo "IDL changed for:$DIFFERING"
-          ADDED=$(git diff --name-only --diff-filter=A "$BASE"...HEAD -- '.changeset/*.md')
-          if [ -n "$ADDED" ] && grep -l '@helium/idls' $ADDED > /dev/null 2>&1; then
-            echo "Found @helium/idls changeset."
-            exit 0
-          fi
-          # Release PRs (develop -> master) carry the consumed changeset: the
-          # .changeset/*.md was deleted by Version Packages, but the version
-          # bump it produced is in the diff, which proves the flow ran.
-          if git diff "$BASE"...HEAD -- packages/idls/package.json | grep -q '^+.*"version"'; then
-            echo "@helium/idls version already bumped in this PR (changeset consumed)."
-            exit 0
-          fi
-          echo "This PR changes the generated IDL for:$DIFFERING -- but adds no"
-          echo "changeset for @helium/idls, which publishes those generated types."
-          echo "Run: npx changeset -- and include \"@helium/idls\" (patch is usually right)."
-          exit 1
+          node scripts/backstop-check.mjs "$BASE_SHA" HEAD "${args[@]}"
+
+  missing-bump:
+    name: Program Version Bumps
+    # The last gate before program source reaches master. The backstop asks a
+    # PR to declare its releases and an admin can bypass it; this one asks the
+    # tags, which cannot be argued with: a program whose current version is
+    # already tagged and whose source moved since that tag would deploy under a
+    # version that is already on chain. Not a required check.
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # The check reads every `program-*` tag and diffs from the tagged commit,
+      # so a shallow clone without tags would pass it vacuously.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Every changed program has a version bump
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node scripts/missing-bump-check.mjs "$PR_HEAD" --json "$RUNNER_TEMP/missing-bump.json"
+
+  # The release scripts decide what deploys to mainnet. No develop-seed skip: a push to develop
+  # runs them too.
+  test-release-scripts:
+    name: Release Script Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .node-version
+      # The pnpm store under setup-ts's key, which develop and master save. `cache: pnpm` on
+      # setup-node would hold a second copy of the same store under its own key.
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@v4
+        name: Restore pnpm store
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('./pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+      # The pending-proposal tests import `@sqds/multisig` from the workspace.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: node --test 'scripts/*.test.mjs'
 
   test-unit:
     name: Rust Unit Tests
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -151,12 +206,112 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo build --locked
       - run: cargo test --lib
 
+  # These suites fake every RPC, so they need no chain and no anchor build.
+  # setup-ts would build @helium/idls, which needs target/types; the filtered
+  # turbo run builds only the four packages the suites import. automation-hooks
+  # and voter-stake-registry-hooks run their suites directly: their dependency
+  # graphs need an anchor build, and their tests load only source through swc.
+  test-ts-unit:
+    name: spl-utils, sus, account-fetch-cache and automation-hooks Unit Tests
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      # The pnpm store under setup-ts's key, which develop and master save. `cache: pnpm` on
+      # setup-node would hold a second copy of the same store under its own key.
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@v4
+        name: Restore pnpm store
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('./pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run test --filter=@helium/spl-utils --filter=@helium/sus --filter=@helium/account-fetch-cache
+      - run: pnpm --filter @helium/automation-hooks test
+      - run: pnpm --filter @helium/voter-stake-registry-hooks test
+
+  test-testing-guard:
+    name: TESTING Build Guard
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup/
+      - uses: actions/cache@v4
+        name: Cache Cargo registry + index
+        id: cache-cargo-build
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
+      # Scope: every program whose src reads TESTING, enumerated from the source rather
+      # than from a list, so a new program that reads TESTING without a guard fails here, and
+      # under both default features and `--features devnet`, so a devnet-exempt guard fails too.
+      # Trigger: this workflow has no path filter, so the job runs on every pull request
+      # whatever it touches.
+      - name: A leaked TESTING refuses to compile, and a deliberate test build does not
+        run: |
+          set -euo pipefail
+          # `|| true` so a no-match grep does not abort the step under `set -e`, which would
+          # skip the empty-enumeration refusal below and end the run before it could report.
+          PROGRAMS=$(grep -rl 'option_env!("TESTING")' programs/*/src | cut -d/ -f2 | sort -u || true)
+          if [ -z "$PROGRAMS" ]; then
+            echo "::error::no program reads TESTING; this check is measuring nothing"
+            exit 1
+          fi
+          COUNT=$(printf '%s\n' "$PROGRAMS" | wc -l | tr -d ' ')
+          echo "Programs that read TESTING ($COUNT):"
+          printf '  %s\n' $PROGRAMS
+          CHECKED=0
+          for p in $PROGRAMS; do
+            echo "--- $p"
+            for features in "" "--features devnet"; do
+              if TESTING=1 cargo check -p "$p" $features > /tmp/leak.log 2>&1; then
+                echo "::error::$p compiles with TESTING set and no HELIUM_TEST_BUILD (features: ${features:-default}); the guard is missing or ineffective"
+                exit 1
+              fi
+              # Assert the reason, not just the failure: any other compile error would
+              # otherwise read as the guard doing its job.
+              if ! grep -q "TESTING is set without HELIUM_TEST_BUILD" /tmp/leak.log; then
+                echo "::error::$p failed to compile with TESTING set (features: ${features:-default}), but not because of the guard"
+                tail -40 /tmp/leak.log
+                exit 1
+              fi
+            done
+            if ! TESTING=1 HELIUM_TEST_BUILD=1 cargo check -p "$p" > /tmp/ack.log 2>&1; then
+              echo "::error::$p does not compile as a deliberate test build"
+              tail -40 /tmp/ack.log
+              exit 1
+            fi
+            CHECKED=$((CHECKED + 1))
+          done
+          if [ "$CHECKED" != "$COUNT" ]; then
+            echo "::error::checked $CHECKED of $COUNT programs"
+            exit 1
+          fi
+          echo "Guard verified in $CHECKED programs"
+
   test-atomic-data-publisher:
     name: Atomic Data Publisher Tests
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -187,7 +342,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
       - run: cargo test --locked
         working-directory: utils/atomic-data-publisher
         env:
@@ -203,10 +358,58 @@ jobs:
         with:
           testing: true
       - uses: ./.github/actions/localnet-accounts/
+      # Every `needs: build` job takes the build from here instead of restoring the same `target/`
+      # cache itself. Only the three directories those jobs read are uploaded: `target/deploy` (the
+      # .so files and program keypairs `anchor localnet --skip-build` loads), `target/idl` and
+      # `target/types` (what `@helium/idls` compiles).
+      - name: Upload anchor build
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-build
+          path: |
+            target/deploy
+            target/idl
+            target/types
+          retention-days: 1
+          if-no-files-found: error
+      # The changeset bot's IDL diff needs the IDLs of the commit a PR is based on. Only a develop
+      # run can save them under a SHA a later PR will ask for: a PR run builds a merge commit whose
+      # SHA nothing else ever names. Save only, because this run has nothing to restore.
+      - name: Save base IDLs
+        if: ${{ github.event_name == 'push' && github.ref_name == 'develop' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ./target/idl
+          key: base-idls-${{ github.sha }}
+
+  # `setup-ts` ends in a full workspace build, and ten-odd jobs of this workflow run it. This job
+  # runs it once and saves `.turbo` under the run's exact key; the others restore that key and their
+  # build is a turbo cache hit. It needs `build` because `@helium/idls` compiles `target/types`, so
+  # a TS build without the anchor build would cache a wrong `lib/`. It has no `if:` gate: on the
+  # develop seed run the consumers are skipped, but the save still seeds the prefix every later PR
+  # restores from.
+  build-ts:
+    needs: build
+    name: Build TS
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # v4, not the v3 the older jobs pin: actionlint flags v3 as too old, and a new job should
+      # not add a finding. The bump of the rest is its own PR.
+      - uses: actions/checkout@v4
+      - name: Download anchor build
+        uses: actions/download-artifact@v4
+        with:
+          name: anchor-build
+          path: ./target
+      - uses: ./.github/actions/setup-ts/
+        with:
+          save-turbo: true
 
   test-devflow:
-    needs: build
+    needs: [build, build-ts]
     name: Test Development Workflow
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -214,6 +417,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
       - uses: ./.github/actions/localnet-accounts/
       - uses: ./.github/actions/start-localnet/
@@ -221,8 +425,9 @@ jobs:
         run: ./scripts/bootstrap.sh
 
   test-helium-vote-service:
-    needs: build
+    needs: [build, build-ts]
     name: Test Helium Vote Service
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -230,12 +435,14 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
       - run: pnpm --filter @helium/helium-vote-service test
 
-  test-migration-service:
-    needs: build
-    name: Test Migration Service
+  test-blockchain-api-unit:
+    needs: [build, build-ts]
+    name: Test Blockchain API Unit
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -243,12 +450,44 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
+      - uses: ./.github/actions/setup-ts/
+      - run: pnpm --filter @helium/blockchain-api-service test:unit
+
+  test-migration-service:
+    needs: [build, build-ts]
+    name: Test Migration Service
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
       - run: pnpm --filter @helium/migration-service test
 
+  test-account-postgres-sink-service:
+    needs: [build, build-ts]
+    name: Test Account Postgres Sink Service
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/build-anchor/
+        with:
+          testing: true
+          target-artifact: anchor-build
+      - uses: ./.github/actions/setup-ts/
+      - run: pnpm --filter @helium/account-postgres-sink-service test
+
   test-docker-builds:
-    needs: build
+    needs: [build, build-ts]
     name: Test Docker Builds
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -281,6 +520,7 @@ jobs:
         if: startsWith(matrix.test, 'packages/')
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
         if: startsWith(matrix.test, 'packages/')
       - name: Build idls package
@@ -310,6 +550,7 @@ jobs:
   test-rust-builds:
     needs: build
     name: Test Rust Builds
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -322,16 +563,27 @@ jobs:
           - utils/vehnt
     steps:
       - uses: actions/checkout@v3
+      # These four crates are `exclude`d from the root workspace, so they never read the workspace
+      # `target/`; the artifact is taken only to keep them off the cache and out of a cold
+      # `anchor build`. What they need from this action is the pinned toolchain and the cargo
+      # registry cache.
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
-      - run: cd $RUST_PATH && cargo build
+          target-artifact: anchor-build
+      - run: cd $RUST_PATH && cargo build && cargo test
+        env:
+          RUST_PATH: ${{ matrix.test }}
+      # hpl-utils carries unit tests that no other job runs.
+      - if: matrix.test == 'utils/hpl-utils'
+        run: cd $RUST_PATH && cargo test
         env:
           RUST_PATH: ${{ matrix.test }}
 
   test-contracts:
-    needs: build
+    needs: [build, build-ts]
     name: Test Anchor Contracts
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -344,6 +596,8 @@ jobs:
           - tests/helium-entity-manager.ts
           - tests/mobile-entity-manager.ts
           - tests/helium-sub-daos.ts
+          - tests/helium-sub-daos-vehnt-cases-2-3.ts
+          - tests/helium-sub-daos-vehnt-cases-4-5.ts
           - tests/hexboosting.ts
           - tests/hpl-crons.ts
           - tests/lazy-distributor.ts
@@ -366,6 +620,7 @@ jobs:
       - uses: ./.github/actions/build-anchor/
         with:
           testing: true
+          target-artifact: anchor-build
       - uses: ./.github/actions/setup-ts/
       - uses: ./.github/actions/localnet-accounts/
       - uses: ./.github/actions/start-localnet/
@@ -388,3 +643,22 @@ jobs:
         working-directory: packages/spl-utils
         env:
           RPC_URL: http://localhost:8899
+      # A transaction sent with skipPreflight fails without its program logs, so a failed suite
+      # keeps what `anchor localnet` streamed for each program, and the validator's own log.
+      - name: Name localnet logs
+        id: localnet-logs
+        if: failure() || cancelled()
+        run: echo "name=localnet-logs-$(basename "$TEST" .ts)" >> "$GITHUB_OUTPUT"
+        env:
+          TEST: ${{ matrix.test }}
+      - name: Upload localnet logs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.localnet-logs.outputs.name }}
+          path: |
+            .anchor/program-logs/
+            .anchor/test-ledger/validator.log
+            /tmp/localnet.log
+          if-no-files-found: warn
+          retention-days: 14

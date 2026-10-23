@@ -1,40 +1,59 @@
 name: Blockchain API E2E Tests
 
 on:
-  # These path filters gate every job below, the 19-job e2e matrix included.
-  # The typecheck step resolves the workspace SDKs (spl-utils, the *-sdk
-  # packages, idls) too, so a change confined to those does not run it.
+  # These path filters gate every job below, the 40-job e2e matrix included.
+  # The typecheck step resolves the workspace SDKs (the *-sdk packages,
+  # idls) too, so a change confined to those does not run it.
   push:
     branches: [master]
     paths:
       - "packages/blockchain-api/**"
       - "packages/blockchain-api-client/**"
+      - "packages/spl-utils/**"
+      - "packages/sus/**"
       # The matrix check below reads this file, so an edit here runs it.
       - ".github/workflows/blockchain-api-e2e.yml"
   pull_request:
     paths:
       - "packages/blockchain-api/**"
       - "packages/blockchain-api-client/**"
+      - "packages/spl-utils/**"
+      - "packages/sus/**"
       # The matrix check below reads this file, so an edit here runs it.
       - ".github/workflows/blockchain-api-e2e.yml"
 
+permissions:
+  contents: read
+
+env:
+  SOLANA_CLI_VERSION: 4.3.2
+  # The commit of the `v1.5.0` tag. A tag can move; a commit cannot.
+  # 1.6.0 deadlocks on sendTransaction (solana-foundation/surfpool#849); the
+  # Agave 4.4 PR moves to the first 1.6.x commit with that fix.
+  SURFPOOL_REV: 86493c4bf716b01d4bedbc531aa9288cb14d5f36
+
 jobs:
-  # Build anchor once and share the generated types/IDLs as an artifact. The
+  # Build the IDLs once and share them with the matrix as an artifact. The
   # matrix jobs only need target/types (to build @helium/idls); having each of
-  # them run build-anchor meant 19 full rebuilds whenever the cache was evicted
-  # (the repo sits at the 10GB Actions cache cap), and a cold anchor build
-  # can't finish inside the matrix jobs' 20-minute timeout.
+  # them build meant 19 full rebuilds whenever the cache was evicted (the repo
+  # sits at the 10GB Actions cache cap), and a cold build can't finish inside
+  # the matrix jobs' 20-minute timeout.
+  #
+  # `anchor idl build` writes target/idl and target/types without the SBF
+  # compile that `anchor build` paid for, and nothing here reads target/deploy.
+  # The build leaves TESTING unset because it changes no IDL: the only
+  # TESTING-dependent addresses (ECC_VERIFIER, the VSR ledger-transfer
+  # approver) reach the program through `Pubkey::from_str`, and anchor emits no
+  # `address` in the IDL for those accounts.
   build-idls:
     runs-on: ubuntu-latest
-    # A cold-cache anchor build of the whole workspace takes well over 20
-    # minutes; this is the only job that compiles, so give it room.
+    # A cold-cache build of the whole workspace takes well over 20 minutes;
+    # this is the only job that compiles, so give it room.
     timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - uses: ./.github/actions/build-anchor/
-        with:
-          testing: true
+      - uses: ./.github/actions/build-idls/
       - name: Upload anchor types and IDLs
         uses: actions/upload-artifact@v4
         with:
@@ -45,12 +64,73 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # `setup-ts` ends in a full workspace build, and the 19 matrix legs plus unit-tests each ran it.
+  # This job runs it once and saves `.turbo` under the run's exact key; the others restore that key
+  # and their build is a turbo cache hit. It needs the anchor types for the same reason they do:
+  # `@helium/idls` compiles `target/types`.
+  build-ts:
+    needs: build-idls
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download anchor types and IDLs
+        uses: actions/download-artifact@v4
+        with:
+          name: anchor-types
+          path: target
+      - uses: ./.github/actions/setup-ts/
+        with:
+          save-turbo: true
+
+  # Build surfpool once and share the binary as an artifact. When every matrix
+  # job built it on a cache miss, a cold build took about half of each job's
+  # 20-minute timeout.
+  build-surfpool:
+    runs-on: ubuntu-latest
+    permissions: {}
+    # A cold build of 0.11.2 took about 10 minutes; 60 leaves room for 1.5.0.
+    timeout-minutes: 60
+    steps:
+      - name: Setup Rust toolchain
+        id: toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache surfpool binary
+        id: cache-surfpool
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/surfpool
+            ~/.cargo/.crates2.json
+            ~/.cargo/.crates.toml
+          key: ${{ runner.os }}-surfpool-bin-${{ env.SURFPOOL_REV }}-${{ steps.toolchain.outputs.cachekey }}
+
+      - name: Install Surfpool CLI
+        if: steps.cache-surfpool.outputs.cache-hit != 'true'
+        env:
+          # crates.io downloads intermittently fail with "HTTP2 framing layer";
+          # fetch via git CLI and disable HTTP/2 multiplexing to avoid it.
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          CARGO_HTTP_MULTIPLEXING: "false"
+        run: |
+          cargo install --git https://github.com/txtx/surfpool --rev "$SURFPOOL_REV" --locked --force
+
+      - name: Upload surfpool binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: surfpool
+          path: ~/.cargo/bin/surfpool
+          retention-days: 1
+          if-no-files-found: error
+
   # Unit tests, typecheck and lint need no chain, no secrets and no surfpool,
   # so they run as their own job and report in about a minute rather than
   # waiting on the matrix. Tests run first so a lint or type failure cannot
   # suppress the test signal.
   unit-tests:
-    needs: build-idls
+    needs: [build-idls, build-ts]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -99,7 +179,7 @@ jobs:
           exit $missing
 
   e2e-tests:
-    needs: build-idls
+    needs: [build-idls, build-ts, build-surfpool]
     runs-on: ubuntu-latest
     # Backstop so a hung test (e.g. a stalled RPC) fails fast instead of running
     # until GitHub's default 6h job timeout and holding a runner.
@@ -146,18 +226,21 @@ jobs:
             file: delegate-account-resolution.test.ts
           - name: delegate-automation
             file: delegate-automation.test.ts
+          - name: tx-version
+            file: tx-version.test.ts
+        # Every suite runs with the transaction version forced each way.
+        tx-version: [v1, v0]
 
-    name: ${{ matrix.test.name }}
+    name: ${{ matrix.test.name }} (${{ matrix.tx-version }})
 
     env:
       NODE_ENV: test
       PORT: 3000
-      SOLANA_CLI_VERSION: 2.1.6
       SURFPOOL_RPC_URL: http://127.0.0.1:8899
-      ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
       SOLANA_CLUSTER: mainnet
       SURFPOOL_SHOW_LOGS: "0"
       SURFPOOL_HEALTH_TIMEOUT_MS: "180000"
+      HPL_TX_VERSION: ${{ matrix.tx-version }}
 
     defaults:
       run:
@@ -173,42 +256,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-          cache: "pnpm"
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      # The pnpm store under setup-ts's key, which develop and master save. `cache: pnpm` on
+      # setup-node would hold a second copy of the same store under its own key.
+      - name: Get pnpm store directory
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+      - name: Restore pnpm store
+        uses: actions/cache/restore@v4
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('./pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            pnpm-store-${{ runner.os }}-
 
-      - name: Cache surfpool binary
-        id: cache-surfpool
-        uses: actions/cache@v4
+      # download-artifact drops the executable bit.
+      - name: Download surfpool binary
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.cargo/bin/surfpool
-            ~/.cargo/.crates2.json
-            ~/.cargo/.crates.toml
-          key: ${{ runner.os }}-surfpool-bin-v0.11.2
-
-      - name: Install Surfpool CLI
-        if: steps.cache-surfpool.outputs.cache-hit != 'true'
-        env:
-          # crates.io downloads intermittently fail with "HTTP2 framing layer";
-          # fetch via git CLI and disable HTTP/2 multiplexing to avoid it.
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          CARGO_HTTP_MULTIPLEXING: "false"
-        run: |
-          cargo install --git https://github.com/txtx/surfpool --tag v0.11.2 --locked --force
+          name: surfpool
+          path: ${{ runner.temp }}/surfpool
+      - run: chmod +x "$RUNNER_TEMP/surfpool/surfpool"
 
       - name: Download anchor types and IDLs
         uses: actions/download-artifact@v4
@@ -227,7 +295,10 @@ jobs:
           echo "${{ secrets.TESTING_KEY_2 }}" > testing_key_2.json
           test -s testing_key_2.json || (echo 'TESTING_KEY_2 is empty' && exit 1)
 
+      # Scoped to the steps that read it, so installs and builds never see it.
       - name: Validate ASSET_ENDPOINT secret
+        env:
+          ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
         run: |
           if [ -z "${ASSET_ENDPOINT}" ]; then
             echo "ASSET_ENDPOINT secret is not set. Please add it in repository secrets." >&2
@@ -236,14 +307,11 @@ jobs:
 
       - name: Run ${{ matrix.test.name }} tests
         env:
+          ASSET_ENDPOINT: ${{ secrets.ASSET_ENDPOINT }}
           TEST_WALLET_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
           TEST_WALLET_2_KEYPAIR_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key_2.json
           FEE_PAYER_WALLET_PATH: ${{ github.workspace }}/packages/blockchain-api/testing_key.json
-          SURFPOOL_CMD: ${{ runner.tool_cache }}/cargo/bin/surfpool
+          SURFPOOL_CMD: ${{ runner.temp }}/surfpool/surfpool
         run: |
-          # Fallback if cached path not present
-          if [ ! -x "$SURFPOOL_CMD" ]; then
-            export SURFPOOL_CMD="$HOME/.cargo/bin/surfpool"
-          fi
           echo "Using SURFPOOL_CMD=$SURFPOOL_CMD"
           pnpm test:e2e:file tests/e2e/${{ matrix.test.file }}
