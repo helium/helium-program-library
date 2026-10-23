@@ -232,4 +232,33 @@ describe("buildApp", () => {
       expect(inspect(args, { depth: null })).to.not.include(marker);
     }
   });
+
+  it("leaves unlisted input values out of the REST validation error log", async () => {
+    // #given a REST input that fails validation and carries a marker in a
+    // field the log allowlist does not name
+    const marker = "SECRET-MARKER-xyz";
+    const logged: unknown[][] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      logged.push(args);
+    };
+
+    try {
+      // #when the procedure rejects the input
+      const res = await app.inject({
+        method: "GET",
+        url: `/api/v1/tokens/not-a-wallet?note=${marker}`,
+      });
+      expect(res.statusCode).to.equal(400);
+      expect(res.json().code).to.equal("BAD_REQUEST");
+    } finally {
+      console.error = originalError;
+    }
+
+    // #then the error is logged without the marker
+    expect(logged).to.not.be.empty;
+    for (const args of logged) {
+      expect(inspect(args, { depth: null })).to.not.include(marker);
+    }
+  });
 });

@@ -16,6 +16,7 @@ import {
   getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
 import { TOKEN_MINTS } from "@/lib/constants/tokens";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import {
@@ -52,8 +53,6 @@ import {
   getAsset,
   getAssetProof,
   getTransactionSizeLimit,
-  HELIUM_COMMON_LUT,
-  HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
   proofArgsAndAccounts,
   resolveTxVersion,
@@ -834,9 +833,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     // 3f. Incremental batching + Jito tip + Sign
     const lut =
-      process.env.SOLANA_CLUSTER === "devnet"
-        ? HELIUM_COMMON_LUT_DEVNET
-        : HELIUM_COMMON_LUT;
+      getHeliumLookupTable();
     const cluster = getCluster();
 
     // Work with TransactionDrafts (instructions + metadata) until the very end,

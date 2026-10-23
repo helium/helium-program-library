@@ -19,8 +19,6 @@ import {
 import { init as initMiniFanout } from "@helium/mini-fanout-sdk";
 import {
   batchInstructionsToTxsWithPriorityFee,
-  HELIUM_COMMON_LUT,
-  HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
   toVersionedTx,
   WALLET_SIGNED,
@@ -54,6 +52,7 @@ import {
   getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 import { preTaskUrl, TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
@@ -231,9 +230,7 @@ export const createSplit = publicProcedure.hotspots.createSplit.handler(
       (
         await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
           addressLookupTableAddresses: [
-            process.env.SOLANA_CLUSTER === "devnet"
-              ? HELIUM_COMMON_LUT_DEVNET
-              : HELIUM_COMMON_LUT,
+            getHeliumLookupTable(),
           ],
           commitment: "finalized",
           signing: WALLET_SIGNED,

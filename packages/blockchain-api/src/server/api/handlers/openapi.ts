@@ -19,7 +19,7 @@ import { summarizeProcedureInput } from "@/lib/utils/log-input";
 export const openApiHandler = new OpenAPIHandler(publicRouter, {
   interceptors: [
     onError((error: any) => {
-      // Don't log expected 401 auth errors - they're handled by the frontend
+      // UNAUTHORIZED is a caller error: do not log it or send it to Sentry
       if (error.code !== "UNAUTHORIZED") {
         console.error(
           "[ORPC API Error]",
