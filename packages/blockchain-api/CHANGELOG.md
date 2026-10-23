@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.13.0
+
+### Minor Changes
+
+- [#1321](https://github.com/helium/helium-program-library/pull/1321) [`62a711f`](https://github.com/helium/helium-program-library/commit/62a711f0a0001016eceddebde00f1f0aa6fb1bfd) Thanks [@bryzettler](https://github.com/bryzettler)! - Serve the API from Fastify in place of Next.js, and retire the Bridge fiat routes
+
+### Patch Changes
+
+- Updated dependencies [[`9e6faba`](https://github.com/helium/helium-program-library/commit/9e6faba9e13b7ff5d5dc50b0ce522a4945ecb175), [`96a3fb1`](https://github.com/helium/helium-program-library/commit/96a3fb1d56993cc9ee769f5f80b6c7992182cc8d), [`8bca988`](https://github.com/helium/helium-program-library/commit/8bca9885f18b2f9fa877f7ed329631878ef5f5f7)]:
+  - @helium/blockchain-api@0.17.0
+  - @helium/distributor-oracle@0.14.4
+
 ## 0.12.5
 
 ### Patch Changes

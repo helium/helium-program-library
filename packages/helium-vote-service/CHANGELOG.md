@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.27
+
+### Patch Changes
+
+- [#1322](https://github.com/helium/helium-program-library/pull/1322) [`eb7ab89`](https://github.com/helium/helium-program-library/commit/eb7ab8923da347ca11ded2a94dd5414cb91e835a) Thanks [@bryzettler](https://github.com/bryzettler)! - Move the service to Fastify 5
+
 ## 0.11.26
 
 ### Patch Changes
