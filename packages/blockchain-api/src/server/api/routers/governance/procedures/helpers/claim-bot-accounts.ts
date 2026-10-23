@@ -1,10 +1,12 @@
 import { queueAuthorityKey } from "@helium/hpl-crons-sdk";
 import {
+  init as initTuktuk,
   PROGRAM_ID as TUKTUK_PROGRAM_ID,
   taskQueueAuthorityKey,
 } from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
+import { getMultipleAccounts } from "@/lib/utils/get-multiple-accounts";
 
 /**
  * Every account the delegation claim-bot instructions need, so they can be
@@ -105,4 +107,27 @@ export function closeDelegationClaimBotAccounts(
     queueAuthority,
     tuktukProgram: TUKTUK_PROGRAM_ID,
   };
+}
+
+/**
+ * The rent refund each task names, by task address. An address with no account has no
+ * entry. Neither has an address that holds lamports and no data: the programs skip the
+ * dequeue on `data_is_empty()`, so it is no task here either.
+ */
+export async function fetchTaskRentRefunds(
+  connection: Connection,
+  tuktukProgram: Awaited<ReturnType<typeof initTuktuk>>,
+  taskKeys: PublicKey[],
+): Promise<Map<string, PublicKey>> {
+  const taskRentRefunds = new Map<string, PublicKey>();
+  const infos = await getMultipleAccounts(connection, taskKeys);
+  infos.forEach((info, i) => {
+    if (info && info.data.length > 0) {
+      taskRentRefunds.set(
+        taskKeys[i].toBase58(),
+        tuktukProgram.coder.accounts.decode("taskV0", info.data).rentRefund,
+      );
+    }
+  });
+  return taskRentRefunds;
 }

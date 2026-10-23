@@ -1,4 +1,9 @@
-import { Commitment, Connection, SignatureStatus } from "@solana/web3.js";
+import {
+  Commitment,
+  Connection,
+  SignatureStatus,
+  TransactionConfirmationStatus,
+} from "@solana/web3.js";
 import { chunks } from "./getMultipleAccounts";
 import { sleep } from "./utils";
 
@@ -17,6 +22,28 @@ async function getSignatureStatusesBatch(
     .map((v) => v.value)
     .flat();
 }
+
+/**
+ * Confirmation levels that count as landed for the commitment that was asked for.
+ * A node only reports the three modern levels, so each deprecated alias takes the row of the level it names.
+ */
+const LANDED_LEVELS: Record<
+  Commitment,
+  readonly TransactionConfirmationStatus[]
+> = {
+  processed: ["processed", "confirmed", "finalized"],
+  recent: ["processed", "confirmed", "finalized"],
+  confirmed: ["confirmed", "finalized"],
+  single: ["confirmed", "finalized"],
+  singleGossip: ["confirmed", "finalized"],
+  finalized: ["finalized"],
+  root: ["finalized"],
+  max: ["finalized"],
+};
+
+const hasLanded = (status: SignatureStatus, commitment: Commitment) =>
+  !status.confirmationStatus ||
+  LANDED_LEVELS[commitment].includes(status.confirmationStatus);
 
 export class TransactionCompletionQueue {
   log: boolean;
@@ -85,19 +112,20 @@ export class TransactionCompletionQueue {
       confirmations: 0,
       err: null,
     };
-    let subId = 0;
+    // Subscription ids start at 0, so no default: a failed subscribe must not
+    // remove another caller's subscription on the shared connection.
+    let subId: number | undefined;
     const cleanup = async () => {
-      if (
-        //@ts-ignore
-        connection._signatureSubscriptions &&
-        //@ts-ignore
-        connection._signatureSubscriptions[subId]
-      ) {
-        connection.removeSignatureListener(subId);
-      }
       done = true;
       // @ts-ignore
       this.txPromises[commitment][txid] = undefined;
+      if (subId !== undefined) {
+        try {
+          await connection.removeSignatureListener(subId);
+        } catch (e) {
+          // Already removed.
+        }
+      }
     };
     this.txPromises[commitment][txid] = new Promise(async (resolve, reject) => {
       let t: NodeJS.Timeout;
@@ -122,14 +150,13 @@ export class TransactionCompletionQueue {
               slot: context.slot,
               confirmations: 0,
             };
+            // web3.js removes a signature listener itself once it fires.
+            subId = undefined;
             setDone();
             if (result.err) {
               this.log && console.log("Rejected via websocket", result.err);
               reject(status);
-            } else if (
-              !status.confirmationStatus ||
-              status.confirmationStatus == commitment
-            ) {
+            } else if (hasLanded(status, commitment)) {
               resolve(status);
             }
           },
@@ -154,10 +181,7 @@ export class TransactionCompletionQueue {
                   console.log("REST no confirmations for", txid, status);
               } else {
                 this.log && console.log("REST confirmation for", txid, status);
-                if (
-                  !status.confirmationStatus ||
-                  status.confirmationStatus == commitment
-                ) {
+                if (hasLanded(status, commitment)) {
                   setDone();
                   resolve(status);
                 }

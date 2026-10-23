@@ -19,7 +19,7 @@ import {
   TransactionInstruction,
   VersionedTransaction,
 } from "@solana/web3.js";
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   customSignerKey,
   init as initTuktuk,
@@ -32,6 +32,7 @@ import {
   HELIUM_COMMON_LUT_DEVNET,
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import {
   getJitoTipAmountLamports,
@@ -406,18 +407,19 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       .instruction();
 
     instructions.push(ix);
-    const vtxs = (
-      await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-        addressLookupTableAddresses: [
-          process.env.SOLANA_CLUSTER?.trim() === "devnet"
-            ? HELIUM_COMMON_LUT_DEVNET
-            : HELIUM_COMMON_LUT,
-        ],
-        commitment: "finalized",
-        // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-        deriveLoadedAccountsDataSizeLimit: false,
-      })
-    ).map((tx) => toVersionedTx(tx));
+    const vtxs = await Promise.all(
+      (
+        await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+          addressLookupTableAddresses: [
+            process.env.SOLANA_CLUSTER?.trim() === "devnet"
+              ? HELIUM_COMMON_LUT_DEVNET
+              : HELIUM_COMMON_LUT,
+          ],
+          commitment: "finalized",
+          signing: WALLET_SIGNED,
+        })
+      ).map((tx) => toVersionedTx(tx)),
+    );
 
     // Add Jito tip if needed for mainnet bundles
     const useJito = shouldUseJitoBundle(vtxs.length, getCluster());

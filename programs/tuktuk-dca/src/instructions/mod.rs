@@ -4,11 +4,13 @@ pub mod check_repay_v0;
 pub mod close_dca_v0;
 pub mod initialize_dca_v0;
 pub mod lend_v0;
+pub mod swap_v0;
 
 pub use check_repay_v0::*;
 pub use close_dca_v0::*;
 pub use initialize_dca_v0::*;
 pub use lend_v0::*;
+pub use swap_v0::*;
 
 // Re-export nested version
 pub use initialize_dca_v0::InitializeDcaNestedV0;
@@ -45,3 +47,12 @@ const _: () = assert!(DCA_URL.len() <= 128);
 
 // 10000 bps is the whole input, so slippage must stay below it for the swap to have a floor.
 pub const MAX_SLIPPAGE_BPS_FROM_ORACLE: u16 = 10000;
+
+// The only program a DCA swap may run against. `swap_v0` forwards instruction data it does not
+// interpret, so the callee is fixed here rather than taken from that data. A TESTING build
+// swaps through the token program, which is what the test server's stand-in swap uses.
+pub const SWAP_PROGRAM: Pubkey = if TESTING {
+  pubkey!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+} else {
+  pubkey!("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4")
+};

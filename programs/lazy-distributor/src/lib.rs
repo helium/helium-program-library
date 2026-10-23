@@ -4,6 +4,7 @@ use {default_env::default_env, solana_security_txt::security_txt};
 
 declare_id!("1azyuavdMyvsivtNxPoz6SucD18eDHeXzFCUPq5XU7w");
 
+pub mod compression;
 pub mod ed25519;
 pub mod error;
 pub mod instructions;

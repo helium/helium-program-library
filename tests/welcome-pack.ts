@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import { Keypair as HeliumKeypair } from "@helium/crypto";
 import { init as initHeliumSubDaos } from "@helium/helium-sub-daos-sdk";
 import { init as initMiniFanout } from "@helium/mini-fanout-sdk";
@@ -72,7 +72,7 @@ import {
   SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
 } from "@solana/spl-account-compression";
 import { loadKeypair } from "./utils/solana";
-import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
+import { ASSOCIATED_PROGRAM_ID } from "@anchor-lang/core/dist/cjs/utils/token";
 import {
   BUBBLEGUM_PROGRAM_ID,
   NOOP_PROGRAM_ID,

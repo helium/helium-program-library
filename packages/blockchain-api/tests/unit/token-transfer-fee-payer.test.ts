@@ -38,30 +38,35 @@ const noRecipientAta = {
 } as unknown as Connection;
 
 /** The message the endpoint compiles, through the same helper it uses. */
-function compiledMessage(
+async function compiledMessage(
   instructions: TransactionInstruction[],
   feePayer: PublicKey
 ) {
-  return toVersionedTx({
-    instructions,
-    feePayer,
-    recentBlockhash: BLOCKHASH,
-    addressLookupTables: [],
-  }).message;
+  return (
+    await toVersionedTx({
+      instructions,
+      feePayer,
+      recentBlockhash: BLOCKHASH,
+      addressLookupTables: [],
+    })
+  ).message;
 }
 
 /** The compiled message's bytes, for comparison against a fixture. */
-function messageBase64(
+async function messageBase64(
   instructions: TransactionInstruction[],
   feePayer: PublicKey
 ) {
-  const bytes = compiledMessage(instructions, feePayer).serialize();
+  const bytes = (await compiledMessage(instructions, feePayer)).serialize();
   return Buffer.from(bytes).toString("base64");
 }
 
 /** Every account a compiled message requires a signature from. */
-function signerKeys(instructions: TransactionInstruction[], payer: PublicKey) {
-  const message = compiledMessage(instructions, payer);
+async function signerKeys(
+  instructions: TransactionInstruction[],
+  payer: PublicKey
+) {
+  const message = await compiledMessage(instructions, payer);
   return message.staticAccountKeys
     .slice(0, message.header.numRequiredSignatures)
     .map((key) => key.toBase58());
@@ -129,21 +134,21 @@ describe("buildTransferInstructions without a separate fee payer", () => {
   it("compiles the SPL transfer to the same message as before", async () => {
     const { instructions, needsAta } = await splTransfer(AUTHORITY);
     expect(needsAta).to.eq(true);
-    expect(messageBase64(instructions, AUTHORITY)).to.eq(
+    expect(await messageBase64(instructions, AUTHORITY)).to.eq(
       MESSAGE_WITHOUT_FEE_PAYER.spl
     );
   });
 
   it("compiles the SOL transfer to the same message as before", async () => {
     const { instructions } = await solTransfer(AUTHORITY);
-    expect(messageBase64(instructions, AUTHORITY)).to.eq(
+    expect(await messageBase64(instructions, AUTHORITY)).to.eq(
       MESSAGE_WITHOUT_FEE_PAYER.sol
     );
   });
 
   it("needs the wallet's signature and nothing else", async () => {
     const { instructions } = await splTransfer(AUTHORITY);
-    expect(signerKeys(instructions, AUTHORITY)).to.deep.eq([
+    expect(await signerKeys(instructions, AUTHORITY)).to.deep.eq([
       AUTHORITY.toBase58(),
     ]);
   });
@@ -173,7 +178,7 @@ describe("buildTransferInstructions with a separate fee payer", () => {
 
   it("requires both signatures, with the fee payer first", async () => {
     const { instructions } = await splTransfer(PAYER);
-    expect(signerKeys(instructions, PAYER)).to.deep.eq([
+    expect(await signerKeys(instructions, PAYER)).to.deep.eq([
       PAYER.toBase58(),
       AUTHORITY.toBase58(),
     ]);
@@ -185,7 +190,7 @@ describe("buildTransferInstructions with a separate fee payer", () => {
     expect(instructionSigners(instructions[0])).to.deep.eq([
       AUTHORITY.toBase58(),
     ]);
-    expect(signerKeys(instructions, PAYER)).to.deep.eq([
+    expect(await signerKeys(instructions, PAYER)).to.deep.eq([
       PAYER.toBase58(),
       AUTHORITY.toBase58(),
     ]);
@@ -214,7 +219,8 @@ describe("transferSolShortfall", () => {
           authorityBalance: null,
         })
       ).to.deep.eq({
-        message: "Insufficient SOL balance for transaction fees",
+        message:
+          "Insufficient SOL balance for transaction fees and account rent",
         required: FEE,
         available: FEE - 1,
       });
@@ -238,7 +244,8 @@ describe("transferSolShortfall", () => {
           authorityBalance: null,
         })
       ).to.deep.eq({
-        message: "Insufficient SOL balance for transfer and transaction fees",
+        message:
+          "Insufficient SOL balance for transfer, transaction fees and account rent",
         required: FEE + 500,
         available: FEE + 499,
       });
@@ -277,7 +284,8 @@ describe("transferSolShortfall", () => {
           authorityBalance: 500,
         })
       ).to.deep.eq({
-        message: "Insufficient SOL balance for transaction fees",
+        message:
+          "Insufficient SOL balance for transaction fees and account rent",
         required: FEE,
         available: FEE - 1,
       });

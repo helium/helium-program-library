@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { delegatedDataCreditsKey } from "@helium/data-credits-sdk";
 import {
   autoTopOffKey,
@@ -6,7 +6,7 @@ import {
 } from "@helium/dc-auto-top-sdk";
 import { subDaoKey } from "@helium/helium-sub-daos-sdk";
 import { MOBILE_MINT } from "@helium/spl-utils";
-import { taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
+import { init as initTuktuk, taskQueueAuthorityKey } from "@helium/tuktuk-sdk";
 import {
   init as initTuktukDca,
   queueAuthorityKey,
@@ -16,6 +16,7 @@ import { PublicKey } from "@solana/web3.js";
 import * as multisig from "@sqds/multisig";
 import os from "os";
 import yargs from "yargs/yargs";
+import { resolveTaskRentRefund } from "./mini-fanout-utils";
 import { sendInstructionsOrSquadsV4 } from "./utils";
 
 export async function run(args: any = process.argv) {
@@ -60,6 +61,7 @@ export async function run(args: any = process.argv) {
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const dcAutoTopoffProgram = await initDcAutoTopoff(provider);
   const tuktukDcaProgram = await initTuktukDca(provider);
+  const tuktukProgram = await initTuktuk(provider);
 
   const multisigPda = argv.multisig ? new PublicKey(argv.multisig) : null;
   const authority = multisigPda
@@ -98,6 +100,14 @@ export async function run(args: any = process.argv) {
       taskQueue: dcaAcc.taskQueue,
       nextTask: dcaAcc.nextTask,
     })
+    .remainingAccounts(
+      await resolveTaskRentRefund(
+        tuktukProgram,
+        [dcaAcc.nextTask],
+        dca,
+        tuktukDcaProgram.programId,
+      ),
+    )
     .instruction();
 
   await sendInstructionsOrSquadsV4({

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { cronJobKey, init as initCron } from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,
@@ -7,6 +7,7 @@ import {
 import {
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
+  WALLET_SIGNED,
 } from "@helium/spl-utils";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -93,14 +94,15 @@ export const buildAutomationTransactionResponse = async ({
   actionMetadata: Record<string, unknown>;
   extraFeeLamports?: number;
 }) => {
-  const vtxs = (
-    await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
-      addressLookupTableAddresses: [getHeliumLookupTable()],
-      commitment: "finalized",
-      // Wallet-signed: guard ixs may be appended (see withPriorityFees).
-      deriveLoadedAccountsDataSizeLimit: false,
-    })
-  ).map((tx) => toVersionedTx(tx));
+  const vtxs = await Promise.all(
+    (
+      await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
+        addressLookupTableAddresses: [getHeliumLookupTable()],
+        commitment: "finalized",
+        signing: WALLET_SIGNED,
+      })
+    ).map((tx) => toVersionedTx(tx)),
+  );
 
   const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
   if (useJito) {

@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import {
   dcaKey,
   init as initTuktukDca,
@@ -18,6 +18,7 @@ import {
 } from "@solana/web3.js";
 import os from "os";
 import yargs from "yargs/yargs";
+import { resolveTaskRentRefund } from "./mini-fanout-utils";
 import { loadKeypair, sendInstructionsOrSquadsV4 } from "./utils";
 
 const TASK_QUEUE_ID = new PublicKey(
@@ -162,6 +163,14 @@ export async function run(args: any = process.argv) {
     const { instruction: closeDcaIx } = await tuktukDcaProgram.methods
       .closeDcaV0()
       .accounts({ dca: dcaPda })
+      .remainingAccounts(
+        await resolveTaskRentRefund(
+          tuktukProgram,
+          [dcaPdaExists.nextTask],
+          dcaPda,
+          tuktukDcaProgram.programId,
+        ),
+      )
       .prepare();
     await sendInstructionsOrSquadsV4({
       provider,

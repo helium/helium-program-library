@@ -145,10 +145,34 @@ pub fn handler(ctx: Context<ExecuteTransactionV0>, args: ExecuteTransactionArgsV
 
   signers.extend(vec![lazy_signer_seeds]);
 
-  let signer_addresses = signers
+  // The leaf hash is a concatenation of accounts, instructions, signer seeds and index with no
+  // length prefix between the sections, so the same preimage can be re-split: bytes the leaf
+  // committed to as a trailing instruction can be presented as signer seeds instead, hashing to the
+  // same value and passing the proof while those instructions never run. Every caller-supplied seed
+  // set must therefore derive an address this transaction actually uses. Seeds that are really
+  // re-labelled instruction bytes derive an address that appears nowhere in the account list, and
+  // are rejected here.
+  let used_accounts = ctx.remaining_accounts[..(largest_acct_idx + 1)]
     .iter()
-    .map(|s| Pubkey::create_program_address(s, ctx.program_id).unwrap())
+    .map(|a| a.key())
     .collect::<std::collections::HashSet<Pubkey>>();
+
+  let mut signer_addresses = std::collections::HashSet::new();
+  for seeds in &signers_inner_u8 {
+    let address = Pubkey::create_program_address(seeds, ctx.program_id)
+      .map_err(|_| error!(ErrorCode::InvalidSignerSeeds))?;
+    require!(
+      used_accounts.contains(&address),
+      ErrorCode::UnusedSignerSeeds
+    );
+    signer_addresses.insert(address);
+  }
+  // The lazy signer is a named account of this instruction rather than caller-supplied data, so it
+  // carries no re-labelling risk and is not required to appear in the instruction accounts.
+  signer_addresses.insert(
+    Pubkey::create_program_address(lazy_signer_seeds, ctx.program_id)
+      .map_err(|_| error!(ErrorCode::InvalidSignerSeeds))?,
+  );
   for ix in args.instructions {
     let mut accounts = Vec::new();
     let mut account_infos = Vec::new();

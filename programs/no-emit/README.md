@@ -4,4 +4,4 @@ Burns HNT that was meant to be emitted but forfeited (e.g. rewards for an entity
 
 SDK: [`@helium/no-emit-sdk`](../../packages/no-emit-sdk).
 
-Release / upgrade: push a `program-no-emit-<version>` git tag.
+Release / upgrade: add a program changeset that names `no-emit` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/no-emit/Cargo.toml`. After the change reaches `master`, push the `program-no-emit-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

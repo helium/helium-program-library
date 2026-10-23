@@ -6,4 +6,4 @@ This is no longer used, but was used while we were doing HM revenue burns. It ma
 
 SDK: [`@helium/tuktuk-dca-sdk`](../../packages/tuktuk-dca-sdk).
 
-Release / upgrade: push a `program-tuktuk-dca-<version>` git tag.
+Release / upgrade: add a program changeset that names `tuktuk-dca` in [`.changeset-programs/`](../../.changeset-programs), and bump `version` in `programs/tuktuk-dca/Cargo.toml`. After the change reaches `master`, push the `program-tuktuk-dca-<version>` tag by hand. The tag's run opens the Squads proposal. See [CI / deployment overview](../../README.md#ci--deployment-overview).

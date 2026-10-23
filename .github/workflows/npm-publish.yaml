@@ -1,7 +1,7 @@
 name: NPM Publish
 
 env:
-  SOLANA_CLI_VERSION: 2.1.6
+  SOLANA_CLI_VERSION: 4.3.2
 
 permissions:
   id-token: write
@@ -19,6 +19,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    environment: npm-publish
     steps:
       - uses: actions/checkout@v4
 
@@ -53,21 +54,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Anchor
+      # `@helium/idls` is the only published package built from the anchor
+      # output, and it compiles target/types alone (packages/idls/tsconfig.*).
+      # `anchor idl build` writes those without the SBF compile, which costs
+      # 1.4 min median, 13.6 min p90 on a cache miss. The action runs
+      # setup-anchor itself when its cache misses, so no separate setup step
+      # is needed.
+      - name: Build IDLs
         if: steps.check.outputs.has_changesets == 'false'
-        uses: ./.github/actions/setup-anchor/
-
-      - name: Build Anchor
-        if: steps.check.outputs.has_changesets == 'false'
-        uses: ./.github/actions/build-anchor/
-        with:
-          testing: false
-          devnet: false
+        uses: ./.github/actions/build-idls/
 
       - name: Build all packages
         if: steps.check.outputs.has_changesets == 'false'
         run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
 
+      # npm authenticates this job by OIDC trusted publishing (`id-token: write`), so no npm
+      # token is set. Each package's trusted publisher on npmjs.com names the `npm-publish`
+      # environment, which admits develop only.
       - name: Publish to npm
         if: steps.check.outputs.has_changesets == 'false'
         uses: changesets/action@v1
@@ -75,5 +78,3 @@ jobs:
           publish: pnpm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

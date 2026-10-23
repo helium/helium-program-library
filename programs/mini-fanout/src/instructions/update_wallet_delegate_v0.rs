@@ -9,8 +9,8 @@ use tuktuk_program::{
 };
 
 use crate::{
-  errors::ErrorCode, queue_authority_seeds, schedule_impl, MiniFanoutV0, ScheduleTaskArgsV0,
-  ScheduleTaskV0,
+  errors::ErrorCode, queue_authority_seeds, rent_refund_account, schedule_impl, task_names,
+  MiniFanoutV0, ScheduleTaskArgsV0, ScheduleTaskV0,
 };
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -68,20 +68,31 @@ pub struct UpdateWalletDelegateV0<'info> {
   pub system_program: Program<'info, System>,
 }
 
-pub fn handler(
-  ctx: Context<UpdateWalletDelegateV0>,
+pub fn handler<'info>(
+  ctx: Context<'_, '_, '_, 'info, UpdateWalletDelegateV0<'info>>,
   args: UpdateWalletDelegateArgsV0,
 ) -> Result<()> {
   let mini_fanout = &mut ctx.accounts.mini_fanout;
   mini_fanout.shares[args.index as usize].delegate = args.delegate;
-  if !ctx.accounts.next_task.data_is_empty() && ctx.accounts.next_task.key() != mini_fanout.key() {
+  if !ctx.accounts.next_task.data_is_empty()
+    && ctx.accounts.next_task.key() != mini_fanout.key()
+    && task_names(&ctx.accounts.next_task, &mini_fanout.key())?
+  {
+    let rent_refund = rent_refund_account(
+      &ctx.accounts.next_task,
+      &[
+        ctx.accounts.payer.to_account_info(),
+        ctx.accounts.task_queue.to_account_info(),
+      ],
+      ctx.remaining_accounts,
+    )?;
     dequeue_task_v0(CpiContext::new_with_signer(
       ctx.accounts.tuktuk_program.to_account_info(),
       DequeueTaskV0 {
         task_queue: ctx.accounts.task_queue.to_account_info(),
         task: ctx.accounts.next_task.to_account_info(),
         queue_authority: ctx.accounts.queue_authority.to_account_info(),
-        rent_refund: ctx.accounts.payer.to_account_info(),
+        rent_refund,
         task_queue_authority: ctx.accounts.task_queue_authority.to_account_info(),
       },
       &[queue_authority_seeds!(mini_fanout)],

@@ -67,7 +67,7 @@ export class RecentTransactionsService {
           signature,
           {
             maxSupportedTransactionVersion: 1,
-            commitment: "confirmed",
+            commitment: "finalized",
           }
         );
 

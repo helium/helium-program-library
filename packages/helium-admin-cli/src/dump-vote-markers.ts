@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
 import { VoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { organizationKey } from "@helium/organization-sdk";
 import { init as initProposal } from "@helium/proposal-sdk";
@@ -72,7 +72,7 @@ export async function run(args: any = process.argv) {
       const sigs = await provider.connection.getSignaturesForAddress(
         proposal.publicKey,
         { before: lastSig, limit: 1000 },
-        "confirmed"
+        "finalized"
       );
 
       if (sigs.length === 0) break;
@@ -96,7 +96,7 @@ export async function run(args: any = process.argv) {
       const chunk = signatures.slice(i, i + chunkSize);
       const txs = await provider.connection.getTransactions(
         chunk.map((sig) => sig.signature),
-        { maxSupportedTransactionVersion: 1, commitment: "confirmed" }
+        { maxSupportedTransactionVersion: 1, commitment: "finalized" }
       );
 
       for (const tx of txs) {

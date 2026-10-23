@@ -1,4 +1,4 @@
-import { BN, IdlAccounts, IdlTypes } from "@coral-xyz/anchor";
+import { BN, IdlAccounts, IdlTypes } from "@anchor-lang/core";
 import { HeliumSubDaos } from "@helium/idls/lib/types/helium_sub_daos";
 import { VoterStakeRegistry as HeliumVoterStakeRegistry } from "@helium/idls/lib/types/voter_stake_registry";
 import { NftProxy } from "@helium/modular-governance-idls/lib/types/nft_proxy";

@@ -1,5 +1,5 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
+import * as anchor from "@anchor-lang/core";
+import { Program } from "@anchor-lang/core";
 import { Tuktuk } from "@helium/tuktuk-idls/lib/types/tuktuk";
 import {
   compileTransaction,
@@ -7,6 +7,7 @@ import {
   nextAvailableTaskIds,
   runTask,
   taskKey,
+  taskQueueAuthorityKey,
   taskQueueKey,
   taskQueueNameMappingKey,
   tuktukConfigKey,
@@ -22,6 +23,7 @@ import {
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import {
+  AccountMeta,
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
@@ -46,6 +48,11 @@ const MINI_FANOUT = new PublicKey(
   "mfanLprNnaiP4RX9Zz1BMcDosYHCqnG24H1fMEbi9Gn"
 );
 const TUKTUK = new PublicKey("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
+// shared_utils::ORACLE_SIGNER, which the tests build against because `anchor build` here runs
+// without the `devnet` feature.
+const ORACLE_SIGNER = new PublicKey(
+  "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
+);
 // tuktuk's config, and the IDL account `initTuktuk` reads to build its Program. Both are what
 // `Anchor.toml` clones for the localnet suites, so both suites run against the same tuktuk.
 const TUKTUK_CONFIG = tuktukConfigKey()[0];
@@ -57,6 +64,10 @@ const FANOUT_AMOUNT = 1000000000;
 // No cron string can be "two seconds from now" without racing the run that reads it. Under
 // bankrun the trigger is reached by moving the clock, so the schedule is an ordinary one.
 const HOURLY = "0 0 * * * *";
+const RENT_REFUND_MISSING =
+  /Error Code: RentRefundAccountMissing\. Error Number: 6014\./;
+const RENT_REFUND_NOT_WRITABLE =
+  /Error Code: RentRefundAccountNotWritable\. Error Number: 6015\./;
 
 /** The logs of a failed transaction, which is where an Anchor error names itself. */
 async function programErrorLogs(run: Promise<unknown>): Promise<string> {
@@ -186,22 +197,32 @@ describe("mini-fanout under bankrun", () => {
       .addQueueAuthorityV0()
       .accounts({ payer: me, queueAuthority, taskQueue })
       .rpc();
+    // A second queue authority, so a test can queue and dequeue a task directly.
+    await tuktukProgram.methods
+      .addQueueAuthorityV0()
+      .accounts({ payer: me, queueAuthority: me, taskQueue })
+      .rpc();
   });
 
   /**
    * A fanout with its distribution scheduled: the same state the localnet suite reaches by
-   * waiting for a cron string two seconds out, minus the wait and the race.
+   * waiting for a cron string two seconds out, minus the wait and the race. `payer` pays for
+   * the queued tasks, and so is their rent refund.
    */
   async function scheduledFanout({
     seed,
     shares,
     funding = FANOUT_AMOUNT,
     preTask = { compiledV0: [memoPreTask as any] } as any,
+    payer,
+    schedule = HOURLY,
   }: {
     seed: string;
     shares: any[];
     funding?: number;
     preTask?: any;
+    payer?: Keypair;
+    schedule?: string;
   }) {
     const {
       pubkeys: { miniFanout },
@@ -209,7 +230,7 @@ describe("mini-fanout under bankrun", () => {
       .initializeMiniFanoutV0({
         seed: Buffer.from(seed, "utf-8"),
         shares,
-        schedule: HOURLY,
+        schedule,
         preTask,
       })
       .accounts({ payer: me, owner: me, taskQueue, rentRefund: me, mint })
@@ -239,11 +260,12 @@ describe("mini-fanout under bankrun", () => {
         ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
       ])
       .accounts({
-        payer: me,
+        payer: payer?.publicKey ?? me,
         miniFanout: miniFanout!,
         task: taskKey(taskQueue, taskId)[0],
         preTask: taskKey(taskQueue, preTaskId)[0],
       })
+      .signers(payer ? [payer] : [])
       .rpc();
 
     if (funding > 0) {
@@ -274,8 +296,32 @@ describe("mini-fanout under bankrun", () => {
     await overwriteAccountData(ctx, miniFanout, planted);
   }
 
+  // dequeue_task_v0 refunds to the task's own rent_refund, which is the payer for a task
+  // queue_task_v0 created and the queue itself for one a run returned.
+  // Read through banksClient: anchor's fetchNullable goes through BankrunConnectionProxy,
+  // which throws on a missing account rather than returning null.
+  const taskRentRefundOf = async (miniFanout: PublicKey) => {
+    const { nextTask } = await program.account.miniFanoutV0.fetch(miniFanout);
+    return nextTask.equals(miniFanout)
+      ? me
+      : (tuktukProgram.coder.accounts.decode(
+          "taskV0",
+          (await readAccount(ctx, nextTask))!
+        ).rentRefund as PublicKey);
+  };
+
+  /** A rent refund in the shape of a remaining account. */
+  const rentRefundMeta = (pubkey: PublicKey, isWritable = true): AccountMeta => ({
+    pubkey,
+    isWritable,
+    isSigner: false,
+  });
+
   /** Reschedule through `update_mini_fanout_v0`, changing nothing but the task ids. */
-  async function rescheduleViaUpdate(miniFanout: PublicKey) {
+  async function rescheduleViaUpdate(
+    miniFanout: PublicKey,
+    remainingAccounts: AccountMeta[] = []
+  ) {
     const { taskBitmap, capacity } =
       await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
     const [newPreTaskId, newTaskId] = nextAvailableTaskIds(
@@ -297,6 +343,7 @@ describe("mini-fanout under bankrun", () => {
         newPreTask: taskKey(taskQueue, newPreTaskId)[0],
         taskRentRefund: me,
       })
+      .remainingAccounts(remainingAccounts)
       .rpc();
   }
 
@@ -566,6 +613,27 @@ describe("mini-fanout under bankrun", () => {
     expect(Number(await tokenAmount(ctx, walletAta))).to.equal(FANOUT_AMOUNT);
   });
 
+  it("refuses to distribute when the schedule has no future time", async () => {
+    const wallet = Keypair.generate();
+    const walletAta = await ataWith(wallet.publicKey, 0);
+    // The only time of the schedule is the last second of this year, so once the clock reaches
+    // it the distribution that runs then has no next time to queue. clockwork-cron finds no time
+    // in a later year whose month is before the current month, so the year stays this one.
+    const { unixTimestamp } = await ctx.banksClient.getClock();
+    const year = new Date(Number(unixTimestamp) * 1000).getUTCFullYear();
+    const { task, preTask } = await scheduledFanout({
+      seed: "no-future-time",
+      shares: [shareOf(wallet.publicKey, 100)],
+      schedule: `59 59 23 31 12 * ${year}`,
+    });
+
+    const distribute = await reachDistribution(task, preTask);
+    expect(await programErrorLogs(distribute())).to.match(
+      /Error Code: InvalidSchedule\. Error Number: 6003\./
+    );
+    expect(Number(await tokenAmount(ctx, walletAta))).to.equal(0);
+  });
+
   it("clears a stale next pre task when it reschedules", async () => {
     const wallet = Keypair.generate();
     await ataWith(wallet.publicKey, 0);
@@ -717,6 +785,707 @@ describe("mini-fanout under bankrun", () => {
 
     const acc = await program.account.miniFanoutV0.fetch(miniFanout!);
     expect(acc.shares[0].delegate.toBase58()).to.equal(delegate.toBase58());
+  });
+
+  describe("changing a delegate on a scheduled fanout", () => {
+    const lamportsOf = async (address: PublicKey) =>
+      Number((await ctx.banksClient.getAccount(address))!.lamports);
+
+    /**
+     * What tuktuk holds in a task, and so what a dequeue refunds: rent exemption for the task's
+     * size, and the crank reward the task records.
+     */
+    const lamportsHeldBy = async (task: PublicKey) => {
+      const data = (await readAccount(ctx, task))!;
+      const { crankReward } = tuktukProgram.coder.accounts.decode("taskV0", data);
+      return (
+        (await provider.connection.getMinimumBalanceForRentExemption(
+          data.length
+        )) + Number(crankReward.toString())
+      );
+    };
+
+    /** update_wallet_delegate_v0 on the next free task ids, with `payer` paying for the new task. */
+    async function changeDelegate(
+      miniFanout: PublicKey,
+      wallet: Keypair,
+      payer?: Keypair,
+      remainingAccounts: AccountMeta[] = []
+    ) {
+      const { taskBitmap, capacity } =
+        await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+      const [newPreTaskId, newTaskId] = nextAvailableTaskIds(
+        taskBitmap,
+        2,
+        true,
+        capacity
+      );
+      const delegate = Keypair.generate().publicKey;
+      await program.methods
+        .updateWalletDelegateV0({ newTaskId, newPreTaskId, delegate, index: 0 })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
+        .accounts({
+          payer: payer?.publicKey ?? me,
+          wallet: wallet.publicKey,
+          miniFanout,
+          newTask: taskKey(taskQueue, newTaskId)[0],
+          newPreTask: taskKey(taskQueue, newPreTaskId)[0],
+        })
+        .remainingAccounts(remainingAccounts)
+        .signers(payer ? [wallet, payer] : [wallet])
+        .rpc();
+      return { delegate, newTask: taskKey(taskQueue, newTaskId)[0] };
+    }
+
+    it("refunds the task's rent to the payer that queued it", async () => {
+      const wallet = Keypair.generate();
+      // `me` pays the transaction fees, so the payer's lamports move only by task rent.
+      const payer = Keypair.generate();
+      await send([
+        SystemProgram.transfer({
+          fromPubkey: me,
+          toPubkey: payer.publicKey,
+          lamports: 1_000_000_000,
+        }),
+      ]);
+      const { miniFanout, task } = await scheduledFanout({
+        seed: "delegate-refunds-payer",
+        shares: [shareOf(wallet.publicKey, 100)],
+        preTask: null,
+        payer,
+      });
+      expect((await taskRentRefundOf(miniFanout)).toBase58()).to.equal(
+        payer.publicKey.toBase58()
+      );
+      const taskLamports = await lamportsHeldBy(task);
+      expect(await lamportsOf(task)).to.equal(taskLamports);
+      const before = await lamportsOf(payer.publicKey);
+
+      const { delegate, newTask } = await changeDelegate(
+        miniFanout,
+        wallet,
+        payer
+      );
+
+      expect(await readAccount(ctx, task)).to.equal(null);
+      const acc = await program.account.miniFanoutV0.fetch(miniFanout);
+      expect(acc.shares[0].delegate.toBase58()).to.equal(delegate.toBase58());
+      expect(acc.nextTask.toBase58()).to.equal(newTask.toBase58());
+      // The payer got the old task's lamports back and funded the new task.
+      const newTaskLamports = await lamportsOf(newTask);
+      expect(newTaskLamports).to.equal(await lamportsHeldBy(newTask));
+      expect(await lamportsOf(payer.publicKey)).to.equal(
+        before + taskLamports - newTaskLamports
+      );
+    });
+
+    it("refunds a task that a run returned to the task queue", async () => {
+      const wallet = Keypair.generate();
+      await ataWith(wallet.publicKey, 0);
+      const { miniFanout, task } = await scheduledFanout({
+        seed: "delegate-refunds-queue",
+        shares: [shareOf(wallet.publicKey, 100)],
+        preTask: null,
+      });
+      const queued = await tuktukProgram.account.taskV0.fetch(task);
+      await warpTo(ctx, BigInt(queued.trigger.timestamp![0].toString()));
+      await crank(task);
+
+      const { nextTask } = await program.account.miniFanoutV0.fetch(miniFanout);
+      expect((await taskRentRefundOf(miniFanout)).toBase58()).to.equal(
+        taskQueue.toBase58(),
+        "the run should have returned a task that refunds to the task queue"
+      );
+      const taskLamports = await lamportsHeldBy(nextTask);
+      expect(await lamportsOf(nextTask)).to.equal(taskLamports);
+      const before = await lamportsOf(taskQueue);
+
+      const { delegate, newTask } = await changeDelegate(miniFanout, wallet);
+
+      expect(await readAccount(ctx, nextTask)).to.equal(null);
+      const acc = await program.account.miniFanoutV0.fetch(miniFanout);
+      expect(acc.shares[0].delegate.toBase58()).to.equal(delegate.toBase58());
+      expect(acc.nextTask.toBase58()).to.equal(newTask.toBase58());
+      expect(await lamportsOf(newTask)).to.equal(await lamportsHeldBy(newTask));
+      expect(await lamportsOf(taskQueue)).to.equal(before + taskLamports);
+    });
+
+    describe("with a task whose rent refund is no account of the instruction", () => {
+      /** A scheduled fanout whose task another payer queued, so that payer is its rent refund. */
+      async function fanoutOfAnotherPayer(seed: string) {
+        const wallet = Keypair.generate();
+        const payer = Keypair.generate();
+        await send([
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: payer.publicKey,
+            lamports: 1_000_000_000,
+          }),
+        ]);
+        const { miniFanout, task } = await scheduledFanout({
+          seed,
+          shares: [shareOf(wallet.publicKey, 100)],
+          preTask: null,
+          payer,
+        });
+        return {
+          miniFanout,
+          task,
+          wallet,
+          rentRefund: payer.publicKey,
+          taskLamports: await lamportsHeldBy(task),
+          before: await lamportsOf(payer.publicKey),
+        };
+      }
+
+      it("refunds the task to a writable remaining account", async () => {
+        const { miniFanout, task, wallet, rentRefund, taskLamports, before } =
+          await fanoutOfAnotherPayer("delegate-remaining");
+
+        await changeDelegate(miniFanout, wallet, undefined, [
+          rentRefundMeta(rentRefund),
+        ]);
+
+        expect(await readAccount(ctx, task)).to.equal(null);
+        expect(await lamportsOf(rentRefund)).to.equal(before + taskLamports);
+      });
+
+      it("refuses when the rent refund is not passed", async () => {
+        const { miniFanout, task, wallet } = await fanoutOfAnotherPayer(
+          "delegate-missing"
+        );
+
+        expect(
+          await programErrorLogs(changeDelegate(miniFanout, wallet))
+        ).to.match(RENT_REFUND_MISSING);
+        expect(await readAccount(ctx, task)).to.not.equal(null);
+      });
+
+      it("refuses a rent refund passed as a read-only remaining account", async () => {
+        const { miniFanout, task, wallet, rentRefund } =
+          await fanoutOfAnotherPayer("delegate-read-only");
+
+        expect(
+          await programErrorLogs(
+            changeDelegate(miniFanout, wallet, undefined, [
+              rentRefundMeta(rentRefund, false),
+            ])
+          )
+        ).to.match(RENT_REFUND_NOT_WRITABLE);
+        expect(await readAccount(ctx, task)).to.not.equal(null);
+      });
+    });
+  });
+
+  describe("a task at the recorded address whose transaction does not name the fanout", () => {
+    /**
+     * A scheduled fanout with a memo task at the address it records. The transaction of that task
+     * does not name the fanout.
+     */
+    async function fanoutWithMemoTask(seed: string, wallet: PublicKey) {
+      const { miniFanout, task } = await scheduledFanout({
+        seed,
+        shares: [shareOf(wallet, 100)],
+        preTask: null,
+      });
+      const own = await tuktukProgram.account.taskV0.fetch(task);
+      // The task that schedule_task_v0 queued names the fanout.
+      expect(
+        own.transaction.compiledV0![0].accounts.map((a) => a.toBase58())
+      ).to.include(miniFanout.toBase58());
+      const taskQueueAuthority = taskQueueAuthorityKey(taskQueue, me)[0];
+      await tuktukProgram.methods
+        .dequeueTaskV0()
+        .accounts({
+          queueAuthority: me,
+          rentRefund: own.rentRefund,
+          taskQueueAuthority,
+          taskQueue,
+          task,
+        })
+        .rpc();
+      const { transaction, remainingAccounts } = compileTransaction(
+        [createMemoInstruction("memo", [])],
+        []
+      );
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id: own.id,
+          trigger: { now: {} },
+          transaction: { compiledV0: [transaction] },
+          crankReward: null,
+          freeTasks: 0,
+          description: "memo",
+        })
+        .accounts({
+          payer: me,
+          queueAuthority: me,
+          taskQueueAuthority,
+          taskQueue,
+          task,
+        })
+        .remainingAccounts(remainingAccounts)
+        .rpc();
+      const { nextTask } = await program.account.miniFanoutV0.fetch(miniFanout);
+      expect(nextTask.toBase58()).to.equal(task.toBase58());
+      return { miniFanout, task, queued: (await readAccount(ctx, task))! };
+    }
+
+    it("stays queued when a delegate changes", async () => {
+      const wallet = Keypair.generate();
+      const { miniFanout, task, queued } = await fanoutWithMemoTask(
+        "memo-delegate",
+        wallet.publicKey
+      );
+      const { taskBitmap, capacity } =
+        await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+      const [newPreTaskId, newTaskId] = nextAvailableTaskIds(
+        taskBitmap,
+        2,
+        true,
+        capacity
+      );
+      const newTask = taskKey(taskQueue, newTaskId)[0];
+
+      await program.methods
+        .updateWalletDelegateV0({
+          newTaskId,
+          newPreTaskId,
+          delegate: Keypair.generate().publicKey,
+          index: 0,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 1400000 }),
+        ])
+        .accounts({
+          payer: me,
+          wallet: wallet.publicKey,
+          miniFanout,
+          newTask,
+          newPreTask: taskKey(taskQueue, newPreTaskId)[0],
+        })
+        .signers([wallet])
+        .rpc();
+
+      expect(await readAccount(ctx, task)).to.deep.equal(queued);
+      const acc = await program.account.miniFanoutV0.fetch(miniFanout);
+      expect(acc.nextTask.toBase58()).to.equal(newTask.toBase58());
+    });
+
+    it("stays queued when the fanout is updated", async () => {
+      const { miniFanout, task, queued } = await fanoutWithMemoTask(
+        "memo-update",
+        Keypair.generate().publicKey
+      );
+
+      await rescheduleViaUpdate(miniFanout);
+
+      expect(await readAccount(ctx, task)).to.deep.equal(queued);
+      const acc = await program.account.miniFanoutV0.fetch(miniFanout);
+      expect(acc.nextTask.toBase58()).to.not.equal(task.toBase58());
+    });
+
+    it("stays queued when the fanout is closed", async () => {
+      const { miniFanout, task, queued } = await fanoutWithMemoTask(
+        "memo-close",
+        Keypair.generate().publicKey
+      );
+
+      await program.methods
+        .closeMiniFanoutV0()
+        .accounts({ miniFanout, taskRentRefund: me })
+        .rpc();
+
+      expect(await readAccount(ctx, task)).to.deep.equal(queued);
+      expect(await readAccount(ctx, miniFanout)).to.equal(null);
+    });
+  });
+
+  describe("a fanout with a pre task after one distribution", () => {
+    /** A fanout that ran one distribution, and the two tasks that the run returned. */
+    async function distributedFanout(seed: string) {
+      const { miniFanout, task, preTask } = await scheduledFanout({
+        seed,
+        shares: [shareOf(Keypair.generate().publicKey, 100)],
+      });
+      const distribute = await reachDistribution(task, preTask);
+      await distribute();
+      const { nextTask, nextPreTask } =
+        await program.account.miniFanoutV0.fetch(miniFanout);
+      return { miniFanout, nextTask, nextPreTask };
+    }
+
+    it("dequeues both returned tasks when the fanout is updated", async () => {
+      const { miniFanout, nextTask, nextPreTask } =
+        await distributedFanout("distributed-update");
+
+      await rescheduleViaUpdate(miniFanout);
+
+      expect(await readAccount(ctx, nextTask)).to.equal(null);
+      expect(await readAccount(ctx, nextPreTask)).to.equal(null);
+    });
+
+    it("dequeues both returned tasks when the fanout is closed", async () => {
+      const { miniFanout, nextTask, nextPreTask } =
+        await distributedFanout("distributed-close");
+
+      await program.methods
+        .closeMiniFanoutV0()
+        .accounts({ miniFanout, taskRentRefund: me })
+        .rpc();
+
+      expect(await readAccount(ctx, nextTask)).to.equal(null);
+      expect(await readAccount(ctx, nextPreTask)).to.equal(null);
+      expect(await readAccount(ctx, miniFanout)).to.equal(null);
+    });
+  });
+
+  describe("a task at the recorded pre task address", () => {
+    const ORACLE_URL = "https://hnt-rewards.oracle.helium.io/v1/tuktuk/asset";
+    const otherMemo = compileTransaction(
+      [createMemoInstruction("memo", [])],
+      []
+    );
+    // Each shape a pre task takes, beside a different transaction of the same shape.
+    const shapes = [
+      {
+        shape: "remote",
+        preTask: { remoteV0: { url: `${ORACLE_URL}/1`, signer: ORACLE_SIGNER } },
+        other: { remoteV0: { url: `${ORACLE_URL}/2`, signer: ORACLE_SIGNER } },
+        otherAccounts: [],
+      },
+      {
+        shape: "compiled",
+        preTask: { compiledV0: [memoPreTask] },
+        other: { compiledV0: [otherMemo.transaction] },
+        otherAccounts: otherMemo.remainingAccounts,
+      },
+    ];
+
+    const transactionOf = async (task: PublicKey) =>
+      JSON.stringify((await tuktukProgram.account.taskV0.fetch(task)).transaction);
+
+    const storedPreTaskOf = async (miniFanout: PublicKey) =>
+      JSON.stringify(
+        (await program.account.miniFanoutV0.fetch(miniFanout)).preTask
+      );
+
+    /** A scheduled fanout that stores `preTask`, with its own pre task queued. */
+    async function fanoutWithPreTask(seed: string, preTask: any) {
+      const { miniFanout, preTask: task } = await scheduledFanout({
+        seed,
+        shares: [shareOf(Keypair.generate().publicKey, 100)],
+        preTask,
+      });
+      // The queued pre task equals the pre task the fanout stores.
+      expect(await transactionOf(task)).to.equal(
+        await storedPreTaskOf(miniFanout)
+      );
+      return { miniFanout, task };
+    }
+
+    /**
+     * The same fanout with a task at the recorded pre task address whose transaction differs from
+     * the pre task the fanout stores.
+     */
+    async function fanoutWithDifferentPreTask(
+      seed: string,
+      { preTask, other, otherAccounts }: (typeof shapes)[number]
+    ) {
+      const { miniFanout, task } = await fanoutWithPreTask(seed, preTask);
+      const own = await tuktukProgram.account.taskV0.fetch(task);
+      const taskQueueAuthority = taskQueueAuthorityKey(taskQueue, me)[0];
+      await tuktukProgram.methods
+        .dequeueTaskV0()
+        .accounts({
+          queueAuthority: me,
+          rentRefund: own.rentRefund,
+          taskQueueAuthority,
+          taskQueue,
+          task,
+        })
+        .rpc();
+      await tuktukProgram.methods
+        .queueTaskV0({
+          id: own.id,
+          trigger: { now: {} },
+          transaction: other as any,
+          crankReward: null,
+          freeTasks: 0,
+          description: "memo",
+        })
+        .accounts({
+          payer: me,
+          queueAuthority: me,
+          taskQueueAuthority,
+          taskQueue,
+          task,
+        })
+        .remainingAccounts(otherAccounts)
+        .rpc();
+      const { nextPreTask } = await program.account.miniFanoutV0.fetch(
+        miniFanout
+      );
+      expect(nextPreTask.toBase58()).to.equal(task.toBase58());
+      expect(await transactionOf(task)).to.not.equal(
+        await storedPreTaskOf(miniFanout)
+      );
+      return { miniFanout, task, queued: (await readAccount(ctx, task))! };
+    }
+
+    const close = async (
+      miniFanout: PublicKey,
+      remainingAccounts: AccountMeta[] = []
+    ) =>
+      program.methods
+        .closeMiniFanoutV0()
+        .accounts({ miniFanout, taskRentRefund: me })
+        .remainingAccounts(remainingAccounts)
+        .rpc();
+
+    describe("with a rent refund that is no account of the instruction", () => {
+      const lamportsOf = async (address: PublicKey) =>
+        Number((await ctx.banksClient.getAccount(address))!.lamports);
+
+      /**
+       * A scheduled fanout whose next task another payer queued. The next task refunds to that
+       * payer.
+       */
+      async function fanoutWithNextTaskOfAnotherPayer(seed: string) {
+        const payer = Keypair.generate();
+        await send([
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: payer.publicKey,
+            lamports: 1000000000,
+          }),
+        ]);
+        const { miniFanout, task } = await scheduledFanout({
+          seed,
+          shares: [shareOf(Keypair.generate().publicKey, 100)],
+          preTask: null,
+          payer,
+        });
+        return {
+          miniFanout,
+          task,
+          rentRefund: payer.publicKey,
+          refunded: await lamportsOf(payer.publicKey),
+        };
+      }
+
+      /**
+       * A scheduled fanout whose pre task another payer queued, with the transaction the fanout
+       * stores. The next task refunds to the wallet and the pre task refunds to that payer.
+       */
+      async function fanoutWithPreTaskOfAnotherPayer(seed: string) {
+        const payer = Keypair.generate();
+        await send([
+          SystemProgram.transfer({
+            fromPubkey: me,
+            toPubkey: payer.publicKey,
+            lamports: 1000000000,
+          }),
+        ]);
+        const { miniFanout, task } = await fanoutWithPreTask(seed, {
+          compiledV0: [memoPreTask],
+        });
+        const own = await tuktukProgram.account.taskV0.fetch(task);
+        const taskQueueAuthority = taskQueueAuthorityKey(taskQueue, me)[0];
+        await tuktukProgram.methods
+          .dequeueTaskV0()
+          .accounts({
+            queueAuthority: me,
+            rentRefund: own.rentRefund,
+            taskQueueAuthority,
+            taskQueue,
+            task,
+          })
+          .rpc();
+        await tuktukProgram.methods
+          .queueTaskV0({
+            id: own.id,
+            trigger: own.trigger,
+            transaction: own.transaction,
+            crankReward: null,
+            freeTasks: 0,
+            description: own.description,
+          })
+          .accounts({
+            payer: payer.publicKey,
+            queueAuthority: me,
+            taskQueueAuthority,
+            taskQueue,
+            task,
+          })
+          .signers([payer])
+          .rpc();
+        expect(await transactionOf(task)).to.equal(
+          await storedPreTaskOf(miniFanout)
+        );
+        const { rentRefund } = await tuktukProgram.account.taskV0.fetch(task);
+        expect(rentRefund.toBase58()).to.equal(payer.publicKey.toBase58());
+        expect((await taskRentRefundOf(miniFanout)).toBase58()).to.equal(
+          me.toBase58()
+        );
+        return {
+          miniFanout,
+          task,
+          rentRefund: payer.publicKey,
+          refunded: await lamportsOf(payer.publicKey),
+        };
+      }
+
+      const tasks = [
+        { name: "next task", seed: "next", fanout: fanoutWithNextTaskOfAnotherPayer },
+        { name: "pre task", seed: "pre", fanout: fanoutWithPreTaskOfAnotherPayer },
+      ];
+      const instructions = [
+        { name: "updated", seed: "update", run: rescheduleViaUpdate },
+        { name: "closed", seed: "close", run: close },
+      ];
+
+      for (const { name: taskName, seed: taskSeed, fanout } of tasks) {
+        for (const { name, seed, run } of instructions) {
+          it(`refunds the ${taskName} to a writable remaining account when the fanout is ${name}`, async () => {
+            const { miniFanout, task, rentRefund, refunded } = await fanout(
+              `${taskSeed}-${seed}-remaining`
+            );
+
+            await run(miniFanout, [rentRefundMeta(rentRefund)]);
+
+            expect(await readAccount(ctx, task)).to.equal(null);
+            expect(await lamportsOf(rentRefund)).to.be.greaterThan(refunded);
+          });
+
+          it(`refuses when the rent refund of the ${taskName} is not passed and the fanout is ${name}`, async () => {
+            const { miniFanout, task } = await fanout(
+              `${taskSeed}-${seed}-missing`
+            );
+
+            expect(await programErrorLogs(run(miniFanout))).to.match(
+              RENT_REFUND_MISSING
+            );
+            expect(await readAccount(ctx, task)).to.not.equal(null);
+          });
+
+          it(`refuses a read-only rent refund of the ${taskName} when the fanout is ${name}`, async () => {
+            const { miniFanout, task, rentRefund } = await fanout(
+              `${taskSeed}-${seed}-read-only`
+            );
+
+            expect(
+              await programErrorLogs(
+                run(miniFanout, [rentRefundMeta(rentRefund, false)])
+              )
+            ).to.match(RENT_REFUND_NOT_WRITABLE);
+            expect(await readAccount(ctx, task)).to.not.equal(null);
+          });
+        }
+      }
+    });
+
+    for (const each of shapes) {
+      const { shape, preTask } = each;
+
+      describe(`on a fanout with a ${shape} pre task`, () => {
+        it("dequeues the pre task it stores when the fanout is updated", async () => {
+          const { miniFanout, task } = await fanoutWithPreTask(
+            `${shape}-own-update`,
+            preTask
+          );
+
+          await rescheduleViaUpdate(miniFanout);
+
+          expect(await readAccount(ctx, task)).to.equal(null);
+        });
+
+        it("dequeues the pre task it stores when the fanout is closed", async () => {
+          const { miniFanout, task } = await fanoutWithPreTask(
+            `${shape}-own-close`,
+            preTask
+          );
+
+          await close(miniFanout);
+
+          expect(await readAccount(ctx, task)).to.equal(null);
+          expect(await readAccount(ctx, miniFanout)).to.equal(null);
+        });
+
+        it("leaves a task with a different transaction queued when the fanout is updated", async () => {
+          const { miniFanout, task, queued } = await fanoutWithDifferentPreTask(
+            `${shape}-other-update`,
+            each
+          );
+
+          await rescheduleViaUpdate(miniFanout);
+
+          expect(await readAccount(ctx, task)).to.deep.equal(queued);
+          // The fanout queued a new pre task at another id.
+          const acc = await program.account.miniFanoutV0.fetch(miniFanout);
+          expect(acc.nextPreTask.toBase58()).to.not.equal(task.toBase58());
+          expect(await transactionOf(acc.nextPreTask)).to.equal(
+            await storedPreTaskOf(miniFanout)
+          );
+        });
+
+        it("leaves a task with a different transaction queued when the fanout is closed", async () => {
+          const { miniFanout, task, queued } = await fanoutWithDifferentPreTask(
+            `${shape}-other-close`,
+            each
+          );
+
+          await close(miniFanout);
+
+          expect(await readAccount(ctx, task)).to.deep.equal(queued);
+          expect(await readAccount(ctx, miniFanout)).to.equal(null);
+        });
+      });
+    }
+  });
+
+  it("leaves a task larger than the decode limit queued when the fanout is updated", async () => {
+    const { miniFanout, task, preTask } = await scheduledFanout({
+      seed: "large-update",
+      shares: Array.from({ length: 5 }, () =>
+        shareOf(Keypair.generate().publicKey, 100)
+      ),
+    });
+    // A compiled transaction with 90 account keys, no instructions and no signer seeds. It is
+    // written onto the task directly.
+    const largeTransaction = Buffer.concat([
+      Buffer.from([0, 0, 0, 0, 90, 0, 0, 0]),
+      Buffer.alloc(32 * 90, 7),
+      Buffer.alloc(8),
+    ]);
+    const queued: Buffer[] = [];
+    for (const address of [task, preTask]) {
+      const own = (await readAccount(ctx, address))!;
+      const transaction = tuktukProgram.coder.types.encode(
+        "transactionSourceV0",
+        tuktukProgram.coder.accounts.decode("taskV0", own).transaction
+      );
+      const at = own.indexOf(transaction);
+      expect(at).to.be.greaterThan(-1);
+      const large = Buffer.concat([
+        own.subarray(0, at),
+        largeTransaction,
+        own.subarray(at + transaction.length),
+      ]);
+      expect(large.length).to.be.greaterThan(2048);
+      await overwriteAccountData(ctx, address, large);
+      queued.push(large);
+    }
+
+    await rescheduleViaUpdate(miniFanout);
+
+    expect(await readAccount(ctx, task)).to.deep.equal(queued[0]);
+    expect(await readAccount(ctx, preTask)).to.deep.equal(queued[1]);
+    const acc = await program.account.miniFanoutV0.fetch(miniFanout);
+    expect(acc.nextTask.toBase58()).to.not.equal(task.toBase58());
+    expect(acc.nextPreTask.toBase58()).to.not.equal(preTask.toBase58());
   });
 
   it("rewrites an account the programs would not produce", async () => {

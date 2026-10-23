@@ -1,0 +1,6 @@
+require:
+  - "@swc-node/register"
+node-option:
+  - "no-experimental-strip-types"
+timeout: 60000
+exit: true

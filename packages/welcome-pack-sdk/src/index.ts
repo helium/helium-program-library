@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Idl, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Idl, Program } from "@anchor-lang/core";
 import { WelcomePack } from "@helium/idls/lib/types/welcome_pack";
 import { fetchBackwardsCompatibleIdl } from "@helium/spl-utils";
 import { Keypair, PublicKey } from "@solana/web3.js";

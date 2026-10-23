@@ -29,7 +29,7 @@ The `lazy-distributor` contract is used to claim rewards for hotspots.
 import { entityCreatorKey } from '@helium/helium-entity-manager-sdk'
 import { daoKey } from '@helium/helium-sub-daos-sdk'
 import { HNT_MINT, searchAssets } from '@helium/spl-utils'
-import { AnchorProvider } from '@coral-xyz/anchor'
+import { AnchorProvider } from '@anchor-lang/core'
 import { PublicKey } from '@solana/web3.js'
 
 export const DAO_KEY = daoKey(HNT_MINT)[0]
@@ -59,7 +59,7 @@ export const getCompressedCollectablesByCreator = async (
 
 ```js async name=annotate-pending-rewards
 
-import { AnchorProvider } from '@coral-xyz/anchor'
+import { AnchorProvider } from '@anchor-lang/core'
 import { Asset, HNT_MINT } from '@helium/spl-utils'
 import * as lz from '@helium/lazy-distributor-sdk'
 import { init, keyToAssetForAsset, decodeEntityKey } from '@helium/helium-entity-manager-sdk'
@@ -122,9 +122,9 @@ export async function annotateWithPendingRewards(
 ### Generate and send claim txn for a hotspot
 
 ```js async name=claim-hotspot-reward
-import { AnchorProvider } from '@coral-xyz/anchor'
+import { AnchorProvider } from '@anchor-lang/core'
 import { daoKey } from '@helium/helium-sub-daos-sdk'
-import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes'
+import { bs58 } from '@anchor-lang/core/dist/cjs/utils/bytes'
 import {
   init as initHem,
   keyToAssetKey,

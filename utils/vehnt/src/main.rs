@@ -14,6 +14,6 @@ async fn main() -> MyResult {
   use clap::Parser;
   let cli = cli::Cli::parse();
   let rpc_client =
-    RpcClient::new_with_commitment(cli.solana_url.to_string(), CommitmentConfig::confirmed());
+    RpcClient::new_with_commitment(cli.solana_url.to_string(), CommitmentConfig::finalized());
   cli.run(rpc_client).await
 }
