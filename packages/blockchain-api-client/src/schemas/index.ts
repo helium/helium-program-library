@@ -1,5 +1,4 @@
 export * from "./common";
-export * from "./fiat";
 export * from "./governance";
 export * from "./health";
 export * from "./tokens";

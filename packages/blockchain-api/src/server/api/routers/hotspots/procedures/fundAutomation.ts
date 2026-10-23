@@ -2,8 +2,6 @@ import { createSolanaConnection, getCluster } from "@/lib/solana";
 import { calculateFundingForAdditionalDuration } from "@/lib/utils/automation-helpers";
 import * as anchor from "@anchor-lang/core";
 import {
-  HELIUM_COMMON_LUT,
-  HELIUM_COMMON_LUT_DEVNET,
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
   WALLET_SIGNED,
@@ -26,6 +24,7 @@ import {
   BASE_TX_FEE_LAMPORTS,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 
@@ -145,9 +144,7 @@ export const fundAutomation = publicProcedure.hotspots.fundAutomation.handler(
       (
         await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
           addressLookupTableAddresses: [
-            process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
-              ? HELIUM_COMMON_LUT_DEVNET
-              : HELIUM_COMMON_LUT,
+            getHeliumLookupTable(),
           ],
           commitment: "finalized",
           signing: WALLET_SIGNED,

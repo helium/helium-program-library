@@ -1,6 +1,3 @@
-import { BankAccount } from "./bank-account";
-import { BridgeTransfer } from "./bridge-transfer";
-import { BridgeUser } from "./bridge-user";
 import {
   AssetOwner,
   HotspotOwnership,
@@ -78,21 +75,6 @@ export function defineAssociations() {
     foreignKey: "asset",
     sourceKey: "asset",
     as: "mobileHotspotInfo",
-  });
-
-  BankAccount.belongsTo(BridgeUser, {
-    foreignKey: "bridgeUserId",
-    as: "bridgeUser",
-  });
-
-  BridgeTransfer.belongsTo(BridgeUser, {
-    foreignKey: "bridgeUserId",
-    as: "bridgeUser",
-  });
-
-  BridgeTransfer.belongsTo(BankAccount, {
-    foreignKey: "bankAccountId",
-    as: "bankAccount",
   });
 
   MobileHotspotInfo.belongsTo(KeyToAsset, {

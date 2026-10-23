@@ -28,8 +28,6 @@ import {
   taskQueueAuthorityKey,
 } from "@helium/tuktuk-sdk";
 import {
-  HELIUM_COMMON_LUT,
-  HELIUM_COMMON_LUT_DEVNET,
   batchInstructionsToTxsWithPriorityFee,
   toVersionedTx,
   WALLET_SIGNED,
@@ -49,6 +47,7 @@ import {
   getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 import {
@@ -411,9 +410,7 @@ export const claimRewards = publicProcedure.hotspots.claimRewards.handler(
       (
         await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
           addressLookupTableAddresses: [
-            process.env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
-              ? HELIUM_COMMON_LUT_DEVNET
-              : HELIUM_COMMON_LUT,
+            getHeliumLookupTable(),
           ],
           commitment: "finalized",
           signing: WALLET_SIGNED,

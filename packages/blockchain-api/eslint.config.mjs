@@ -1,16 +1,22 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
-
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals"),
-];
-
-export default eslintConfig;
+export default tseslint.config(
+  { ignores: ["lib/**"] },
+  {
+    files: ["src/**/*.ts", "tests/**/*.ts"],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    rules: {
+      // Rules `next/core-web-vitals` never enabled. Keeping them off makes this
+      // a like-for-like replacement of the Next preset rather than a new lint
+      // pass over code no ticket in this migration touches.
+      "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "no-empty": "off",
+      // Next's preset had this as a warning
+      "@typescript-eslint/no-unused-vars": "warn",
+    },
+  },
+);

@@ -5,7 +5,7 @@ import { setupTestCtx, TestCtx } from "./helpers/context";
 import { ensureFunds, loadKeypair2FromEnv } from "./helpers/wallet";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import { createTestMultisig } from "./helpers/squads";
-import { stopNextServer } from "./helpers/next";
+import { stopServer } from "./helpers/server";
 import { stopSurfpool } from "./helpers/surfpool";
 
 /**
@@ -102,7 +102,7 @@ describe("squads v4 proposal lifecycle", function () {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

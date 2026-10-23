@@ -1,10 +1,9 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
-import { CreateBankAccountInputSchema } from "../../../blockchain-api-client/src/schemas/fiat";
 import { summarizeProcedureInput } from "../../src/lib/utils/log-input";
 
-/** A filled-in `fiat.createBankAccount` input, the worst case for the log. */
-const BANK_ACCOUNT = CreateBankAccountInputSchema.parse({
+/** An input full of account and personal details, the worst case for the log. */
+const BANK_ACCOUNT = {
   currency: "usd",
   account_type: "checking",
   bank_name: "Example Bank",
@@ -23,7 +22,7 @@ const BANK_ACCOUNT = CreateBankAccountInputSchema.parse({
     postal_code: "NW1",
     country: "GB",
   },
-});
+};
 
 /** Every string anywhere in a value, so a test can assert none of it is logged. */
 function strings(value: unknown): string[] {
@@ -42,19 +41,19 @@ describe("summarizeProcedureInput", () => {
 
   it("logs the value of an allowlisted field", () => {
     expect(
-      summarizeProcedureInput({ walletAddress: "GZairnxHiWXk73Yhs" })
+      summarizeProcedureInput({ walletAddress: "GZairnxHiWXk73Yhs" }),
     ).to.equal(' {walletAddress="GZairnxHiWXk73Yhs"}');
   });
 
   it("logs an unlisted field by name only", () => {
     expect(summarizeProcedureInput({ secretToken: "s3cret" })).to.equal(
-      " {secretToken}"
+      " {secretToken}",
     );
   });
 
   it("keeps the order and separates the fields", () => {
     expect(
-      summarizeProcedureInput({ walletAddress: "abc", memo: "5" })
+      summarizeProcedureInput({ walletAddress: "abc", memo: "5" }),
     ).to.equal(' {walletAddress="abc", memo}');
   });
 
@@ -73,22 +72,22 @@ describe("summarizeProcedureInput", () => {
     // A schema that nests something under a name that used to hold a string
     // does not start logging what it nested.
     expect(
-      summarizeProcedureInput({ owner: { address: "GZairnxHiWXk73Yhs" } })
+      summarizeProcedureInput({ owner: { address: "GZairnxHiWXk73Yhs" } }),
     ).to.equal(" {owner}");
     expect(summarizeProcedureInput({ owner: ["GZairnxHiWXk73Yhs"] })).to.equal(
-      " {owner}"
+      " {owner}",
     );
   });
 
   it("logs a listed field's scalar value whatever its type", () => {
     expect(
-      summarizeProcedureInput({ parallel: true, simulate: false, type: 3 })
+      summarizeProcedureInput({ parallel: true, simulate: false, type: 3 }),
     ).to.equal(" {parallel=true, simulate=false, type=3}");
   });
 
   it("does not take a value from Object.prototype for an unlisted name", () => {
     expect(
-      summarizeProcedureInput({ constructor: "x", toString: "y" })
+      summarizeProcedureInput({ constructor: "x", toString: "y" }),
     ).to.equal(" {constructor, toString}");
   });
 });

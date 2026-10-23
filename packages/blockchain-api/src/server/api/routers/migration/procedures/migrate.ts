@@ -16,6 +16,7 @@ import {
   getRentLamports,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
 import { TOKEN_MINTS } from "@/lib/constants/tokens";
 import { HNT_LAZY_DISTRIBUTOR_ADDRESS } from "@/lib/constants/lazy-distributor";
 import {
@@ -52,8 +53,6 @@ import {
   getAsset,
   getAssetProof,
   getTransactionSizeLimit,
-  HELIUM_COMMON_LUT,
-  HELIUM_COMMON_LUT_DEVNET,
   HNT_MINT,
   proofArgsAndAccounts,
   resolveTxVersion,
@@ -86,7 +85,6 @@ import {
   NATIVE_MINT,
 } from "@solana/spl-token";
 import BN from "bn.js";
-import { headers } from "next/headers";
 import {
   createRateLimiter,
   getClientIp,
@@ -141,7 +139,7 @@ async function getBubblegumAuthorityPDA(
 }
 
 export const migrate = publicProcedure.migration.migrate.handler(
-  async ({ input, errors }) => {
+  async ({ input, errors, context }) => {
     const { sourceWallet, destinationWallet, hotspots, tokens } = input;
 
     // Rate limit per wallet pair and per client IP. Pair is checked first; on a
@@ -149,8 +147,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
     // Both keys are ultimately caller-influenced (wallets are free to generate;
     // the IP key depends on the ingress's XFF handling) and the limiter is
     // per-process, so this is a courtesy throttle, not an abuse boundary.
-    const headerStore = await headers();
-    const clientIp = getClientIp(headerStore);
+    const clientIp = getClientIp(context.reqHeaders ?? new Headers());
     if (
       !migrationPairRateLimiter(`${sourceWallet}:${destinationWallet}`) ||
       !migrationIpRateLimiter(clientIp)
@@ -836,9 +833,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
 
     // 3f. Incremental batching + Jito tip + Sign
     const lut =
-      process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "devnet"
-        ? HELIUM_COMMON_LUT_DEVNET
-        : HELIUM_COMMON_LUT;
+      getHeliumLookupTable();
     const cluster = getCluster();
 
     // Work with TransactionDrafts (instructions + metadata) until the very end,

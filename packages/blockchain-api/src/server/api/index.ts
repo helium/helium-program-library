@@ -1,4 +1,3 @@
-import { createRouterClient } from "@orpc/server";
 import { governanceRouter } from "./routers/governance/router";
 import { healthRouter } from "./routers/health/router";
 import { hotspotsRouter } from "./routers/hotspots/router";
@@ -7,13 +6,12 @@ import { rewardContractRouter } from "./routers/reward-contract/router";
 import { swapRouter } from "./routers/swap/router";
 import { transactionsRouter } from "./routers/transactions/router";
 import { welcomePacksRouter } from "./routers/welcomePacks/router";
-import { fiatRouter } from "./routers/fiat/router";
-import { webhooksRouter } from "./routers/webhooks/router";
 import { migrationRouter } from "./routers/migration/router";
 import { dataCreditsRouter } from "./routers/data-credits/router";
 import { squadsRouter } from "./routers/squads/router";
 import { implement } from "@orpc/server";
 import { fullApiContract, apiContract } from "@helium/blockchain-api";
+import type { AppContext } from "./procedures";
 
 const sharedRouters = {
   governance: governanceRouter,
@@ -29,17 +27,13 @@ const sharedRouters = {
   squads: squadsRouter,
 };
 
-export const publicRouter = implement(apiContract).router(sharedRouters);
+export const publicRouter = implement(apiContract)
+  .$context<AppContext>()
+  .router(sharedRouters);
 
-export const appRouter = implement(fullApiContract).router({
-  ...sharedRouters,
-  fiat: fiatRouter,
-  webhooks: webhooksRouter,
-  migration: migrationRouter,
-});
+export const appRouter = implement(fullApiContract)
+  .$context<AppContext>()
+  .router(sharedRouters);
 
 /** Type of the main router for client-side type inference */
 export type ORPCRouter = typeof appRouter;
-
-/** Server-side router client for direct procedure calls */
-export const api = createRouterClient(appRouter);
