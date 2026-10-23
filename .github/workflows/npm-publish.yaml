@@ -19,6 +19,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    environment: npm-publish
     steps:
       - uses: actions/checkout@v4
 
@@ -67,6 +68,9 @@ jobs:
         if: steps.check.outputs.has_changesets == 'false'
         run: pnpm turbo run build --filter='!@helium/blockchain-api-service' --filter='!hpl-docs'
 
+      # npm authenticates this job by OIDC trusted publishing (`id-token: write`), so no npm
+      # token is set. Each package's trusted publisher on npmjs.com names the `npm-publish`
+      # environment, which admits develop only.
       - name: Publish to npm
         if: steps.check.outputs.has_changesets == 'false'
         uses: changesets/action@v1
@@ -74,5 +78,3 @@ jobs:
           publish: pnpm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

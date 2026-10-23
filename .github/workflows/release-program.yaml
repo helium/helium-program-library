@@ -13,9 +13,10 @@ permissions:
   contents: read
 
 # In this workflow the deployer key reaches `buffers` and `propose` only, and neither installs
-# the workspace. The key is a repository secret, so this holds for this file alone: the sweep
-# workflow holds it too. `@sqds/multisig` runs in `plan` and `wait`, which hold no key and no
-# write token.
+# the workspace. The key must exist only as a `mainnet-deploy` environment secret, never as a
+# repository secret: the environment admits `program-*` tags and master, so only those runs of
+# a job that names it can read the key. The sweep workflow holds it too. `@sqds/multisig` runs
+# in `plan` and `wait`, which name no environment and hold no key and no write token.
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -225,6 +226,7 @@ jobs:
     needs: [build, plan]
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-latest
+    environment: mainnet-deploy
     # The program buffer write retries up to 3 x 55 minutes.
     timeout-minutes: 180
     outputs:
@@ -349,6 +351,7 @@ jobs:
     needs: [build, buffers, wait]
     if: needs.wait.outputs.skip != 'true'
     runs-on: ubuntu-latest
+    environment: mainnet-deploy
     timeout-minutes: 30
     steps:
       - name: Checkout code
