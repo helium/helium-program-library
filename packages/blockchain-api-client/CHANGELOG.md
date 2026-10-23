@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.17.0
+
+### Minor Changes
+
+- [#1321](https://github.com/helium/helium-program-library/pull/1321) [`8bca988`](https://github.com/helium/helium-program-library/commit/8bca9885f18b2f9fa877f7ed329631878ef5f5f7) Thanks [@bryzettler](https://github.com/bryzettler)! - Remove fiat and webhooks contracts and schemas (Bridge on-ramp retired)
+
+### Patch Changes
+
+- [#1321](https://github.com/helium/helium-program-library/pull/1321) [`9e6faba`](https://github.com/helium/helium-program-library/commit/9e6faba9e13b7ff5d5dc50b0ce522a4945ecb175) Thanks [@bryzettler](https://github.com/bryzettler)! - Add a `module-sync` export condition so CommonJS consumers on Node 22.12+ can `require()` the client
+
 ## 0.16.1
 
 ### Patch Changes

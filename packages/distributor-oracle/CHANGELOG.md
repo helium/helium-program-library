@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.14.4
+
+### Patch Changes
+
+- [#1322](https://github.com/helium/helium-program-library/pull/1322) [`96a3fb1`](https://github.com/helium/helium-program-library/commit/96a3fb1d56993cc9ee769f5f80b6c7992182cc8d) Thanks [@bryzettler](https://github.com/bryzettler)! - Move the oracle server to Fastify 5 (`fastify` ^5.12.5, `@fastify/cors` ^11.0.1)
+
 ## 0.14.3
 
 ### Patch Changes

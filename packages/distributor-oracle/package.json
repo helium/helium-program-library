@@ -5,7 +5,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.14.3",
+  "version": "0.14.4",
   "description": "Oracle server for the lazy distributor",
   "repository": {
     "type": "git",

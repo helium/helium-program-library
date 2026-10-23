@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.11.26
+
+### Patch Changes
+
+- [#1322](https://github.com/helium/helium-program-library/pull/1322) [`eb7ab89`](https://github.com/helium/helium-program-library/commit/eb7ab8923da347ca11ded2a94dd5414cb91e835a) Thanks [@bryzettler](https://github.com/bryzettler)! - Move the service to Fastify 5
+
+- Updated dependencies [[`96a3fb1`](https://github.com/helium/helium-program-library/commit/96a3fb1d56993cc9ee769f5f80b6c7992182cc8d)]:
+  - @helium/distributor-oracle@0.14.4
+
 ## 0.11.25
 
 ### Patch Changes
