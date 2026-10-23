@@ -5,9 +5,9 @@ import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { publicRouter } from "@/server/api";
 import { env } from "@/lib/env";
 import { onError } from "@orpc/server";
-import { RequestHeadersPlugin } from "@orpc/server/plugins";
-import { ORPCError } from "@orpc/server";
+import { ORPCError, ValidationError } from "@orpc/server";
 import * as Sentry from "@sentry/node";
+import { summarizeProcedureInput } from "@/lib/utils/log-input";
 
 /**
  * ORPC OpenAPI handler for the public v1 API.
@@ -21,7 +21,17 @@ export const openApiHandler = new OpenAPIHandler(publicRouter, {
     onError((error: any) => {
       // Don't log expected 401 auth errors - they're handled by the frontend
       if (error.code !== "UNAUTHORIZED") {
-        console.error("[ORPC API Error]", error);
+        console.error(
+          "[ORPC API Error]",
+          error.cause instanceof ValidationError
+            ? {
+                message: error.message,
+                code: error.code,
+                issues: error.cause.issues,
+                data: summarizeProcedureInput(error.cause.data),
+              }
+            : error,
+        );
       }
 
       // Capture 500-level errors to Sentry
@@ -59,7 +69,6 @@ export const openApiHandler = new OpenAPIHandler(publicRouter, {
     }),
   ],
   plugins: [
-    new RequestHeadersPlugin(),
     new SmartCoercionPlugin({
       schemaConverters: [new ZodToJsonSchemaConverter()],
     }),
@@ -73,26 +82,6 @@ export const openApiHandler = new OpenAPIHandler(publicRouter, {
           description:
             "API for the Helium Dashboard - manage Helium hotspots, tokens, swaps, and more.",
         },
-        components: {
-          securitySchemes: {
-            cookieAuth: {
-              type: "apiKey",
-              in: "cookie",
-              name: "privy-id-token",
-              description:
-                "Privy ID token stored in cookie. Used by browser clients after Privy authentication.",
-            },
-            bearerAuth: {
-              type: "http",
-              scheme: "bearer",
-              bearerFormat: "JWT",
-              description:
-                "Privy ID token passed as Bearer token. Use for external API consumers: Authorization: Bearer <privy-id-token>",
-            },
-          },
-        },
-        // Security is applied per-route via protectedOc's .meta({ security: [...] })
-        // No global security - public routes don't require auth
         servers: [
           {
             url: `${

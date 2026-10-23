@@ -2,7 +2,7 @@
 
 set -e
 
-# Fail before the migrations run, since they drop tables and cannot be reverted
+# Fail before the migrations run, so a bad environment never reaches the database
 echo "Validating environment..."
 node -e "require('./lib/lib/env.js')"
 

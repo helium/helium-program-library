@@ -1,44 +1,13 @@
-import { implement, os, type Middleware, ORPCError } from "@orpc/server";
-import type { Meta } from "@orpc/contract";
-import { getCookie } from "@orpc/server/helpers";
-import type { RequestHeadersPluginContext } from "@orpc/server/plugins";
-import { privy } from "@/lib/privy";
+import { implement, os } from "@orpc/server";
 import { env } from "@/lib/env";
 import { summarizeProcedureInput } from "@/lib/utils/log-input";
-import type { User } from "@privy-io/server-auth";
 import { fullApiContract } from "@helium/blockchain-api";
 
 /**
- * Session context provided to authenticated procedures.
+ * Initial context every procedure receives. `reqHeaders` is preset from the
+ * outer request in app.ts on both handlers.
  */
-export interface SessionContext {
-  /** Privy user ID */
-  userId: string;
-  /** User's wallet address (if available) */
-  walletAddress: string | null;
-  /** Full Privy user object */
-  user: User;
-}
-
-/**
- * Initial context every procedure receives. `reqHeaders` is filled by
- * `RequestHeadersPlugin` on both handlers.
- */
-export type AppContext = RequestHeadersPluginContext;
-
-/**
- * Context available to authenticated procedures.
- */
-export interface AuthenticatedContext {
-  session: SessionContext;
-}
-
-/**
- * Context available to public procedures that require wallet identity.
- */
-export interface UnverifiedWalletIdentityContext {
-  unverifiedWalletAddress: string;
-}
+export type AppContext = { reqHeaders?: Headers };
 
 /**
  * Middleware for timing procedure execution and adding an artificial delay in development.
@@ -84,79 +53,3 @@ const timingMiddleware = os.middleware(async ({ next, path }, input) => {
 export const publicProcedure = implement(fullApiContract)
   .$context<AppContext>()
   .use(timingMiddleware);
-
-/**
- * Error constructor map that requires UNAUTHENTICATED error.
- * Used to constrain the withAuth middleware at compile time.
- */
-type AuthErrorConstructorMap = {
-  UNAUTHENTICATED: (opts?: {
-    message?: string;
-  }) => ORPCError<"UNAUTHENTICATED", unknown>;
-};
-
-/**
- * Creates an auth guard middleware for use with `.use()`.
- * Requires the contract to include UNAUTHENTICATED error (use `protectedOc`).
- *
- * @example
- * ```ts
- * export const myHandler = publicProcedure.myRoute
- *   .use(withAuth)
- *   .handler(async ({ context }) => {
- *     // context.session is guaranteed to be SessionContext
- *   });
- * ```
- */
-export const withAuth: Middleware<
-  AppContext,
-  AuthenticatedContext,
-  unknown,
-  any,
-  AuthErrorConstructorMap,
-  Meta
-> = async ({ context, next, errors }) => {
-  const headerStore = context.reqHeaders;
-  let idToken = getCookie(headerStore, "privy-id-token");
-
-  if (!idToken) {
-    const authHeader = headerStore?.get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      idToken = authHeader.slice(7);
-    }
-  }
-
-  if (!idToken) {
-    throw errors.UNAUTHENTICATED({
-      message: "No authentication token provided",
-    });
-  }
-
-  const privyUser = await privy.getUser({ idToken });
-  if (!privyUser) {
-    throw errors.UNAUTHENTICATED({
-      message: "Invalid authentication token",
-    });
-  }
-
-  let walletAddress = privyUser.wallet?.address ?? null;
-
-  // Debug: allow overriding wallet address via x-view-as header (dev only)
-  if (env.NODE_ENV === "development") {
-    const viewAs = headerStore?.get("x-view-as");
-    if (viewAs) {
-      walletAddress = viewAs;
-    }
-  }
-
-  return next({
-    context: {
-      ...context,
-      session: {
-        userId: privyUser.id,
-        walletAddress,
-        user: privyUser,
-      },
-    } as AuthenticatedContext,
-  });
-};

@@ -19,7 +19,6 @@ const schema = z.object({
   ASSET_OWNER_INDEXER_URL: z.string().url().optional(),
   ACCOUNT_INDEXER_PASSWORD: z.string().optional(),
   ASSET_OWNER_INDEXER_PASSWORD: z.string().optional(),
-  PRIVY_APP_SECRET: z.string(),
   ORACLE_SIGNER: z
     .string()
     .default("orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"),
@@ -48,7 +47,6 @@ const schema = z.object({
     .refine((u) => u.startsWith("https://"), "ECC_VERIFIER_URL must be https")
     .default("https://ecc-verifier.web.helium.io"),
   FEE_PAYER_WALLET_PATH: z.string().optional(),
-  PRIVY_APP_ID: z.string(),
   SOLANA_CLUSTER: z.string().optional(),
   PUBLIC_URL: z.string().url().optional(),
 });

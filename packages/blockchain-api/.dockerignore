@@ -1,8 +1,0 @@
-node_modules
-.git
-tests
-init-scripts
-docker-compose.yml
-.env*
-!.env.example
-*.md
