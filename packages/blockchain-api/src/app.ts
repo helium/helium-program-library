@@ -87,11 +87,7 @@ export const buildApp = async (): Promise<FastifyInstance> => {
 
 export const startBackgroundServices = (): void => {
   if (process.env.NO_PG === "true") return;
-  try {
-    defineAssociations();
-    transactionResubmissionService.start();
-    console.log("[server] Transaction resubmission service started");
-  } catch (e) {
-    console.error("Failed to start transaction resubmission service:", e);
-  }
+  defineAssociations();
+  transactionResubmissionService.start();
+  console.log("[server] Transaction resubmission service started");
 };

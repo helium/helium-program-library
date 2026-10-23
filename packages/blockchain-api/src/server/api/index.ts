@@ -1,4 +1,3 @@
-import { createRouterClient } from "@orpc/server";
 import { governanceRouter } from "./routers/governance/router";
 import { healthRouter } from "./routers/health/router";
 import { hotspotsRouter } from "./routers/hotspots/router";
@@ -38,6 +37,3 @@ export const appRouter = implement(fullApiContract)
 
 /** Type of the main router for client-side type inference */
 export type ORPCRouter = typeof appRouter;
-
-/** Server-side router client for direct procedure calls */
-export const api = createRouterClient(appRouter);

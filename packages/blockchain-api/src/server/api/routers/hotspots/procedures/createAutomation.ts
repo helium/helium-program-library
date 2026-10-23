@@ -18,8 +18,6 @@ import {
 } from "@helium/hpl-crons-sdk";
 import {
   batchInstructionsToTxsWithPriorityFee,
-  HELIUM_COMMON_LUT,
-  HELIUM_COMMON_LUT_DEVNET,
   toVersionedTx,
   WALLET_SIGNED,
 } from "@helium/spl-utils";
@@ -34,6 +32,7 @@ import {
   BASE_TX_FEE_LAMPORTS,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
 import { NATIVE_MINT } from "@solana/spl-token";
 import BN from "bn.js";
 import {
@@ -247,9 +246,7 @@ export const createAutomation =
         (
           await batchInstructionsToTxsWithPriorityFee(provider, instructions, {
             addressLookupTableAddresses: [
-              process.env.SOLANA_CLUSTER?.trim() === "devnet"
-                ? HELIUM_COMMON_LUT_DEVNET
-                : HELIUM_COMMON_LUT,
+              getHeliumLookupTable(),
             ],
             commitment: "finalized",
             signing: WALLET_SIGNED,

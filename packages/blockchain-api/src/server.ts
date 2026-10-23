@@ -13,7 +13,7 @@ const start = async () => {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
 
-  const port = Number(process.env.PORT ?? 3000);
+  const port = Number(process.env.PORT || 3000);
   await app.listen({ host: "0.0.0.0", port });
   console.log(`[server] Listening on 0.0.0.0:${port}`);
 };

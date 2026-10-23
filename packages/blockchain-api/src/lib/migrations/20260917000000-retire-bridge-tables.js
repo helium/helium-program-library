@@ -7,8 +7,9 @@
  * renamed bridge_users table still uses.
  *
  * Pods of the previous release still read these tables, so their fiat and
- * webhook routes fail from the rename until the rollout completes. That is
- * accepted, since those routes only served the removed frontend.
+ * webhook routes fail from the rename until the rollout completes. The fiat
+ * routes only served the removed frontend. The webhook route received the
+ * provider's KYC callbacks, so disable that webhook before this release.
  *
  * @type {import('sequelize-cli').Migration}
  */

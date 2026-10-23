@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const schema = z.object({
+export const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
@@ -47,13 +47,21 @@ const schema = z.object({
     .refine((u) => u.startsWith("https://"), "ECC_VERIFIER_URL must be https")
     .default("https://ecc-verifier.web.helium.io"),
   FEE_PAYER_WALLET_PATH: z.string().optional(),
-  SOLANA_CLUSTER: z.string().optional(),
+  SOLANA_CLUSTER: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim() : v),
+    z.enum(["mainnet", "mainnet-beta", "devnet"]).optional(),
+  ),
+  NEXT_PUBLIC_SOLANA_CLUSTER: z
+    .undefined({
+      error: "NEXT_PUBLIC_SOLANA_CLUSTER was renamed to SOLANA_CLUSTER",
+    })
+    .optional(),
   PUBLIC_URL: z.string().url().optional(),
 });
 
 // Empty strings are treated as undefined. `SOME_VAR: z.string()` and
 // `SOME_VAR=''` will throw an error.
-export const env = schema.parse(
+export const env = envSchema.parse(
   Object.fromEntries(
     Object.entries(process.env).map(([key, value]) => [
       key,
