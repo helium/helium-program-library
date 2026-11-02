@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.26
+
+### Patch Changes
+
+- [#1372](https://github.com/helium/helium-program-library/pull/1372) [`9be1c7a`](https://github.com/helium/helium-program-library/commit/9be1c7a8b0ded7a36853e6586dc79c1b7d40ca69) Thanks [@madninja](https://github.com/madninja)! - Stop monitoring the closed Helium Mobile auto top off. Only the carrier auto top off is monitored, and `HELIUM_MOBILE_AUTO_TOPOFF_KEY` is no longer read.
+
 ## 0.11.25
 
 ### Patch Changes
