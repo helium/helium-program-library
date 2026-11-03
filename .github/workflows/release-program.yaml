@@ -122,6 +122,21 @@ jobs:
       - name: Check the build against the SIMD-0500 gate
         run: |
           set -euo pipefail
+          # SIMD-0433 makes an upgrade resize programdata to the ELF length. Its gate is printed
+          # for information only: the extend step in `write-program-buffer` handles it. A failed
+          # read prints `unknown` and does not fail the job.
+          RESIZE_GATE=EhisBfVtGvEA8bVCVN5VMaYEaX6iTfoUrmcDi8LY7Kxy
+          RESIZE_ACTIVE=unknown
+          if RESIZE_DATA=$(curl -sSf https://api.mainnet-beta.solana.com -H 'Content-Type: application/json' \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getAccountInfo\",\"params\":[\"${RESIZE_GATE}\",{\"encoding\":\"base64\"}]}" \
+            | jq -r '.result.value.data[0] // ""'); then
+            RESIZE_ACTIVE=false
+            if [ -n "$RESIZE_DATA" ] && [ "$(echo "$RESIZE_DATA" | base64 -d | head -c 1 | od -An -tu1 | tr -d ' ')" = "1" ]; then
+              RESIZE_ACTIVE=true
+            fi
+          fi
+          echo "SIMD-0433 active on mainnet: ${RESIZE_ACTIVE}"
+
           GATE=B8JJXCy5amZyWG9r7EnUYLwzXSXTxG7GZ1qZ1qggo83g
           DATA=$(curl -sSf https://api.mainnet-beta.solana.com -H 'Content-Type: application/json' \
             -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getAccountInfo\",\"params\":[\"${GATE}\",{\"encoding\":\"base64\"}]}" \
