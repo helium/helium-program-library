@@ -11,7 +11,8 @@
 # - Cleanup does not remove `./authority-keypair.json`. No step here makes that file.
 # - The buffer address is an output before the write starts, and a failure before the
 #   authority transfer closes that buffer.
-# - The program check also requires the buffer authority to be the program's upgrade authority.
+# - The program check lives in the shared `extend-program` action. It also requires the buffer
+#   authority to be the program's upgrade authority.
 # - The extend is the shared `extend-program` action, which `deploy-buffers` also calls.
 #
 # The caller installs the Solana CLI first (`setup-anchor` does it).
@@ -68,41 +69,9 @@ runs:
       env:
         DEPLOY_KEYPAIR: ${{ inputs.keypair }}
 
-    # This action upgrades an existing program: it writes a buffer for the multisig to apply.
-    # Creating a program at a new address needs that address's own keypair, which no workflow
-    # here holds. Check that precondition before spending anything on a buffer.
-    # Also check that the buffer authority is the program's upgrade authority.
-    - name: Require the program on the target cluster
-      shell: bash
-      run: |
-        set +e
-        PROGRAM_INFO=$(solana program show "$PROGRAM_ID" -u "$NETWORK" 2>&1)
-        EXIT_CODE=$?
-        set -e
-        if [ "$EXIT_CODE" -ne 0 ]; then
-          # The RPC URL is a secret and the CLI puts it in some errors.
-          echo "${PROGRAM_INFO//"$NETWORK"/<rpc-url>}"
-          echo "::error title=$PROGRAM is not deployed on the target cluster::solana program show failed for $PROGRAM_ID, so there is nothing to upgrade. If the program does not exist there, deploy it once with its program keypair, then re-run."
-          exit 1
-        fi
-
-        CURRENT_SIZE=$(echo "$PROGRAM_INFO" | grep "Data Length:" | sed -E 's/.*Data Length: ([0-9]+).*/\1/' | cut -d ' ' -f1)
-        if ! [[ "$CURRENT_SIZE" =~ ^[0-9]+$ ]]; then
-          echo "::error::Could not read the data length of $PROGRAM_ID (got: $CURRENT_SIZE)"
-          exit 1
-        fi
-        UPGRADE_AUTHORITY=$(echo "$PROGRAM_INFO" | sed -nE 's/^Authority: ([1-9A-HJ-NP-Za-km-z]+)$/\1/p')
-        if [ -z "$BUFFER_AUTHORITY" ] || [ "$UPGRADE_AUTHORITY" != "$BUFFER_AUTHORITY" ]; then
-          echo "::error title=$PROGRAM upgrade authority is not the buffer authority::$PROGRAM_ID upgrade authority is ${UPGRADE_AUTHORITY:-unknown}, not the buffer authority, so the multisig cannot apply a buffer. Nothing was written."
-          exit 1
-        fi
-        echo "Current program data length: $CURRENT_SIZE"
-      env:
-        PROGRAM: ${{ inputs.program }}
-        PROGRAM_ID: ${{ inputs.program-id }}
-        NETWORK: ${{ inputs.network }}
-        BUFFER_AUTHORITY: ${{ inputs.buffer-authority }}
-
+    # The extend step also checks that the program exists and that its upgrade authority is the
+    # buffer authority, before anything is spent. Creating a program at a new address needs that
+    # address's keypair, which no workflow here holds.
     # `deploy-buffers` calls the same action on its buffer reuse paths.
     - uses: ./.github/actions/extend-program/
       with:
@@ -110,6 +79,7 @@ runs:
         program: ${{ inputs.program }}
         program-id: ${{ inputs.program-id }}
         keypair: ${{ inputs.keypair }}
+        buffer-authority: ${{ inputs.buffer-authority }}
 
     - name: Write program buffer
       id: write-buffer

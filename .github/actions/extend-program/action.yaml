@@ -1,12 +1,14 @@
-# The extend step, shared by `write-program-buffer` and the buffer reuse paths in
-# `deploy-buffers`, so every deploy grows the programdata before the Squads proposal.
-# Under SIMD-0433 an upgrade resizes the programdata to the ELF length, and a Squads CPI
-# upgrade can grow it by at most 10 KiB. The extend runs top-level from the deployer key:
-# `ExtendProgram` is permissionless, so the proposal needs no vault SOL transfer.
+# Checks that the program exists and that its upgrade authority is the buffer authority, then
+# extends the programdata to hold the ELF when it is short. It runs on every path that writes or
+# reuses a buffer: `write-program-buffer` on a fresh write, `deploy-buffers` on reuse.
+# Under SIMD-0433 an upgrade resizes programdata to the ELF length, and a Squads CPI upgrade can
+# grow it by at most 10 KiB (the CPI realloc limit), so the extend runs top-level from the
+# deployer key. `ExtendProgram` is permissionless (SIMD-0431), so the proposal needs no vault SOL
+# transfer. SIMD-0431 also sets the 10,240 B minimum extend.
 #
 # The caller installs the Solana CLI first (`setup-anchor` does it).
 name: "Extend Program"
-description: "Extends the programdata so it holds ./target/deploy/<program>.so"
+description: "Checks the program's upgrade authority and extends the programdata so it holds ./target/deploy/<program>.so"
 inputs:
   network:
     description: "Solana RPC URL"
@@ -20,11 +22,14 @@ inputs:
   keypair:
     description: "The keypair that pays for the extend"
     required: true
+  buffer-authority:
+    description: "The Squads vault. The program's upgrade authority must be this address."
+    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Resize program if needed
+    - name: Check the program and extend it if needed
       shell: bash
       run: |
         set +e
@@ -34,12 +39,17 @@ runs:
         if [ "$EXIT_CODE" -ne 0 ]; then
           # The RPC URL is a secret and the CLI puts it in some errors.
           echo "${PROGRAM_INFO//"$NETWORK"/<rpc-url>}"
-          echo "::error::solana program show failed for $PROGRAM_ID"
+          echo "::error title=$PROGRAM is not deployed on the target cluster::solana program show failed for $PROGRAM_ID, so there is nothing to upgrade. If the program does not exist there, deploy it once with its program keypair, then re-run."
           exit 1
         fi
         CURRENT_SIZE=$(echo "$PROGRAM_INFO" | grep "Data Length:" | sed -E 's/.*Data Length: ([0-9]+).*/\1/' | cut -d ' ' -f1)
         if ! [[ "$CURRENT_SIZE" =~ ^[0-9]+$ ]]; then
           echo "::error::Could not read the data length of $PROGRAM_ID (got: $CURRENT_SIZE)"
+          exit 1
+        fi
+        UPGRADE_AUTHORITY=$(echo "$PROGRAM_INFO" | sed -nE 's/^Authority: ([1-9A-HJ-NP-Za-km-z]+)$/\1/p')
+        if [ -z "$BUFFER_AUTHORITY" ] || [ "$UPGRADE_AUTHORITY" != "$BUFFER_AUTHORITY" ]; then
+          echo "::error title=$PROGRAM upgrade authority is not the buffer authority::$PROGRAM_ID upgrade authority is ${UPGRADE_AUTHORITY:-unknown}, not the buffer authority, so the multisig cannot apply a buffer. Nothing was extended or written."
           exit 1
         fi
 
@@ -74,10 +84,19 @@ runs:
           trap 'rm -f "$KEYPAIR_FILE"' EXIT
           chmod 600 "$KEYPAIR_FILE"
           echo "$DEPLOY_KEYPAIR" > "$KEYPAIR_FILE"
-          solana program extend "$PROGRAM_ID" "$EXTEND_SIZE" \
+          set +e
+          EXTEND_OUT=$(solana program extend "$PROGRAM_ID" "$EXTEND_SIZE" \
             --keypair "$KEYPAIR_FILE" \
             --url "$NETWORK" \
-            --commitment confirmed
+            --commitment confirmed 2>&1)
+          EXIT_CODE=$?
+          set -e
+          # The RPC URL is a secret and the CLI puts it in some errors.
+          echo "${EXTEND_OUT//"$NETWORK"/<rpc-url>}"
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "::error::solana program extend failed for $PROGRAM_ID"
+            exit 1
+          fi
         else
           echo "Program size is sufficient"
         fi
@@ -86,3 +105,4 @@ runs:
         PROGRAM_ID: ${{ inputs.program-id }}
         NETWORK: ${{ inputs.network }}
         DEPLOY_KEYPAIR: ${{ inputs.keypair }}
+        BUFFER_AUTHORITY: ${{ inputs.buffer-authority }}

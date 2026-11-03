@@ -123,13 +123,14 @@ jobs:
         run: |
           set -euo pipefail
           # SIMD-0433 makes an upgrade resize programdata to the ELF length. Its gate is printed
-          # for information only: the `extend-program` action handles it. A failed
-          # read prints `unknown` and does not fail the job.
+          # for information only: the `extend-program` action handles it. A failed read, or an
+          # RPC error body, prints `unknown` and does not fail the job. The line is for the person
+          # who pushed the tag: `true` means the extend step is now load-bearing.
           RESIZE_GATE=EhisBfVtGvEA8bVCVN5VMaYEaX6iTfoUrmcDi8LY7Kxy
           RESIZE_ACTIVE=unknown
           if RESIZE_DATA=$(curl -sSf https://api.mainnet-beta.solana.com -H 'Content-Type: application/json' \
             -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getAccountInfo\",\"params\":[\"${RESIZE_GATE}\",{\"encoding\":\"base64\"}]}" \
-            | jq -r '.result.value.data[0] // ""'); then
+            | jq -er 'if .error then error(.error.message) else (.result.value.data[0] // "") end'); then
             RESIZE_ACTIVE=false
             if [ -n "$RESIZE_DATA" ] && [ "$(echo "$RESIZE_DATA" | base64 -d | head -c 1 | od -An -tu1 | tr -d ' ')" = "1" ]; then
               RESIZE_ACTIVE=true
@@ -443,9 +444,11 @@ jobs:
           name: "Deploy ${{ needs.build.outputs.program-name }} ${{ needs.build.outputs.version }}"
           keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
 
-      # A second proposal for the same program is open. Signers must reject the old one, or an
-      # execute of it after the new one rolls the program back. The annotation and the summary line
-      # are the whole notice: the person who pushed the tag is watching this run.
+      # A second proposal for the same program is open. Signers must reject the old one. Executing
+      # it after this one rolls the program back. Executing it before this one can shrink the
+      # programdata under SIMD-0433, and this proposal's upgrade then fails `InvalidRealloc`.
+      # The annotation and the summary line are the whole notice: the person who pushed the tag
+      # is watching this run.
       - name: Report the older pending proposal
         if: needs.wait.outputs.pending-proposal-index != ''
         env:
@@ -453,6 +456,6 @@ jobs:
           VERSION: ${{ needs.build.outputs.version }}
           PENDING: ${{ needs.wait.outputs.pending-proposal-index }}
         run: |
-          LINE="${PROGRAM} ${VERSION}: proposal ${PENDING} is still pending"
+          LINE="${PROGRAM} ${VERSION}: proposal ${PENDING} is still pending. Reject it; do not execute it before or after this one."
           echo "::notice title=Older pending proposal::${LINE}"
           echo "$LINE" >> "$GITHUB_STEP_SUMMARY"
