@@ -421,6 +421,34 @@ jobs:
           # Artifacts do not keep file modes.
           chmod +x "${ANCHOR_DIR}/anchor"
           echo "$ANCHOR_DIR" >> "$GITHUB_PATH"
+      # `buffers` extended the programdata, but an earlier proposal for this program can execute
+      # during `wait` and shrink it again under SIMD-0433. Extend again here, so the gap is only
+      # the time between this proposal and its execute. The extend reads the ELF length from the
+      # build, and `plan` and `wait` can replace the artifact, so the build hash is checked first.
+      - name: Download the build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: build
+          path: ./target/
+      - name: Check the build against the hash taken before plan-deploy
+        env:
+          PROGRAM_NAME: ${{ needs.build.outputs.program-name }}
+          EXPECTED: ${{ needs.build.outputs.artifact-sha256 }}
+        # The file names are part of the hashed text, so they are spelled as in the build job.
+        run: |
+          ACTUAL=$(sha256sum "target/deploy/${PROGRAM_NAME}.so" "target/idl/${PROGRAM_NAME}.json" | sha256sum | cut -d' ' -f1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::build artifact hash ${ACTUAL} does not match '${EXPECTED}' from the build job"
+            exit 1
+          fi
+      # Before the IDL buffer authority moves, so a failed extend leaves a buffer the sweep can close.
+      - uses: ./.github/actions/extend-program/
+        with:
+          network: ${{ secrets.SOLANA_DEPLOY_URL }}
+          program: ${{ needs.build.outputs.program-name }}
+          program-id: ${{ needs.build.outputs.program-id }}
+          keypair: ${{ secrets.DEPLOYER_KEYPAIR }}
+          buffer-authority: ${{ secrets.MULTISIG_VAULT }}
       # Right before the proposal, so a run that stops earlier (the `wait` skip, a failure)
       # leaves an IDL buffer the deployer key owns and the sweep can close.
       - uses: ./.github/actions/set-idl-buffer-authority/

@@ -1,6 +1,7 @@
 # Checks that the program exists and that its upgrade authority is the buffer authority, then
 # extends the programdata to hold the ELF when it is short. It runs on every path that writes or
-# reuses a buffer: `write-program-buffer` on a fresh write, `deploy-buffers` on reuse.
+# reuses a buffer: `write-program-buffer` on a fresh write, `deploy-buffers` on reuse. The
+# mainnet `release-program` runs it again in `propose`, after the wait for earlier runs.
 # Under SIMD-0433 an upgrade resizes programdata to the ELF length, and a Squads CPI upgrade can
 # grow it by at most 10 KiB (the CPI realloc limit), so the extend runs top-level from the
 # deployer key. `ExtendProgram` is permissionless (SIMD-0431), so the proposal needs no vault SOL
