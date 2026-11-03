@@ -33,14 +33,23 @@ runs:
     - name: Check the program and extend it if needed
       shell: bash
       run: |
-        set +e
-        PROGRAM_INFO=$(solana program show "$PROGRAM_ID" -u "$NETWORK" 2>&1)
-        EXIT_CODE=$?
-        set -e
+        # Three tries, so a single RPC error does not fail the release.
+        for ATTEMPT in 1 2 3; do
+          set +e
+          PROGRAM_INFO=$(solana program show "$PROGRAM_ID" -u "$NETWORK" 2>&1)
+          EXIT_CODE=$?
+          set -e
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            break
+          fi
+          if [ "$ATTEMPT" -lt 3 ]; then
+            sleep 10
+          fi
+        done
         if [ "$EXIT_CODE" -ne 0 ]; then
           # The RPC URL is a secret and the CLI puts it in some errors.
           echo "${PROGRAM_INFO//"$NETWORK"/<rpc-url>}"
-          echo "::error title=$PROGRAM is not deployed on the target cluster::solana program show failed for $PROGRAM_ID, so there is nothing to upgrade. If the program does not exist there, deploy it once with its program keypair, then re-run."
+          echo "::error title=Could not read $PROGRAM on the target cluster::solana program show failed 3 times for $PROGRAM_ID. If the program does not exist there, deploy it once with its program keypair, then re-run. Otherwise re-run the failed job."
           exit 1
         fi
         CURRENT_SIZE=$(echo "$PROGRAM_INFO" | grep "Data Length:" | sed -E 's/.*Data Length: ([0-9]+).*/\1/' | cut -d ' ' -f1)
