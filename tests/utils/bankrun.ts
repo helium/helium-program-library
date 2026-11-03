@@ -1,7 +1,8 @@
 import { Clock, ProgramTestContext, start } from "solana-bankrun";
 import { PublicKey } from "@solana/web3.js";
 import { execFileSync } from "child_process";
-import { existsSync, statSync } from "fs";
+import { createHash } from "crypto";
+import { copyFileSync, existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 
 /**
@@ -53,6 +54,29 @@ export function ensureDumped(
   }
   return path;
 }
+
+// Programs loaded from a committed copy, not a mainnet dump. solana-bankrun 0.4.0 cannot load
+// SBPFv3, and these programs ship v3 on mainnet once Agave 4.4 lands, so a dump would stop
+// loading on their next deploy. Each entry is the sha256 of the file in tests/fixtures/programs.
+const PINNED_PROGRAMS = {
+  // tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA, SBPF v0, mainnet slot 460133297.
+  tuktuk: "9e9ab6f6514ee48814391b227cfac886fa378afa3da37c7930e7673ac47b3e76",
+} as const;
+
+/**
+ * Put a pinned program where bankrun looks for it. It overwrites what is there, so a stale
+ * dump in `target/deploy` cannot stand in for the pinned bytes.
+ */
+export const usePinnedProgram = (name: keyof typeof PINNED_PROGRAMS) => {
+  const source = join(__dirname, "..", "fixtures", "programs", `${name}.so`);
+  const sha256 = createHash("sha256").update(readFileSync(source)).digest("hex");
+  if (sha256 !== PINNED_PROGRAMS[name]) {
+    throw new Error(`${source} has sha256 ${sha256}, not the pinned ${PINNED_PROGRAMS[name]}`);
+  }
+  const path = join(TARGET_DEPLOY, `${name}.so`);
+  copyFileSync(source, path);
+  return path;
+};
 
 /**
  * Clone a mainnet account onto disk so bankrun can start with it, the way `Anchor.toml`'s
