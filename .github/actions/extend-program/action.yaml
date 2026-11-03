@@ -1,0 +1,88 @@
+# The extend step, shared by `write-program-buffer` and the buffer reuse paths in
+# `deploy-buffers`, so every deploy grows the programdata before the Squads proposal.
+# Under SIMD-0433 an upgrade resizes the programdata to the ELF length, and a Squads CPI
+# upgrade can grow it by at most 10 KiB. The extend runs top-level from the deployer key:
+# `ExtendProgram` is permissionless, so the proposal needs no vault SOL transfer.
+#
+# The caller installs the Solana CLI first (`setup-anchor` does it).
+name: "Extend Program"
+description: "Extends the programdata so it holds ./target/deploy/<program>.so"
+inputs:
+  network:
+    description: "Solana RPC URL"
+    required: true
+  program:
+    description: "Program name (snake_case). The binary is ./target/deploy/<program>.so"
+    required: true
+  program-id:
+    description: "The program id of the program to upgrade"
+    required: true
+  keypair:
+    description: "The keypair that pays for the extend"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resize program if needed
+      shell: bash
+      run: |
+        set +e
+        PROGRAM_INFO=$(solana program show "$PROGRAM_ID" -u "$NETWORK" 2>&1)
+        EXIT_CODE=$?
+        set -e
+        if [ "$EXIT_CODE" -ne 0 ]; then
+          # The RPC URL is a secret and the CLI puts it in some errors.
+          echo "${PROGRAM_INFO//"$NETWORK"/<rpc-url>}"
+          echo "::error::solana program show failed for $PROGRAM_ID"
+          exit 1
+        fi
+        CURRENT_SIZE=$(echo "$PROGRAM_INFO" | grep "Data Length:" | sed -E 's/.*Data Length: ([0-9]+).*/\1/' | cut -d ' ' -f1)
+        if ! [[ "$CURRENT_SIZE" =~ ^[0-9]+$ ]]; then
+          echo "::error::Could not read the data length of $PROGRAM_ID (got: $CURRENT_SIZE)"
+          exit 1
+        fi
+
+        MIN_EXTEND_SIZE=10240
+        MAX_PERMITTED_DATA_LENGTH=10485760
+        PROGRAMDATA_METADATA_SIZE=45
+        MAX_PROGRAM_SIZE=$((MAX_PERMITTED_DATA_LENGTH - PROGRAMDATA_METADATA_SIZE))
+
+        REQUIRED_SIZE=$(wc -c < "./target/deploy/$PROGRAM.so")
+        echo "Required size: $REQUIRED_SIZE"
+        echo "Current size: $CURRENT_SIZE"
+
+        if [ "$REQUIRED_SIZE" -gt "$MAX_PROGRAM_SIZE" ]; then
+          echo "Error: program size of $REQUIRED_SIZE bytes exceeds the maximum program size of $MAX_PROGRAM_SIZE bytes"
+          exit 1
+        fi
+
+        if [ "$REQUIRED_SIZE" -gt "$CURRENT_SIZE" ]; then
+          HEADROOM=$((MAX_PROGRAM_SIZE - CURRENT_SIZE))
+          if [ "$HEADROOM" -lt "$MIN_EXTEND_SIZE" ]; then
+            echo "Only $HEADROOM bytes of headroom to the maximum account size, the SIMD-0431 minimum does not apply"
+            MIN_EXTEND_SIZE=$HEADROOM
+          fi
+          EXTEND_SIZE=$((REQUIRED_SIZE - CURRENT_SIZE))
+          if [ "$EXTEND_SIZE" -lt "$MIN_EXTEND_SIZE" ]; then
+            echo "Extend size of $EXTEND_SIZE bytes is below the SIMD-0431 minimum, extending by $MIN_EXTEND_SIZE bytes instead"
+            EXTEND_SIZE=$MIN_EXTEND_SIZE
+          fi
+          echo "Program needs to be extended by $EXTEND_SIZE bytes"
+          echo "Extending from the deployer keypair (permissionless) so the Squads proposal does not need a vault SOL transfer"
+          KEYPAIR_FILE=$(mktemp ./deploy-keypair.XXXXXX.json)
+          trap 'rm -f "$KEYPAIR_FILE"' EXIT
+          chmod 600 "$KEYPAIR_FILE"
+          echo "$DEPLOY_KEYPAIR" > "$KEYPAIR_FILE"
+          solana program extend "$PROGRAM_ID" "$EXTEND_SIZE" \
+            --keypair "$KEYPAIR_FILE" \
+            --url "$NETWORK" \
+            --commitment confirmed
+        else
+          echo "Program size is sufficient"
+        fi
+      env:
+        PROGRAM: ${{ inputs.program }}
+        PROGRAM_ID: ${{ inputs.program-id }}
+        NETWORK: ${{ inputs.network }}
+        DEPLOY_KEYPAIR: ${{ inputs.keypair }}

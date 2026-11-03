@@ -12,6 +12,7 @@
 # - The buffer address is an output before the write starts, and a failure before the
 #   authority transfer closes that buffer.
 # - The program check also requires the buffer authority to be the program's upgrade authority.
+# - The extend is the shared `extend-program` action, which `deploy-buffers` also calls.
 #
 # The caller installs the Solana CLI first (`setup-anchor` does it).
 name: "Write Program Buffer"
@@ -72,7 +73,6 @@ runs:
     # here holds. Check that precondition before spending anything on a buffer.
     # Also check that the buffer authority is the program's upgrade authority.
     - name: Require the program on the target cluster
-      id: check-program
       shell: bash
       run: |
         set +e
@@ -97,55 +97,19 @@ runs:
           exit 1
         fi
         echo "Current program data length: $CURRENT_SIZE"
-        echo "data_len=$CURRENT_SIZE" >> "$GITHUB_OUTPUT"
       env:
         PROGRAM: ${{ inputs.program }}
         PROGRAM_ID: ${{ inputs.program-id }}
         NETWORK: ${{ inputs.network }}
         BUFFER_AUTHORITY: ${{ inputs.buffer-authority }}
 
-    - name: Resize program if needed
-      shell: bash
-      run: |
-        MIN_EXTEND_SIZE=10240
-        MAX_PERMITTED_DATA_LENGTH=10485760
-        PROGRAMDATA_METADATA_SIZE=45
-        MAX_PROGRAM_SIZE=$((MAX_PERMITTED_DATA_LENGTH - PROGRAMDATA_METADATA_SIZE))
-
-        REQUIRED_SIZE=$(wc -c < "./target/deploy/$PROGRAM.so")
-        echo "Required size: $REQUIRED_SIZE"
-        echo "Current size: $CURRENT_SIZE"
-
-        if [ "$REQUIRED_SIZE" -gt "$MAX_PROGRAM_SIZE" ]; then
-          echo "Error: program size of $REQUIRED_SIZE bytes exceeds the maximum program size of $MAX_PROGRAM_SIZE bytes"
-          exit 1
-        fi
-
-        if [ "$REQUIRED_SIZE" -gt "$CURRENT_SIZE" ]; then
-          HEADROOM=$((MAX_PROGRAM_SIZE - CURRENT_SIZE))
-          if [ "$HEADROOM" -lt "$MIN_EXTEND_SIZE" ]; then
-            echo "Only $HEADROOM bytes of headroom to the maximum account size, the SIMD-0431 minimum does not apply"
-            MIN_EXTEND_SIZE=$HEADROOM
-          fi
-          EXTEND_SIZE=$((REQUIRED_SIZE - CURRENT_SIZE))
-          if [ "$EXTEND_SIZE" -lt "$MIN_EXTEND_SIZE" ]; then
-            echo "Extend size of $EXTEND_SIZE bytes is below the SIMD-0431 minimum, extending by $MIN_EXTEND_SIZE bytes instead"
-            EXTEND_SIZE=$MIN_EXTEND_SIZE
-          fi
-          echo "Program needs to be extended by $EXTEND_SIZE bytes"
-          echo "Extending from the deployer keypair (permissionless) so the Squads proposal does not need a vault SOL transfer"
-          solana program extend "$PROGRAM_ID" "$EXTEND_SIZE" \
-            --keypair ./deploy-keypair.json \
-            --url "$NETWORK" \
-            --commitment confirmed
-        else
-          echo "Program size is sufficient"
-        fi
-      env:
-        PROGRAM: ${{ inputs.program }}
-        PROGRAM_ID: ${{ inputs.program-id }}
-        NETWORK: ${{ inputs.network }}
-        CURRENT_SIZE: ${{ steps.check-program.outputs.data_len }}
+    # `deploy-buffers` calls the same action on its buffer reuse paths.
+    - uses: ./.github/actions/extend-program/
+      with:
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        program-id: ${{ inputs.program-id }}
+        keypair: ${{ inputs.keypair }}
 
     - name: Write program buffer
       id: write-buffer

@@ -123,7 +123,7 @@ jobs:
         run: |
           set -euo pipefail
           # SIMD-0433 makes an upgrade resize programdata to the ELF length. Its gate is printed
-          # for information only: the extend step in `write-program-buffer` handles it. A failed
+          # for information only: the `extend-program` action handles it. A failed
           # read prints `unknown` and does not fail the job.
           RESIZE_GATE=EhisBfVtGvEA8bVCVN5VMaYEaX6iTfoUrmcDi8LY7Kxy
           RESIZE_ACTIVE=unknown

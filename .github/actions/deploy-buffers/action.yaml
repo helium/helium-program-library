@@ -132,6 +132,16 @@ runs:
         AUTHORITY: ${{ inputs.buffer-authority }}
         DEPLOY_KEYPAIR: ${{ inputs.keypair }}
 
+    # A reused buffer still needs room in the programdata: an upgrade of the program since the
+    # buffer was written can shrink it. A new buffer gets the same extend in `write-program-buffer`.
+    - uses: ./.github/actions/extend-program/
+      if: inputs.reused-buffer != '' || steps.find-vault-buffer.outputs.buffer != ''
+      with:
+        network: ${{ inputs.network }}
+        program: ${{ inputs.program }}
+        program-id: ${{ inputs.program-id }}
+        keypair: ${{ inputs.keypair }}
+
     # On a failure before the authority transfer, this action closes the buffer it made.
     - uses: ./.github/actions/write-program-buffer/
       id: write-program-buffer
