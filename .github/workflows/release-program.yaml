@@ -115,6 +115,28 @@ jobs:
           cache: false
           setup-anchor: false
 
+      # SIMD-0500 makes the loader refuse a v0-v2 upgrade. Once its gate is active, a non-v3 build
+      # would fail at the Squads execute, after the buffer is paid for, so it fails here. The gate
+      # is read over RPC because a CLI release can predate the feature id. A feature account's
+      # first byte is 1 once it is activated. `e_flags` sits at offset 0x30 of an ELF64 header.
+      - name: Check the build against the SIMD-0500 gate
+        run: |
+          set -euo pipefail
+          GATE=B8JJXCy5amZyWG9r7EnUYLwzXSXTxG7GZ1qZ1qggo83g
+          DATA=$(curl -sSf https://api.mainnet-beta.solana.com -H 'Content-Type: application/json' \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getAccountInfo\",\"params\":[\"${GATE}\",{\"encoding\":\"base64\"}]}" \
+            | jq -r '.result.value.data[0] // ""')
+          ACTIVE=false
+          if [ -n "$DATA" ] && [ "$(echo "$DATA" | base64 -d | head -c 1 | od -An -tu1 | tr -d ' ')" = "1" ]; then
+            ACTIVE=true
+          fi
+          E_FLAGS=$(od -An -tu4 -j 48 -N 4 "target/deploy/${PROGRAM_NAME}.so" | tr -d ' ')
+          echo "SIMD-0500 active on mainnet: ${ACTIVE}; ${PROGRAM_NAME}.so e_flags: ${E_FLAGS}"
+          if [ "$ACTIVE" = "true" ] && [ "$E_FLAGS" != "3" ]; then
+            echo "::error::SIMD-0500 is active and ${PROGRAM_NAME}.so is not SBPFv3 (e_flags ${E_FLAGS})"
+            exit 1
+          fi
+
       # The release hash. The scheduled hash check compares the on-chain program with it.
       # `artifact-sha256` covers the two files the build artifact stores, taken before `plan-deploy`.
       - name: Take the release hash

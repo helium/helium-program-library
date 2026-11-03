@@ -31,7 +31,7 @@ runs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
         key: cargo-${{ runner.os }}-cargo-build-${{ hashFiles('Cargo.lock', 'utils/*/Cargo.lock') }}
-    # Key layout: build-<os>-<anchor version>-<anchor sha>-solana-<cli version>-v0003-<devnet>-<testing>-<program>-<hash of programs/>.
+    # Key layout: build-<os>-<anchor version>-<anchor sha>-solana-<cli version>-sbpf-<arch>-v0003-<devnet>-<testing>-<program>-<hash of programs/>.
     # The `programs/` hash is last so that everything identifying the build flavour sits in the
     # restore-keys prefix. A PR that touches `programs/**` can never hit the exact key, and with no
     # fallback it paid a cold 14 min build: 24 of 30 runs did. The prefix hands it the newest
@@ -47,9 +47,9 @@ runs:
       with:
         path: |
           ./target/
-        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock', 'Cargo.toml') }}
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-sbpf-v3-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock', 'Cargo.toml') }}
         restore-keys: |
-          build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-
+          build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-sbpf-v3-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-
     # A job that only consumes the build takes it from an artifact the run's own `build` job
     # uploaded, so the `needs: build` legs do not each restore (and on a prefix hit rebuild) the
     # same `target/`.
@@ -61,10 +61,11 @@ runs:
         path: ./target
     # The programs refuse to compile when TESTING is set without HELIUM_TEST_BUILD, so a
     # test build carries both.
-    # cargo-build-sbf defaults to v0 up to the 4.3.0 release and to v3 from 4.3.2. Bankrun cannot
-    # load v3, and the SBPFv3 move belongs to the 4.4 PR, so the arch is pinned here. `anchor build`
-    # hands its cargo args to the IDL's `cargo test` too, which rejects `--arch`, so the SBF build
-    # skips the IDL and `anchor idl build` writes it per program.
+    # SIMD-0500 (Agave 4.4) refuses v0-v2 deploys and upgrades, so every program builds SBPFv3.
+    # cargo-build-sbf defaults to v0 up to the 4.3.0 release and to v3 from 4.3.2, so the arch is
+    # pinned, and it is in the cache key: a flag-only change must not restore another arch's
+    # `target/`. `anchor build` hands its cargo args to the IDL's `cargo test` too, which rejects
+    # `--arch`, so the SBF build skips the IDL and `anchor idl build` writes it per program.
     - run: |
         set -euo pipefail
         FEATURES=()
@@ -73,10 +74,10 @@ runs:
           export TESTING=true HELIUM_TEST_BUILD=true
         fi
         if [ -n "$PROGRAM" ]; then
-          ~/.cargo/bin/anchor build --no-idl -p "$PROGRAM" -- --arch v0 "${FEATURES[@]}"
+          ~/.cargo/bin/anchor build --no-idl -p "$PROGRAM" -- --arch v3 "${FEATURES[@]}"
           PROGRAMS=("$PROGRAM")
         else
-          ~/.cargo/bin/anchor build --no-idl -- --arch v0 "${FEATURES[@]}"
+          ~/.cargo/bin/anchor build --no-idl -- --arch v3 "${FEATURES[@]}"
           mapfile -t PROGRAMS < <(~/.cargo/bin/anchor keys list | cut -d: -f1)
         fi
         mkdir -p target/idl target/types
@@ -99,4 +100,4 @@ runs:
       with:
         path: |
           ./target/
-        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock', 'Cargo.toml') }}
+        key: build-${{ runner.os }}-${{env.ANCHOR_VERSION}}-${{env.ANCHOR_SHA}}-solana-${{ env.SOLANA_CLI_VERSION }}-sbpf-v3-v0003-${{ inputs.devnet }}-${{ inputs.testing }}-${{ inputs.program }}-${{ hashFiles('./programs/**/**', './utils/**', 'Cargo.lock', 'Cargo.toml') }}
