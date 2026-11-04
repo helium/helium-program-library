@@ -10,9 +10,10 @@ import {
 } from "@/lib/utils/transaction-tags";
 import {
   getJitoTipInstruction,
+  JITO_TIP_METADATA,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
-import { maxPackedTxs } from "@/lib/utils/jito-bundle";
+import { buildBundleTipDraft, maxPackedTxs } from "@/lib/utils/jito-bundle";
 import {
   ATA_SPACE,
   FANOUT_FUNDING_AMOUNT,
@@ -58,7 +59,6 @@ import {
   getAssetProof,
   HNT_MINT,
   proofArgsAndAccounts,
-  resolveTxVersion,
   toVersionedTx,
   type TransactionDraft,
   type TransactionSigning,
@@ -979,34 +979,18 @@ export const migrate = publicProcedure.migration.migrate.handler(
         : undefined;
     const hasMore = nextParams !== undefined;
 
-    // Step 4: Packing left one bundle slot free, so a bundle always gets its
-    // own tip transaction.
+    // Step 4: Packing left one bundle slot free for the bundle's tip tx.
     if (shouldUseJitoBundle(allDrafts.length, cluster)) {
       const tipIx = await getJitoTipInstruction(feePayer);
-      allDrafts.push({
-        instructions: [
-          // A tip-only tx would be fully signed by the fee payer alone,
-          // letting anyone who calls this open endpoint submit it
-          // standalone and drain tip + fees from the fee payer. Require
-          // the source wallet's signature via a no-op self-transfer so
-          // the tx is only valid as part of the client-signed bundle.
-          SystemProgram.transfer({
-            fromPubkey: sourcePubkey,
-            toPubkey: sourcePubkey,
-            lamports: 0,
-          }),
+      allDrafts.push(
+        buildBundleTipDraft({
           tipIx,
-        ],
-        feePayer,
-        addressLookupTableAddresses: [lut],
-        version: await resolveTxVersion(connection, {
-          signing: MIGRATION_SIGNING,
+          signer: sourcePubkey,
+          feePayer,
+          template: allDrafts[0],
         }),
-      } as TransactionDraft);
-      txMetadata.push({
-        type: TRANSACTION_TYPES.MIGRATION,
-        description: "Migration: Jito tip",
-      });
+      );
+      txMetadata.push(JITO_TIP_METADATA);
     }
 
     // Step 5: Convert drafts to VersionedTransactions and sign with fee payer

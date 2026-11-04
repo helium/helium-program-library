@@ -10,7 +10,7 @@ import { env } from "../env";
 import { classifyBundleSimulationFailure } from "./simulation-classifier";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { createTtlCache } from "./ttl-cache";
-export { isJitoCluster, shouldUseJitoBundle } from "./jito-bundle";
+export { shouldUseJitoBundle } from "./jito-bundle";
 
 export async function jitoBlockEngineRequest(
   method: string,
