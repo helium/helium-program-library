@@ -10,16 +10,7 @@ import { env } from "../env";
 import { classifyBundleSimulationFailure } from "./simulation-classifier";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { createTtlCache } from "./ttl-cache";
-
-export const isJitoCluster = (cluster: string): boolean =>
-  cluster === "mainnet" || cluster === "mainnet-beta";
-
-export function shouldUseJitoBundle(
-  transactionsLength: number,
-  cluster: string,
-): boolean {
-  return isJitoCluster(cluster) && transactionsLength > 1;
-}
+export { isJitoCluster, shouldUseJitoBundle } from "./jito-bundle";
 
 export async function jitoBlockEngineRequest(
   method: string,
