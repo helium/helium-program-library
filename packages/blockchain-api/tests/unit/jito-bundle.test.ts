@@ -21,6 +21,11 @@ describe("maxPackedTxs", () => {
   it("uses the whole bundle limit off a Jito cluster", () => {
     expect(maxPackedTxs("devnet")).to.equal(5);
   });
+
+  it("keeps the tip slot inside a caller's smaller limit", () => {
+    expect(maxPackedTxs("mainnet", 2)).to.equal(1);
+    expect(maxPackedTxs("devnet", 2)).to.equal(2);
+  });
 });
 
 describe("shouldUseJitoBundle", () => {
@@ -79,9 +84,11 @@ describe("buildBundleTipDraft", () => {
       });
 
       it("keeps the template's lookup tables", () => {
-        expect(draft.addressLookupTables).to.equal(template.addressLookupTables);
+        expect(draft.addressLookupTables).to.equal(
+          template.addressLookupTables
+        );
         expect(draft.addressLookupTableAddresses).to.equal(
-          template.addressLookupTableAddresses,
+          template.addressLookupTableAddresses
         );
         expect(() => toVersionedTx(draft)).to.not.throw();
       });

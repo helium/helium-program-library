@@ -14,15 +14,25 @@ export function shouldUseJitoBundle(
   return isJitoCluster(cluster) && transactionsLength > 1;
 }
 
-/**
- * How many transactions a caller can pack before it adds a dedicated tip
- * transaction. On a Jito cluster one bundle slot stays free for the tip.
- */
-export const maxPackedTxs = (cluster: string): number =>
-  isJitoCluster(cluster) ? MAX_JITO_BUNDLE_TXS - 1 : MAX_JITO_BUNDLE_TXS;
+/** Marks the tip transaction so landing checks can skip it. */
+export const JITO_TIP_METADATA = {
+  type: "jito_tip",
+  description: "Jito bundle tip",
+};
 
 /**
- * Build the dedicated Jito tip transaction for a bundle. The tip tx copies the
+ * How many transactions a caller can pack before it adds a dedicated tip
+ * transaction. On a Jito cluster one of the maxTxs slots stays free for the
+ * tip.
+ */
+export const maxPackedTxs = (
+  cluster: string,
+  maxTxs: number = MAX_JITO_BUNDLE_TXS,
+): number => (isJitoCluster(cluster) ? maxTxs - 1 : maxTxs);
+
+/**
+ * Build the dedicated Jito tip transaction for a server-paid bundle. Use
+ * getJitoTipTransaction instead when the user's wallet pays the tip. The tip tx copies the
  * blockhash, lookup tables, and version of a packed draft from the same page.
  * The source wallet is added as a read-only signer on the tip instruction, so
  * the tip tx needs the source's signature without a System debit from the

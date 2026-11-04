@@ -8,12 +8,13 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
+import { getJitoTipInstruction } from "@/lib/utils/jito";
 import {
-  getJitoTipInstruction,
+  buildBundleTipDraft,
   JITO_TIP_METADATA,
+  maxPackedTxs,
   shouldUseJitoBundle,
-} from "@/lib/utils/jito";
-import { buildBundleTipDraft, maxPackedTxs } from "@/lib/utils/jito-bundle";
+} from "@/lib/utils/jito-bundle";
 import {
   ATA_SPACE,
   FANOUT_FUNDING_AMOUNT,
