@@ -11,14 +11,14 @@ import { classifyBundleSimulationFailure } from "./simulation-classifier";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { createTtlCache } from "./ttl-cache";
 
+export const isJitoCluster = (cluster: string): boolean =>
+  cluster === "mainnet" || cluster === "mainnet-beta";
+
 export function shouldUseJitoBundle(
   transactionsLength: number,
   cluster: string,
 ): boolean {
-  return (
-    (cluster === "mainnet" || cluster === "mainnet-beta") &&
-    transactionsLength > 1
-  );
+  return isJitoCluster(cluster) && transactionsLength > 1;
 }
 
 export async function jitoBlockEngineRequest(

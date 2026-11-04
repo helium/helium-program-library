@@ -8,7 +8,12 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
-import { getJitoTipInstruction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipInstruction,
+  isJitoCluster,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
+import { JITO_TIP_RESERVE_BYTES } from "@/lib/constants/jito";
 import {
   ATA_SPACE,
   FANOUT_FUNDING_AMOUNT,
@@ -848,6 +853,11 @@ export const migrate = publicProcedure.migration.migrate.handler(
       addressLookupTableAddresses: [lut],
       commitment: "finalized" as const,
       signing: MIGRATION_SIGNING,
+      // Packing fills every tx, so a full bundle would have no room for the
+      // tip added in step 4. MIGRATION_SIGNING keeps these drafts on v0.
+      maxTxSize: isJitoCluster(cluster)
+        ? getTransactionSizeLimit(0) - JITO_TIP_RESERVE_BYTES
+        : undefined,
     };
 
     const addDrafts = (drafts: TransactionDraft[], description: string) => {
