@@ -1,4 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
+import { MAX_JITO_BUNDLE_TXS } from "@/lib/utils/jito-bundle";
 
 export const LockupKind = {
   CONSTANT: "constant",
@@ -24,7 +25,7 @@ export function flipLockupKind(kind: LockupKindType): LockupKindType {
 export const HNT_EPOCH = 20117;
 export const MAX_LOCKUP_PERIOD_IN_DAYS = 1460;
 export const SECS_PER_DAY = 86400;
-export const MAX_TXS_PER_CALL = 5;
+export const MAX_TXS_PER_CALL = MAX_JITO_BUNDLE_TXS;
 export const PREPAID_TX_FEES = 0.01;
 export const TASK_QUEUE = new PublicKey(
   process.env.HPL_CRONS_TASK_QUEUE ||
