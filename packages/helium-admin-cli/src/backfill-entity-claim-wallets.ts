@@ -13,6 +13,7 @@ import { customSignerKey } from "@helium/tuktuk-sdk";
 import {
   LAMPORTS_PER_SOL,
   PublicKey,
+  SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
 import fs from "fs";
@@ -55,6 +56,12 @@ export async function run(args: any = process.argv) {
       required: true,
       describe:
         "hpl_crons IDL that includes backfill_entity_claim_wallet_v0 (the on-chain IDL may lag the program)",
+    },
+    minRuns: {
+      type: "number",
+      describe:
+        "Top each backfilled cron up so it has at least this many runs left after the backfill. 0 turns top-ups off",
+      default: 365,
     },
     commit: {
       type: "boolean",
@@ -194,6 +201,8 @@ export async function run(args: any = process.argv) {
   // instead of 1, at the task queue's minCrankReward each.
   const runsBefore: anchor.BN[] = [];
   const runsAfter: anchor.BN[] = [];
+  // Lamports the backfill signer sends each cron so it keeps at least minRuns runs.
+  const topUps: anchor.BN[] = [];
   for (const r of ready) {
     const spendable = anchor.BN.max(
       new anchor.BN(r.cronLamports).sub(
@@ -204,7 +213,15 @@ export async function run(args: any = process.argv) {
     const m = minCrankRewards.get(r.taskQueue.toBase58())!;
     runsBefore.push(spendable.div(m));
     runsAfter.push(spendable.div(m.muln(2)));
+    topUps.push(
+      anchor.BN.max(
+        m.muln(2).muln(argv.minRuns).sub(spendable),
+        new anchor.BN(0)
+      )
+    );
   }
+  const topUpLamports = topUps.reduce((a, b) => a.add(b), new anchor.BN(0));
+  const toppedUp = topUps.filter((t) => !t.isZero()).length;
   const minMedian = (values: anchor.BN[]) => {
     if (values.length === 0) return "n/a / n/a";
     const sorted = [...values].sort((a, b) => a.cmp(b));
@@ -236,22 +253,35 @@ export async function run(args: any = process.argv) {
     )}, after backfill ${minMedian(runsAfter)}`
   );
   console.log(
-    `Rent paid by ${BACKFILL_SIGNER.toBase58()}: ${
-      rentLamports / 1e9
-    } SOL, plus fees. Balance: ${signerBalance / 1e9} SOL`
+    `  of which topped up to ${argv.minRuns} runs: ${toppedUp}, for ${
+      topUpLamports.toNumber() / 1e9
+    } SOL`
+  );
+  console.log(
+    `Paid by ${BACKFILL_SIGNER.toBase58()}: ${rentLamports / 1e9} SOL rent + ${
+      topUpLamports.toNumber() / 1e9
+    } SOL top-ups, plus fees. Balance: ${signerBalance / 1e9} SOL`
   );
 
   if (!argv.commit) {
     console.log("Dry run. Re-run with --commit to send.");
     return;
   }
-  if (signerBalance < rentLamports + FEE_MARGIN_LAMPORTS) {
-    throw new Error("Backfill signer cannot pay the rent plus fee margin");
+  if (
+    new anchor.BN(signerBalance).lt(
+      topUpLamports.addn(rentLamports + FEE_MARGIN_LAMPORTS)
+    )
+  ) {
+    throw new Error(
+      "Backfill signer cannot pay the rent, top-ups, and fee margin"
+    );
   }
 
-  const instructions: TransactionInstruction[] = await Promise.all(
-    ready.map((r) =>
-      program.methods
+  // A cron's top-up shares its backfill's transaction, so a re-run never tops up a cron twice:
+  // a backfilled cron has a claim and is skipped.
+  const instructions: TransactionInstruction[][] = await Promise.all(
+    ready.map(async (r, i) => [
+      await program.methods
         .backfillEntityClaimWalletV0()
         .accounts({
           payer: BACKFILL_SIGNER,
@@ -259,8 +289,17 @@ export async function run(args: any = process.argv) {
           cronJob: r.cronJob,
           cronJobTransaction: r.cronJobTransaction,
         })
-        .instruction()
-    )
+        .instruction(),
+      ...(topUps[i].isZero()
+        ? []
+        : [
+            SystemProgram.transfer({
+              fromPubkey: BACKFILL_SIGNER,
+              toPubkey: r.cronJob,
+              lamports: BigInt(topUps[i].toString()),
+            }),
+          ]),
+    ])
   );
   const txns = await batchInstructionsToTxsWithPriorityFee(
     provider,
