@@ -57,6 +57,7 @@ import {
   ensureSubDaoEpochsCurrent,
   getPrograms,
   getSeasonBoundedProxyExpirationTime,
+  readClockTimestamp,
   setDelegatedPositionExpiration,
   setPositionLockupEndTs,
 } from "./helpers/governance";
@@ -227,9 +228,13 @@ describe("governance", () => {
       const positionAfter = await vsrProgram.account.positionV0.fetch(
         positionPubkey
       );
-      const expectedEndTs = clockTimestamp + 60 * 86400;
+      // The tx lands between the two clock reads, so endTs falls in that range.
+      const clockAfter = await readClockTimestamp(ctx);
       const actualEndTs = positionAfter.lockup.endTs.toNumber();
-      expect(actualEndTs).to.be.within(expectedEndTs, expectedEndTs + 3);
+      expect(actualEndTs).to.be.within(
+        clockTimestamp + 60 * 86400,
+        clockAfter + 60 * 86400
+      );
     });
 
     it("flips lockup kind from cliff to constant", async () => {
@@ -316,11 +321,12 @@ describe("governance", () => {
         positionPubkey
       );
       expect(Object.keys(positionAfter.lockup.kind)[0]).to.equal("cliff");
-      const expectedEndTs = clockTimestamp + 90 * 86400;
-      expect(positionAfter.lockup.endTs.toNumber()).to.be.oneOf([
-        expectedEndTs,
-        expectedEndTs + 1,
-      ]);
+      // The tx lands between the two clock reads, so endTs falls in that range.
+      const clockAfter = await readClockTimestamp(ctx);
+      expect(positionAfter.lockup.endTs.toNumber()).to.be.within(
+        clockTimestamp + 90 * 86400,
+        clockAfter + 90 * 86400
+      );
     });
   });
 
