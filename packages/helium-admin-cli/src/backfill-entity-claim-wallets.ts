@@ -10,7 +10,11 @@ import {
   chunks,
 } from "@helium/spl-utils";
 import { customSignerKey } from "@helium/tuktuk-sdk";
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import fs from "fs";
 import os from "os";
 import yargs from "yargs/yargs";
@@ -23,10 +27,11 @@ const CRON_PROGRAM = new PublicKey(
   "cronAjRZnJn3MTP3B9kE62NWDrjSuAPVXf9c4hu4grM"
 );
 const ORACLE_URL = "https://hnt-rewards.oracle.helium.io";
-// Space of a cron transaction holding a remote source, after the cron program's resize_to_fit:
-// discriminator, id, cron job, variant, url, signer, bump.
+// Space of a cron transaction holding a remote source after the cron program's resize_to_fit:
+// discriminator, id, cron job, variant, url, signer, bump, plus its 64-byte pad.
 const remoteTransactionSpace = (url: string) =>
-  8 + 4 + 32 + 1 + 4 + Buffer.byteLength(url) + 32 + 1;
+  8 + 4 + 32 + 1 + 4 + Buffer.byteLength(url) + 32 + 1 + 64;
+const FEE_MARGIN_LAMPORTS = 0.05 * LAMPORTS_PER_SOL;
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -113,6 +118,8 @@ export async function run(args: any = process.argv) {
   const ready: ((typeof targets)[number] & {
     taskQueue: PublicKey;
     notScheduled: boolean;
+    cronLamports: number;
+    cronDataLength: number;
   })[] = [];
   targets.forEach((target, i) => {
     const info = cronAccounts[i];
@@ -132,6 +139,8 @@ export async function run(args: any = process.argv) {
         ...target,
         taskQueue: cron.taskQueue,
         notScheduled: cron.nextScheduleTask.equals(PublicKey.default),
+        cronLamports: info.lamports,
+        cronDataLength: info.data.length,
       });
     }
   });
@@ -139,11 +148,11 @@ export async function run(args: any = process.argv) {
   // The oracle skips a wallet claim when its claim_payer holds less than rent-exempt
   // minimum plus a crank reward per hotspot and one more. One hotspot is the floor.
   const taskQueues = [...new Set(ready.map((r) => r.taskQueue.toBase58()))];
-  const minCrankRewards = new Map<string, number>();
-  for (const taskQueue of taskQueues) {
-    const queue = await program.account.taskQueueV0.fetch(taskQueue);
-    minCrankRewards.set(taskQueue, queue.minCrankReward.toNumber());
-  }
+  const queues = await program.account.taskQueueV0.fetchMultiple(taskQueues);
+  const minCrankRewards = new Map<string, anchor.BN>();
+  taskQueues.forEach((taskQueue, i) => {
+    minCrankRewards.set(taskQueue, queues[i]!.minCrankReward);
+  });
   const walletMinRent = await connection.getMinimumBalanceForRentExemption(0);
   const claimPayers = await fetchAll(
     ready.map(
@@ -154,20 +163,55 @@ export async function run(args: any = process.argv) {
         ])[0]
     )
   );
-  const underfunded = ready.filter(
-    (r, i) =>
-      (claimPayers[i]?.lamports ?? 0) <
-      walletMinRent + 2 * minCrankRewards.get(r.taskQueue.toBase58())!
+  const underfunded = ready.filter((r, i) =>
+    new anchor.BN(claimPayers[i]?.lamports ?? 0).lt(
+      new anchor.BN(walletMinRent).add(
+        minCrankRewards.get(r.taskQueue.toBase58())!.muln(2)
+      )
+    )
   ).length;
+
+  const rentCache = new Map<number, number>();
+  const rentFor = async (space: number) => {
+    let rent = rentCache.get(space);
+    if (rent === undefined) {
+      rent = await connection.getMinimumBalanceForRentExemption(space);
+      rentCache.set(space, rent);
+    }
+    return rent;
+  };
 
   let rentLamports = 0;
   for (const r of ready) {
-    rentLamports += await connection.getMinimumBalanceForRentExemption(
+    rentLamports += await rentFor(
       remoteTransactionSpace(
         `${ORACLE_URL}/v1/tuktuk/wallet/${r.wallet.toBase58()}`
       )
     );
   }
+
+  // After the backfill each cron run pays the cron job for 2 tasks (schedule task + the claim)
+  // instead of 1, at the task queue's minCrankReward each.
+  const runsBefore: anchor.BN[] = [];
+  const runsAfter: anchor.BN[] = [];
+  for (const r of ready) {
+    const spendable = anchor.BN.max(
+      new anchor.BN(r.cronLamports).sub(
+        new anchor.BN(await rentFor(r.cronDataLength))
+      ),
+      new anchor.BN(0)
+    );
+    const m = minCrankRewards.get(r.taskQueue.toBase58())!;
+    runsBefore.push(spendable.div(m));
+    runsAfter.push(spendable.div(m.muln(2)));
+  }
+  const minMedian = (values: anchor.BN[]) => {
+    if (values.length === 0) return "n/a / n/a";
+    const sorted = [...values].sort((a, b) => a.cmp(b));
+    return `${sorted[0].toString()} / ${sorted[
+      Math.floor(sorted.length / 2)
+    ].toString()}`;
+  };
   const signerBalance = await connection.getBalance(BACKFILL_SIGNER);
 
   console.log(`Owners: ${owners.length}`);
@@ -187,6 +231,11 @@ export async function run(args: any = process.argv) {
     `  of which claim_payer below the one-hotspot floor (will claim nothing until topped up): ${underfunded}`
   );
   console.log(
+    `  cron runs left at current funding (min / median): before ${minMedian(
+      runsBefore
+    )}, after backfill ${minMedian(runsAfter)}`
+  );
+  console.log(
     `Rent paid by ${BACKFILL_SIGNER.toBase58()}: ${
       rentLamports / 1e9
     } SOL, plus fees. Balance: ${signerBalance / 1e9} SOL`
@@ -196,22 +245,19 @@ export async function run(args: any = process.argv) {
     console.log("Dry run. Re-run with --commit to send.");
     return;
   }
-  if (signerBalance < rentLamports) {
-    throw new Error("Backfill signer cannot pay the rent");
+  if (signerBalance < rentLamports + FEE_MARGIN_LAMPORTS) {
+    throw new Error("Backfill signer cannot pay the rent plus fee margin");
   }
 
   const instructions: TransactionInstruction[] = await Promise.all(
     ready.map((r) =>
       program.methods
         .backfillEntityClaimWalletV0()
-        .accountsStrict({
+        .accounts({
           payer: BACKFILL_SIGNER,
           wallet: r.wallet,
-          authority: r.authority,
           cronJob: r.cronJob,
           cronJobTransaction: r.cronJobTransaction,
-          systemProgram: anchor.web3.SystemProgram.programId,
-          cronProgram: CRON_PROGRAM,
         })
         .instruction()
     )

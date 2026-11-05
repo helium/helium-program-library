@@ -1,6 +1,5 @@
-//! Temporary. Adds the owner's whole-wallet claim to an entity claim cron that was created
-//! without one (blockchain-api `createAutomation` stopped adding it in PR #1200, and the wallet
-//! app never added it after). Remove this instruction once the backfill has run.
+//! Temporary. Adds the owner's whole-wallet claim as transaction 0 of an entity claim cron that
+//! has none. Remove this instruction once the backfill has run.
 
 use anchor_lang::prelude::*;
 use shared_utils::{ORACLE_SIGNER, ORACLE_URL};

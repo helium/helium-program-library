@@ -116,13 +116,11 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
     program.methods
       .backfillEntityClaimWalletV0()
       .preInstructions(preInstructions)
-      .accountsPartial({
+      .accounts({
         payer: signer.publicKey,
         wallet,
-        authority,
         cronJob,
         cronJobTransaction: cronJobTransactionKey(cronJob, 0)[0],
-        cronProgram: CRON,
       })
       .signers([signer])
       .rpc();
