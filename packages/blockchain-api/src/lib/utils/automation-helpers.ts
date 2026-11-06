@@ -4,7 +4,6 @@ import {
   MAX_PRESET_SCHEDULE_LEN,
 } from "@helium/hpl-crons-sdk";
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { getCluster } from "@/lib/solana";
 import { getRentLamports } from "./balance-validation";
 
 export type Schedule = "daily" | "weekly" | "monthly";
@@ -12,16 +11,6 @@ export type Schedule = "daily" | "weekly" | "monthly";
 // Sizes and the cron name live in @helium/hpl-crons-sdk so the hooks and
 // this service price the same accounts.
 export { ENTITY_CLAIM_CRON_NAME };
-
-/**
- * Oracle URL hpl-crons writes into its claim transactions. The program
- * compiles it in per cluster (utils/shared-utils/src/lib.rs), so it does not
- * follow env.ORACLE_URL.
- */
-export const claimOracleUrl = (): string =>
-  getCluster() === "devnet"
-    ? "https://hnt-rewards.oracle.test-helium.com"
-    : "https://hnt-rewards.oracle.helium.io";
 
 // Constants from useAutomateHotspotClaims hook
 export const TASK_RETURN_ACCOUNT_FUNDING_SOL = 0.01;

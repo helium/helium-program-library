@@ -1,7 +1,6 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
   calculateCronJobCostPerClaim,
-  claimOracleUrl,
   estimateAutomationFunding,
   getBaseAutomationRentLamports,
   ENTITY_CLAIM_CRON_NAME,
@@ -60,6 +59,16 @@ import {
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
 const HNT_DAO = daoKey(HNT_MINT)[0];
+
+/**
+ * Oracle URL hpl-crons writes into its claim transactions. The program
+ * compiles it in per cluster (utils/shared-utils/src/lib.rs), so it does not
+ * follow env.ORACLE_URL.
+ */
+const claimOracleUrl = (): string =>
+  getCluster() === "devnet"
+    ? "https://hnt-rewards.oracle.test-helium.com"
+    : "https://hnt-rewards.oracle.helium.io";
 
 type CronClaimCounts = { numTransactions: number; nextTransactionId: number };
 
