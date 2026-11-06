@@ -1,4 +1,5 @@
 import {
+  BAD_REQUEST,
   CONFLICT,
   INVALID_WALLET_ADDRESS,
   NOT_FOUND,
@@ -34,6 +35,10 @@ import {
   FundAutomationInputSchema,
   SetupAutomationOutputSchema,
   SetupAutomationInputSchema,
+  CreateWalletClaimAutomationInputSchema,
+  CreateWalletClaimAutomationOutputSchema,
+  CreateEntityClaimAutomationInputSchema,
+  CreateEntityClaimAutomationOutputSchema,
   FundingEstimateOutputSchema,
   GetFundingEstimateInputSchema,
   RequeueAutomationInputSchema,
@@ -240,6 +245,34 @@ export const hotspotsContract = oc
       .errors({
         NOT_FOUND,
         INSUFFICIENT_FUNDS,
+      }),
+    /** Protected: Create automation with the whole-wallet claim */
+    createWalletClaimAutomation: oc
+      .route({
+        method: "POST",
+        path: "/wallet/{walletAddress}/automation/wallet-claim",
+        summary: "Setup automation with the wallet claim",
+      })
+      .input(CreateWalletClaimAutomationInputSchema)
+      .output(CreateWalletClaimAutomationOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+        BAD_REQUEST,
+      }),
+    /** Protected: Create automation with per-hotspot claims */
+    createEntityClaimAutomation: oc
+      .route({
+        method: "POST",
+        path: "/wallet/{walletAddress}/automation/entity-claims",
+        summary: "Setup automation with hotspot claims",
+      })
+      .input(CreateEntityClaimAutomationInputSchema)
+      .output(CreateEntityClaimAutomationOutputSchema)
+      .errors({
+        NOT_FOUND,
+        INSUFFICIENT_FUNDS,
+        BAD_REQUEST,
       }),
     /** Protected: Fund automation */
     fundAutomation: oc

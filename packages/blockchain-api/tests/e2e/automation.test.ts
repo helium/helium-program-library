@@ -9,6 +9,7 @@ import { AnchorProvider } from "@anchor-lang/core";
 import {
   cronJobKey,
   cronJobNameMappingKey,
+  cronJobTransactionKey,
   init as initCron,
   userCronJobsKey,
 } from "@helium/cron-sdk";
@@ -79,6 +80,36 @@ describe("automation endpoints", () => {
       new PublicKey(process.env.HPL_CRONS_TASK_QUEUE!)
     );
     return taskQueue.minCrankReward.toNumber();
+  }
+
+  // Lamports the wallet moved in an action's setup transactions, less fees.
+  // Lamports are conserved across a transaction except for its fee, so read
+  // each fee off the ledger. The wallet pays for every setup transaction, so
+  // it is account 0. A Jito tip transaction is neither setup nor part of the
+  // estimate.
+  async function setupLamportsSpent(signatures: string[], transactionData: any) {
+    const sum = (balances: number[]) => balances.reduce((a, b) => a + b, 0);
+    let spent = 0;
+    for (const [i, signature] of signatures.entries()) {
+      if (transactionData.transactions[i].metadata?.type !== "setup_automation") {
+        continue;
+      }
+      const meta = (await connection.getTransaction(signature, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 1,
+      }))!.meta!;
+      const fee = sum(meta.preBalances) - sum(meta.postBalances);
+      spent += meta.preBalances[0] - meta.postBalances[0] - fee;
+    }
+    return spent;
+  }
+
+  async function fetchCronJob(wallet: PublicKey) {
+    const cronProgram = await initCron(
+      new AnchorProvider(connection, {} as any, {})
+    );
+    const cronJob = cronJobKey(entityCronAuthorityKey(wallet)[0], 0)[0];
+    return { cronJob, account: await cronProgram.account.cronJobV0.fetch(cronJob) };
   }
 
   before(async () => {
@@ -231,29 +262,9 @@ describe("automation endpoints", () => {
         wallet
       );
 
-      // Lamports are conserved across a transaction except for its fee, so
-      // read each fee off the ledger. The wallet pays for every setup
-      // transaction, so it is account 0. A Jito tip transaction is neither
-      // setup nor part of the estimate.
-      const sum = (balances: number[]) => balances.reduce((a, b) => a + b, 0);
-      let spentLessFees = 0;
-      for (const [i, signature] of signatures.entries()) {
-        if (
-          result.transactionData.transactions[i].metadata?.type !==
-          "setup_automation"
-        ) {
-          continue;
-        }
-        const meta = (await connection.getTransaction(signature, {
-          commitment: "confirmed",
-          maxSupportedTransactionVersion: 1,
-        }))!.meta!;
-        const fee = sum(meta.preBalances) - sum(meta.postBalances);
-        spentLessFees += meta.preBalances[0] - meta.postBalances[0] - fee;
-      }
-      expect(spentLessFees).to.equal(
-        Math.round(estimate.totalSolNeeded * LAMPORTS_PER_SOL)
-      );
+      expect(
+        await setupLamportsSpent(signatures, result.transactionData)
+      ).to.equal(Math.round(estimate.totalSolNeeded * LAMPORTS_PER_SOL));
     });
 
     it("returns NOT_FOUND when funding a non-existent automation", async () => {
@@ -291,6 +302,158 @@ describe("automation endpoints", () => {
       } catch (error: any) {
         expect(error).to.be.instanceOf(ORPCError);
         expect(error.code).to.equal("NOT_FOUND");
+      }
+    });
+  });
+
+  describe("claim setups", () => {
+    let entityKey: string | undefined;
+
+    before(async () => {
+      try {
+        const hotspotsResult = await client.hotspots.getHotspots({
+          walletAddress: payer.publicKey.toBase58(),
+          page: 1,
+          limit: 1,
+        });
+        entityKey = hotspotsResult.hotspots[0]?.entityKey;
+      } catch {
+        console.log("getHotspots failed; skipping the per-hotspot setup case");
+      }
+    });
+
+    // A fresh wallet with enough SOL for a setup.
+    async function freshWallet() {
+      const wallet = Keypair.generate();
+      await ensureFunds(wallet.publicKey, LAMPORTS_PER_SOL);
+      return wallet;
+    }
+
+    it("sets up a cron with the wallet claim in one signing round", async () => {
+      const wallet = await freshWallet();
+      const walletAddress = wallet.publicKey.toBase58();
+      const duration = 5;
+
+      const estimate = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration,
+        schedule: DAILY_CRON,
+        claims: { kind: "wallet" },
+      });
+      const result = await client.hotspots.createWalletClaimAutomation({
+        walletAddress,
+        schedule: DAILY_CRON,
+        duration,
+      });
+      expect(result.transactionData.tag).to.equal(
+        `setup_automation:${walletAddress}`
+      );
+      const signatures = await signAndSubmitTransactionData(
+        connection,
+        result.transactionData,
+        wallet
+      );
+
+      const { cronJob, account } = await fetchCronJob(wallet.publicKey);
+      expect(account.numTransactions).to.equal(1);
+      expect(account.nextTransactionId).to.equal(1);
+      expect(
+        await connection.getAccountInfo(cronJobTransactionKey(cronJob, 0)[0])
+      ).to.not.equal(null);
+      // The quote carries the claim's rent and its crank reward per run.
+      expect(
+        await setupLamportsSpent(signatures, result.transactionData)
+      ).to.equal(Math.round(estimate.totalSolNeeded * LAMPORTS_PER_SOL));
+      const status = await client.hotspots.getAutomationStatus({
+        walletAddress,
+      });
+      expect(status.fundingPeriodInfo?.cronJobPeriodsRemaining).to.be.at.least(
+        duration
+      );
+    });
+
+    it("sets up a cron with hotspot claims in one signing round", async function () {
+      if (!entityKey) {
+        this.skip();
+      }
+      const wallet = await freshWallet();
+      const walletAddress = wallet.publicKey.toBase58();
+      const duration = 5;
+
+      const estimate = await client.hotspots.getFundingEstimate({
+        walletAddress,
+        duration,
+        schedule: DAILY_CRON,
+        claims: { kind: "entities", entityKeys: [entityKey!] },
+      });
+      const result = await client.hotspots.createEntityClaimAutomation({
+        walletAddress,
+        schedule: DAILY_CRON,
+        duration,
+        entityKeys: [entityKey!],
+      });
+      const signatures = await signAndSubmitTransactionData(
+        connection,
+        result.transactionData,
+        wallet
+      );
+
+      const { account } = await fetchCronJob(wallet.publicKey);
+      expect(account.numTransactions).to.equal(1);
+      expect(
+        await setupLamportsSpent(signatures, result.transactionData)
+      ).to.equal(Math.round(estimate.totalSolNeeded * LAMPORTS_PER_SOL));
+    });
+
+    it("adds the wallet claim to an existing empty cron once", async () => {
+      const wallet = await freshWallet();
+      const walletAddress = wallet.publicKey.toBase58();
+
+      // An old wallet build: the cron exists with no claim.
+      const empty = await client.hotspots.createAutomation({
+        walletAddress,
+        schedule: DAILY_CRON,
+        duration: 1,
+      });
+      await signAndSubmitTransactionData(
+        connection,
+        empty.transactionData,
+        wallet
+      );
+      expect((await fetchCronJob(wallet.publicKey)).account.numTransactions).to.equal(0);
+
+      for (let i = 0; i < 2; i++) {
+        const result = await client.hotspots.createWalletClaimAutomation({
+          walletAddress,
+          schedule: DAILY_CRON,
+          duration: 1,
+        });
+        await signAndSubmitTransactionData(
+          connection,
+          result.transactionData,
+          wallet
+        );
+        // The second call funds the cron and adds no second claim.
+        expect(
+          (await fetchCronJob(wallet.publicKey)).account.numTransactions
+        ).to.equal(1);
+      }
+    });
+
+    it("rejects duplicate hotspot keys", async () => {
+      const walletAddress = payer.publicKey.toBase58();
+      const key = Keypair.generate().publicKey.toBase58();
+      try {
+        await client.hotspots.createEntityClaimAutomation({
+          walletAddress,
+          schedule: DAILY_CRON,
+          duration: 1,
+          entityKeys: [key, key],
+        });
+        expect.fail("Should have thrown a validation error");
+      } catch (error: any) {
+        expect(error).to.be.instanceOf(ORPCError);
+        expect(error.code).to.equal("BAD_REQUEST");
       }
     });
   });

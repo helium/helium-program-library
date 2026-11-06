@@ -73,3 +73,13 @@ export const entityClaimCronSpaces = (
   TASK_RETURN_ACCOUNT_FUNDING_SPACE,
   ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
 ];
+
+/**
+ * Space of a cron transaction that holds a remote source, such as the claim
+ * add_wallet_to_entity_cron_v0 and add_entity_to_cron_v0 add. The cron
+ * program's resize_to_fit sizes it to its serialized length plus a 64-byte
+ * pad: discriminator, id, cron job, variant, url, signer, bump, pad. The payer
+ * pays rent for this size.
+ */
+export const remoteCronTransactionSpace = (url: string) =>
+  8 + 4 + 32 + 1 + 4 + Buffer.byteLength(url) + 32 + 1 + 64;
