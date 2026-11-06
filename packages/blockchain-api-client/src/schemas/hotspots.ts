@@ -118,8 +118,8 @@ export const SetupAutomationInputSchema = z.object({
   duration: z.number().int().min(1), // Number of claims to pre-fund
 });
 
-// Hotspots a per-hotspot claim setup adds, one claim each. On mainnet the
-// server also rejects a list that does not fit one bundle.
+// Hotspots a per-hotspot claim setup adds, one claim each. The server
+// also rejects a list that does not fit one mainnet bundle, on every cluster.
 const SetupEntityKeysSchema = z
   .array(
     HeliumPublicKeySchema.refine((key) => /^[1-9A-HJ-NP-Za-km-z]+$/.test(key), {

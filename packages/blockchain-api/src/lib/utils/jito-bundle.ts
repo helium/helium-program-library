@@ -30,9 +30,12 @@ export const maxPackedTxs = (
   maxTxs: number = MAX_JITO_BUNDLE_TXS,
 ): number => (isJitoCluster(cluster) ? maxTxs - 1 : maxTxs);
 
-/** A setup must land in one bundle on a Jito cluster; elsewhere any count fits. */
-export const fitsOneBundle = (cluster: string, txCount: number): boolean =>
-  !isJitoCluster(cluster) || txCount <= maxPackedTxs(cluster);
+/**
+ * A setup must land in one mainnet bundle. Every cluster applies the mainnet
+ * limit, so a setup that mainnet rejects also fails on devnet.
+ */
+export const fitsOneBundle = (txCount: number): boolean =>
+  txCount <= maxPackedTxs("mainnet");
 
 /**
  * Build the dedicated Jito tip transaction for a server-paid bundle. Use

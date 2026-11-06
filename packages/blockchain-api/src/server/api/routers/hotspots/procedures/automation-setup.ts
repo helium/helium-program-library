@@ -182,7 +182,8 @@ const buildClaimInstructions = async ({
  * Build the transactions that set up (or re-schedule) a wallet's claim
  * automation, fund it for `duration` runs and, when `claims` is given, add
  * those claims (see setupAddsClaims). `fitsOneBundle` is false when the
- * transactions do not fit one Jito bundle, so they could land in part.
+ * transactions do not fit one mainnet Jito bundle, so they could land in part.
+ * It applies the mainnet limit on every cluster.
  */
 export const buildAutomationSetup = async ({
   walletAddress,
@@ -416,7 +417,7 @@ export const buildAutomationSetup = async ({
       })
     ).map((tx) => toVersionedTx(tx))
   );
-  const fitsBundle = fitsOneBundle(cluster, vtxs.length);
+  const fitsBundle = fitsOneBundle(vtxs.length);
 
   // Add Jito tip if needed for mainnet bundles
   const useJito = shouldUseJitoBundle(vtxs.length, getCluster());

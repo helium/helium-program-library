@@ -108,17 +108,11 @@ describe("buildBundleTipDraft", () => {
 });
 
 describe("fitsOneBundle", () => {
-  it("fits a mainnet setup that fills the packed slots", () => {
-    expect(fitsOneBundle("mainnet", maxPackedTxs("mainnet"))).to.equal(true);
+  it("fits a setup that fills the mainnet packed slots", () => {
+    expect(fitsOneBundle(4)).to.equal(true);
   });
 
-  it("rejects a mainnet setup one transaction past the packed slots", () => {
-    expect(fitsOneBundle("mainnet", maxPackedTxs("mainnet") + 1)).to.equal(
-      false
-    );
-  });
-
-  it("fits any devnet setup", () => {
-    expect(fitsOneBundle("devnet", 50)).to.equal(true);
+  it("rejects a setup one transaction past the mainnet packed slots", () => {
+    expect(fitsOneBundle(5)).to.equal(false);
   });
 });
