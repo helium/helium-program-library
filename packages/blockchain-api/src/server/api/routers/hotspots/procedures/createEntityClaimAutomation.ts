@@ -1,11 +1,7 @@
 import { keyToAssetKey } from "@helium/helium-entity-manager-sdk";
-import { daoKey } from "@helium/helium-sub-daos-sdk";
-import { HNT_MINT } from "@helium/spl-utils";
 import { createSolanaConnection } from "@/lib/solana";
 import { publicProcedure } from "../../../procedures";
-import { buildAutomationSetup } from "./automation-setup";
-
-const HNT_DAO = daoKey(HNT_MINT)[0];
+import { buildAutomationSetup, HNT_DAO } from "./automation-setup";
 
 /**
  * Create transactions to set up claim automation with one claim per hotspot,

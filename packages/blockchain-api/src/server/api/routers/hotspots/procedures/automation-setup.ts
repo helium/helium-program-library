@@ -50,7 +50,7 @@ import {
   serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
-import { isJitoCluster, maxPackedTxs } from "@/lib/utils/jito-bundle";
+import { fitsOneBundle } from "@/lib/utils/jito-bundle";
 import {
   buildTeardownInstructions,
   fetchAutomationData,
@@ -58,7 +58,7 @@ import {
 } from "./automation-data-helpers";
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
-const HNT_DAO = daoKey(HNT_MINT)[0];
+export const HNT_DAO = daoKey(HNT_MINT)[0];
 
 /**
  * Oracle URL hpl-crons writes into its claim transactions. The program
@@ -416,8 +416,7 @@ export const buildAutomationSetup = async ({
       })
     ).map((tx) => toVersionedTx(tx))
   );
-  const fitsOneBundle =
-    !isJitoCluster(cluster) || vtxs.length <= maxPackedTxs(cluster);
+  const fitsBundle = fitsOneBundle(cluster, vtxs.length);
 
   // Add Jito tip if needed for mainnet bundles
   const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
@@ -445,7 +444,7 @@ export const buildAutomationSetup = async ({
     : {};
 
   return {
-    fitsOneBundle,
+    fitsOneBundle: fitsBundle,
     response: {
       transactionData: {
         transactions: serializeWithTipMetadata(

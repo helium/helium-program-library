@@ -180,13 +180,19 @@ export function interpretCronString(cronString: string): CronScheduleInfo {
 
 /**
  * Calculate cost per claim for cron job pool.
- * Each cron job triggering uses (1 + numCronTransactions) * minCrankReward.
+ * The cron queues at most 5 transactions per queue call, and each call adds
+ * one schedule task. A firing makes one call per 5 transactions, at least
+ * one, so it uses (Math.max(1, Math.ceil(numCronTransactions / 5)) +
+ * numCronTransactions) * minCrankReward.
  */
 export function calculateCronJobCostPerClaim(
   minCrankReward: number,
   numCronTransactions: number,
 ): number {
-  return (1 + numCronTransactions) * minCrankReward;
+  return (
+    (Math.max(1, Math.ceil(numCronTransactions / 5)) + numCronTransactions) *
+    minCrankReward
+  );
 }
 
 /**

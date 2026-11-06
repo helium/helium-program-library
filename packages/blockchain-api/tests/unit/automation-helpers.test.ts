@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
+  calculateCronJobCostPerClaim,
   estimateAutomationFunding,
   maxScheduleCronLength,
   resolveScheduleToCron,
@@ -300,5 +301,25 @@ describe("estimateAutomationFunding", () => {
     expect(estimate.cronJobFundingLamports).to.equal(
       duration * cronJobCostPerClaimLamports,
     );
+  });
+});
+
+describe("calculateCronJobCostPerClaim", () => {
+  const reward = 10000;
+
+  it("charges one queue call for a cron with no transactions", () => {
+    expect(calculateCronJobCostPerClaim(reward, 0)).to.equal(10000);
+  });
+
+  it("charges one queue call for 5 transactions", () => {
+    expect(calculateCronJobCostPerClaim(reward, 5)).to.equal(60000);
+  });
+
+  it("charges a second queue call for the 6th transaction", () => {
+    expect(calculateCronJobCostPerClaim(reward, 6)).to.equal(80000);
+  });
+
+  it("charges one queue call per 5 transactions for 50", () => {
+    expect(calculateCronJobCostPerClaim(reward, 50)).to.equal(600000);
   });
 });

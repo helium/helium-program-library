@@ -280,7 +280,7 @@ export async function run(args: any = process.argv) {
     ready.map(async (r, i) => [
       await program.methods
         .backfillEntityClaimWalletV0()
-        .accounts({
+        .accountsPartial({
           payer: BACKFILL_SIGNER,
           wallet: r.wallet,
           cronJob: r.cronJob,

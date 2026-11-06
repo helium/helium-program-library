@@ -33,6 +33,7 @@ import {
   stopSurfpool,
 } from "./helpers/surfpool";
 import { ensureFunds, loadKeypairFromEnv } from "./helpers/wallet";
+import { TEST_HOTSPOT_ENTITY_KEY } from "./helpers/constants";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -307,21 +308,6 @@ describe("automation endpoints", () => {
   });
 
   describe("claim setups", () => {
-    let entityKey: string | undefined;
-
-    before(async () => {
-      try {
-        const hotspotsResult = await client.hotspots.getHotspots({
-          walletAddress: payer.publicKey.toBase58(),
-          page: 1,
-          limit: 1,
-        });
-        entityKey = hotspotsResult.hotspots[0]?.entityKey;
-      } catch {
-        console.log("getHotspots failed; skipping the per-hotspot setup case");
-      }
-    });
-
     // A fresh wallet with enough SOL for a setup.
     async function freshWallet() {
       const wallet = Keypair.generate();
@@ -367,15 +353,12 @@ describe("automation endpoints", () => {
       const status = await client.hotspots.getAutomationStatus({
         walletAddress,
       });
-      expect(status.fundingPeriodInfo?.cronJobPeriodsRemaining).to.be.at.least(
+      expect(status.fundingPeriodInfo?.cronJobPeriodsRemaining).to.equal(
         duration
       );
     });
 
-    it("sets up a cron with hotspot claims in one signing round", async function () {
-      if (!entityKey) {
-        this.skip();
-      }
+    it("sets up a cron with hotspot claims in one signing round", async () => {
       const wallet = await freshWallet();
       const walletAddress = wallet.publicKey.toBase58();
       const duration = 5;
@@ -384,13 +367,13 @@ describe("automation endpoints", () => {
         walletAddress,
         duration,
         schedule: DAILY_CRON,
-        claims: { kind: "entities", entityKeys: [entityKey!] },
+        claims: { kind: "entities", entityKeys: [TEST_HOTSPOT_ENTITY_KEY] },
       });
       const result = await client.hotspots.createEntityClaimAutomation({
         walletAddress,
         schedule: DAILY_CRON,
         duration,
-        entityKeys: [entityKey!],
+        entityKeys: [TEST_HOTSPOT_ENTITY_KEY],
       });
       const signatures = await signAndSubmitTransactionData(
         connection,
@@ -403,6 +386,23 @@ describe("automation endpoints", () => {
       expect(
         await setupLamportsSpent(signatures, result.transactionData)
       ).to.equal(Math.round(estimate.totalSolNeeded * LAMPORTS_PER_SOL));
+    });
+
+    it("returns NOT_FOUND when a hotspot claim setup names an unknown hotspot", async () => {
+      const wallet = await freshWallet();
+      const walletAddress = wallet.publicKey.toBase58();
+      try {
+        await client.hotspots.createEntityClaimAutomation({
+          walletAddress,
+          schedule: DAILY_CRON,
+          duration: 1,
+          entityKeys: [Keypair.generate().publicKey.toBase58()],
+        });
+        expect.fail("Should have thrown NOT_FOUND error");
+      } catch (error: any) {
+        expect(error).to.be.instanceOf(ORPCError);
+        expect(error.code).to.equal("NOT_FOUND");
+      }
     });
 
     it("adds the wallet claim to an existing empty cron once", async () => {

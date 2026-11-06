@@ -30,6 +30,10 @@ export const maxPackedTxs = (
   maxTxs: number = MAX_JITO_BUNDLE_TXS,
 ): number => (isJitoCluster(cluster) ? maxTxs - 1 : maxTxs);
 
+/** A setup must land in one bundle on a Jito cluster; elsewhere any count fits. */
+export const fitsOneBundle = (cluster: string, txCount: number): boolean =>
+  !isJitoCluster(cluster) || txCount <= maxPackedTxs(cluster);
+
 /**
  * Build the dedicated Jito tip transaction for a server-paid bundle. Use
  * getJitoTipTransaction instead when the user's wallet pays the tip. The tip tx copies the
