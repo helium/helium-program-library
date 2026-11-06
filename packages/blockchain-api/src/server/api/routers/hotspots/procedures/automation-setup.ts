@@ -1,7 +1,6 @@
 import { createSolanaConnection, getCluster } from "@/lib/solana";
 import {
   calculateCronJobCostPerClaim,
-  calculatePdaWalletCostPerClaim,
   estimateAutomationFunding,
   getBaseAutomationRentLamports,
   ENTITY_CLAIM_CRON_NAME,
@@ -86,10 +85,8 @@ const setupAddsClaims = (
 /**
  * Price the claims a setup adds: the rent of each claim's cron transaction,
  * and the cron job's cost per run with the added claims. The cost counts
- * claims with nextTransactionId, the same as fetchAutomationData. A
- * per-hotspot setup prices the claim payer from the hotspots it adds, not
- * from every hotspot the wallet owns. Returns undefined when the setup adds
- * no claims.
+ * claims with nextTransactionId, the same as fetchAutomationData. Returns
+ * undefined when the setup adds no claims.
  */
 export const priceSetupClaims = async ({
   connection,
@@ -133,10 +130,6 @@ export const priceSetupClaims = async ({
       minCrankReward,
       startIndex + urls.length
     ),
-    pdaWalletCostPerClaimLamports:
-      claims.kind === "entities"
-        ? calculatePdaWalletCostPerClaim(claims.entityKeys.length)
-        : undefined,
   };
 };
 
@@ -352,9 +345,7 @@ export const buildAutomationSetup = async ({
         claimPricing?.cronJobCostPerClaimLamports ??
         cronJobCostPerClaimLamports,
       pdaWalletBalanceLamports,
-      pdaWalletCostPerClaimLamports:
-        claimPricing?.pdaWalletCostPerClaimLamports ??
-        pdaWalletCostPerClaimLamports,
+      pdaWalletCostPerClaimLamports,
       recipientRentLamports,
       cronJobRentLamports,
       pdaWalletRentLamports,
