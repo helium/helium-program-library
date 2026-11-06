@@ -74,7 +74,9 @@ export const getFundingEstimate =
           claimPricing?.cronJobCostPerClaimLamports ??
           cronJobCostPerClaimLamports,
         pdaWalletBalanceLamports,
-        pdaWalletCostPerClaimLamports,
+        pdaWalletCostPerClaimLamports:
+          claimPricing?.pdaWalletCostPerClaimLamports ??
+          pdaWalletCostPerClaimLamports,
         recipientRentLamports,
         cronJobRentLamports,
         pdaWalletRentLamports,
