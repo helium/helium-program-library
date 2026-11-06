@@ -9,12 +9,21 @@ import { buildAutomationSetup } from "./automation-setup";
  */
 export const createWalletClaimAutomation =
   publicProcedure.hotspots.createWalletClaimAutomation.handler(
-    async ({ input, errors }) =>
-      (
-        await buildAutomationSetup({
-          ...input,
-          claims: { kind: "wallet" },
-          errors,
-        })
-      ).response,
+    async ({ input, errors }) => {
+      const { response, fitsOneBundle } = await buildAutomationSetup({
+        ...input,
+        claims: { kind: "wallet" },
+        errors,
+      });
+      // A schedule change removes every existing claim first. With many
+      // claims the setup does not fit one bundle, and the new cron could land
+      // without its claim.
+      if (!fitsOneBundle) {
+        throw errors.BAD_REQUEST({
+          message:
+            "The automation has too many claims to change its schedule in one step. Close it first, then set it up again.",
+        });
+      }
+      return response;
+    }
   );

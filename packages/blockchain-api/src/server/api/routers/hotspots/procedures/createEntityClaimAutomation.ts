@@ -22,7 +22,7 @@ export const createEntityClaimAutomation =
       const { connection } = createSolanaConnection(setup.walletAddress);
       const keyToAssets = await connection.getMultipleAccountsInfo(
         entityKeys.map((entityKey) => keyToAssetKey(HNT_DAO, entityKey)[0]),
-        { dataSlice: { offset: 0, length: 0 } },
+        { dataSlice: { offset: 0, length: 0 } }
       );
       const missing = entityKeys.filter((_, i) => !keyToAssets[i]);
       if (missing.length > 0) {
@@ -44,5 +44,5 @@ export const createEntityClaimAutomation =
         });
       }
       return response;
-    },
+    }
   );

@@ -3,6 +3,7 @@ import { cronJobKey, cronJobTransactionKey } from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,
   init as initHplCrons,
+  remoteCronTransactionSpace,
 } from "@helium/hpl-crons-sdk";
 import {
   batchInstructionsToTxsWithPriorityFee,
@@ -28,10 +29,6 @@ const CRON_PROGRAM = new PublicKey(
   "cronAjRZnJn3MTP3B9kE62NWDrjSuAPVXf9c4hu4grM"
 );
 const ORACLE_URL = "https://hnt-rewards.oracle.helium.io";
-// Space of a cron transaction holding a remote source after the cron program's resize_to_fit:
-// discriminator, id, cron job, variant, url, signer, bump, plus its 64-byte pad.
-const remoteTransactionSpace = (url: string) =>
-  8 + 4 + 32 + 1 + 4 + Buffer.byteLength(url) + 32 + 1 + 64;
 const FEE_MARGIN_LAMPORTS = 0.05 * LAMPORTS_PER_SOL;
 
 export async function run(args: any = process.argv) {
@@ -191,7 +188,7 @@ export async function run(args: any = process.argv) {
   let rentLamports = 0;
   for (const r of ready) {
     rentLamports += await rentFor(
-      remoteTransactionSpace(
+      remoteCronTransactionSpace(
         `${ORACLE_URL}/v1/tuktuk/wallet/${r.wallet.toBase58()}`
       )
     );
