@@ -139,7 +139,8 @@ export const AutomationClaimsSchema = z.discriminatedUnion("kind", [
 ]);
 
 // Set up the cron and add the whole-wallet claim in one signing round.
-export const CreateWalletClaimAutomationInputSchema = SetupAutomationInputSchema;
+export const CreateWalletClaimAutomationInputSchema =
+  SetupAutomationInputSchema;
 
 // Set up the cron and add one claim per hotspot in one signing round.
 export const CreateEntityClaimAutomationInputSchema =
@@ -152,16 +153,23 @@ export const FundAutomationInputSchema = z.object({
   additionalDuration: z.number().int().min(1), // Additional number of claims
 });
 
-export const GetFundingEstimateInputSchema = z.object({
-  walletAddress: WalletAddressSchema,
-  duration: z.coerce.number().int().min(1), // Number of claims to estimate funding for
-  // The schedule createAutomation will be given. Prices the cron job at its
-  // crontab length; without it the estimate assumes the longest preset.
-  schedule: SetupAutomationInputSchema.shape.schedule.optional(),
-  // The claims createWalletClaimAutomation or createEntityClaimAutomation will
-  // add. Prices their rent and the crank reward each claim adds per run.
-  claims: AutomationClaimsSchema.optional(),
-});
+export const GetFundingEstimateInputSchema = z
+  .object({
+    walletAddress: WalletAddressSchema,
+    duration: z.coerce.number().int().min(1), // Number of claims to estimate funding for
+    // The schedule createAutomation will be given. Prices the cron job at its
+    // crontab length; without it the estimate assumes the longest preset.
+    schedule: SetupAutomationInputSchema.shape.schedule.optional(),
+    // The claims createWalletClaimAutomation or createEntityClaimAutomation will
+    // add. Prices their rent and the crank reward each claim adds per run.
+    claims: AutomationClaimsSchema.optional(),
+  })
+  // A claim setup always gives a schedule, and a schedule change re-creates
+  // the cron, so without it the estimate cannot price that re-create.
+  .refine((i) => !i.claims || i.schedule !== undefined, {
+    message: "schedule is required with claims",
+    path: ["schedule"],
+  });
 
 export const CloseAutomationInputSchema = z.object({
   walletAddress: WalletAddressSchema,

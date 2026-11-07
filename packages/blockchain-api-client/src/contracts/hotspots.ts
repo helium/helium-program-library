@@ -245,6 +245,7 @@ export const hotspotsContract = oc
       .errors({
         NOT_FOUND,
         INSUFFICIENT_FUNDS,
+        BAD_REQUEST,
       }),
     /** Protected: Create automation with the whole-wallet claim */
     createWalletClaimAutomation: oc

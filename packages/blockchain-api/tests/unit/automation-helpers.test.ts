@@ -4,8 +4,10 @@ import {
   calculateCronJobCostPerClaim,
   estimateAutomationFunding,
   maxScheduleCronLength,
+  requeuesCronJob,
   resolveScheduleToCron,
   scheduleChanged,
+  setupBundleLimitMessage,
 } from "../../src/lib/utils/automation-helpers";
 
 describe("resolveScheduleToCron", () => {
@@ -193,6 +195,44 @@ describe("estimateAutomationFunding", () => {
     expect(estimate.totalLamports).to.equal(30 * 10_000 + 3 * 40_000);
   });
 
+  it("charges a requeue's schedule task rent and crank reward to an existing cron job", () => {
+    const minCrankRewardLamports = 15_000;
+    const requeueTaskRentLamports = 6_458_880;
+    const cronJobRentLamports = 3_000_000;
+    const duration = 30;
+    const cronJobCostPerClaimLamports = 10_000;
+    const pdaWalletRentLamports = 890_880;
+    const pdaWalletCostPerClaimLamports = 40_000;
+
+    const estimate = estimateAutomationFunding({
+      cronJobExists: true,
+      baseAutomationRentLamports: 0,
+      minCrankRewardLamports,
+      requeueTaskRentLamports,
+      // Both pools already hold the claims, so only the requeue costs SOL.
+      cronJobBalanceLamports:
+        cronJobRentLamports + duration * cronJobCostPerClaimLamports,
+      cronJobRentLamports,
+      cronJobCostPerClaimLamports,
+      pdaWalletBalanceLamports:
+        pdaWalletRentLamports + duration * pdaWalletCostPerClaimLamports,
+      pdaWalletCostPerClaimLamports,
+      recipientRentLamports: 0,
+      pdaWalletRentLamports,
+      additionalDuration: 0,
+      ataRentLamports: 0,
+      taskReturnAccountFundingLamports: 0,
+    });
+
+    // requeue_entity_claim_cron_v0 queues a new schedule task from the wallet.
+    expect(estimate.rentFeeLamports).to.equal(
+      requeueTaskRentLamports + minCrankRewardLamports,
+    );
+    expect(estimate.totalLamports).to.equal(
+      requeueTaskRentLamports + minCrankRewardLamports,
+    );
+  });
+
   it("charges the recipient rent once when the PDA balance covers part of it", () => {
     const pdaWalletRentLamports = 890_880;
     const ataRentLamports = 2_039_280;
@@ -321,5 +361,82 @@ describe("calculateCronJobCostPerClaim", () => {
 
   it("charges one queue call per 5 transactions for 50", () => {
     expect(calculateCronJobCostPerClaim(reward, 50)).to.equal(600000);
+  });
+});
+
+describe("requeuesCronJob", () => {
+  it("does not requeue when there is no cron job", () => {
+    expect(requeuesCronJob(null, true)).to.equal(false);
+  });
+
+  it("does not requeue a removed cron job the setup re-creates", () => {
+    expect(requeuesCronJob({ removedFromQueue: true }, true)).to.equal(false);
+  });
+
+  it("requeues a removed cron job the setup keeps", () => {
+    expect(requeuesCronJob({ removedFromQueue: true }, false)).to.equal(true);
+  });
+
+  it("does not requeue a cron job still in the queue", () => {
+    expect(requeuesCronJob({ removedFromQueue: false }, false)).to.equal(
+      false,
+    );
+  });
+});
+
+describe("setupBundleLimitMessage", () => {
+  const closeFirst =
+    "The automation has too many claims to change its schedule in one step. Close it first, then set it up again.";
+  const fewerHotspots =
+    "Too many hotspots for one setup. Set up with fewer, then add the rest with addEntityToAutomation.";
+
+  it("allows a setup without claims past one bundle", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: undefined,
+        tearsDown: true,
+        txCount: 9,
+      }),
+    ).to.equal(undefined);
+  });
+
+  it("allows a claim setup that fits one bundle", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: "entities",
+        tearsDown: true,
+        txCount: 4,
+      }),
+    ).to.equal(undefined);
+  });
+
+  it("tells a wallet claim setup past one bundle to close first", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: "wallet",
+        tearsDown: false,
+        txCount: 5,
+      }),
+    ).to.equal(closeFirst);
+  });
+
+  it("tells a hotspot setup that tears down a cron to close first", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: "entities",
+        tearsDown: true,
+        txCount: 5,
+      }),
+    ).to.equal(closeFirst);
+  });
+
+  it("tells a hotspot setup without a teardown to add fewer hotspots", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: "entities",
+        tearsDown: false,
+        txCount: 5,
+      }),
+    ).to.equal(fewerHotspots);
   });
 });

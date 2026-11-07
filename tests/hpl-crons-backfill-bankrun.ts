@@ -12,6 +12,10 @@ import { BankrunProvider } from "anchor-bankrun";
 import { expect } from "chai";
 import { ProgramTestContext } from "solana-bankrun";
 import { entityCronAuthorityKey } from "../packages/hpl-crons-sdk/src";
+import {
+  backfillSelection,
+  backfillTopUp,
+} from "../packages/helium-admin-cli/src/backfill-entity-claim-wallets";
 import { HplCrons } from "../target/types/hpl_crons";
 import { ensureDumped, readAccount, startBankrun } from "./utils/bankrun";
 import { loadKeypair } from "./utils/solana";
@@ -75,9 +79,9 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
 
   /**
    * Put a cron in the state the wallet leaves it in: created by `init_entity_claim_cron_v0`,
-   * with no transaction ever added.
+   * with no transaction ever added. `removedFromQueue` marks a cron tuktuk dropped for want of SOL.
    */
-  const emptyCronFor = async (wallet: PublicKey) => {
+  const emptyCronFor = async (wallet: PublicKey, removedFromQueue = false) => {
     const authority = entityCronAuthorityKey(wallet)[0];
     const cronJob = cronJobKey(authority, 0)[0];
     const data = await program.coder.accounts.encode("cronJobV0", {
@@ -93,7 +97,7 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
       currentTransactionId: 0,
       numTransactions: 0,
       nextTransactionId: 0,
-      removedFromQueue: false,
+      removedFromQueue,
       bumpSeed: cronJobKey(authority, 0)[1],
       nextScheduleTask: PublicKey.default,
     });
@@ -147,6 +151,26 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
     expect(cron.numTransactions).to.eq(1);
   });
 
+  it("adds the wallet claim to a cron removed from queue", async () => {
+    const wallet = Keypair.generate().publicKey;
+    const { authority, cronJob } = await emptyCronFor(wallet, true);
+
+    await backfill(backfillSigner, wallet, authority, cronJob);
+
+    const source = decodeRemoteSource(
+      (await readAccount(ctx, cronJobTransactionKey(cronJob, 0)[0]))!
+    );
+    expect(source.url).to.eq(
+      `${ORACLE_URL}/v1/tuktuk/wallet/${wallet.toBase58()}`
+    );
+    const cron = program.coder.accounts.decode(
+      "cronJobV0",
+      (await readAccount(ctx, cronJob))!
+    );
+    expect(cron.nextTransactionId).to.eq(1);
+    expect(cron.removedFromQueue).to.eq(true);
+  });
+
   it("refuses a cron that already has a claim", async () => {
     const wallet = Keypair.generate().publicKey;
     const { authority, cronJob } = await emptyCronFor(wallet);
@@ -187,5 +211,50 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
       backfill(backfillSigner, other, entityCronAuthorityKey(other)[0], cronJob)
     );
     expect(failure).to.include("ConstraintHasOne");
+  });
+});
+
+describe("helium-admin-cli backfill selection and top-up", () => {
+  const minCrankReward = new anchor.BN(10_000);
+  const minRuns = 365;
+
+  it("backfills a cron removed from queue without a top-up", () => {
+    expect(
+      backfillSelection({
+        nextTransactionId: 0,
+        removedFromQueue: true,
+        transactionExists: false,
+      })
+    ).to.equal("ready");
+    expect(
+      backfillTopUp({
+        removedFromQueue: true,
+        spendable: new anchor.BN(0),
+        minCrankReward,
+        minRuns,
+      }).toString()
+    ).to.equal("0");
+  });
+
+  it("tops a queued cron up to minRuns runs at 2 tasks per run", () => {
+    expect(
+      backfillTopUp({
+        removedFromQueue: false,
+        spendable: new anchor.BN(1_000_000),
+        minCrankReward,
+        minRuns,
+      }).toString()
+    ).to.equal("6300000");
+  });
+
+  it("does not top up a queued cron funded for minRuns runs", () => {
+    expect(
+      backfillTopUp({
+        removedFromQueue: false,
+        spendable: new anchor.BN(10_000_000),
+        minCrankReward,
+        minRuns,
+      }).toString()
+    ).to.equal("0");
   });
 });

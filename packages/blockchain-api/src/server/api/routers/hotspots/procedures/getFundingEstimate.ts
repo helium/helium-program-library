@@ -3,8 +3,10 @@ import { createSolanaConnection } from "@/lib/solana";
 import * as anchor from "@anchor-lang/core";
 import {
   getBaseAutomationRentLamports,
+  getRequeueTaskRentLamports,
   estimateAutomationFunding,
   maxScheduleCronLength,
+  requeuesCronJob as requeuesCronJobFor,
   scheduleChanged,
 } from "@/lib/utils/automation-helpers";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
@@ -46,6 +48,11 @@ export const getFundingEstimate =
         (schedule !== undefined &&
           !!cronJobAccount.schedule &&
           scheduleChanged(cronJobAccount.schedule, schedule));
+      // A cron job removed from the queue is requeued, as the setup does.
+      const requeuesCronJob = requeuesCronJobFor(
+        cronJobAccount,
+        recreatesCronJob,
+      );
 
       // Price the claims a claim setup adds the same way it does.
       const claimPricing = await priceSetupClaims({
@@ -69,6 +76,9 @@ export const getFundingEstimate =
             )
           : 0,
         minCrankRewardLamports: minCrankReward,
+        requeueTaskRentLamports: requeuesCronJob
+          ? await getRequeueTaskRentLamports(provider.connection)
+          : undefined,
         cronJobBalanceLamports,
         cronJobCostPerClaimLamports:
           claimPricing?.cronJobCostPerClaimLamports ??

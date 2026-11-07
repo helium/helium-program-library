@@ -3,9 +3,12 @@ import {
   calculateCronJobCostPerClaim,
   estimateAutomationFunding,
   getBaseAutomationRentLamports,
+  getRequeueTaskRentLamports,
   ENTITY_CLAIM_CRON_NAME,
+  requeuesCronJob as requeuesCronJobFor,
   resolveScheduleToCron,
   scheduleChanged,
+  setupBundleLimitMessage,
 } from "@/lib/utils/automation-helpers";
 import * as anchor from "@anchor-lang/core";
 import type { AutomationClaims } from "@helium/blockchain-api";
@@ -50,11 +53,11 @@ import {
   serializeWithTipMetadata,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
-import { fitsOneBundle } from "@/lib/utils/jito-bundle";
 import {
   buildTeardownInstructions,
   fetchAutomationData,
   nextFreeTaskKey,
+  teardownAccountsRefundLamports,
 } from "./automation-data-helpers";
 import { TASK_QUEUE_ID } from "@/lib/constants/tuktuk";
 
@@ -74,8 +77,9 @@ type CronClaimCounts = { numTransactions: number; nextTransactionId: number };
 
 /**
  * A setup adds claims only to a cron it creates, or to an existing cron with
- * no claims. An existing cron that already has claims keeps them, and the
- * setup only funds it, so a repeated setup does not add duplicates.
+ * no claims. On the same schedule, a cron that already has claims keeps them
+ * and is only funded, so a repeated setup does not add duplicates. A schedule
+ * change tears down every claim; the new cron gets only the requested claims.
  */
 const setupAddsClaims = (
   cronJobAccount: CronClaimCounts | null,
@@ -181,9 +185,9 @@ const buildClaimInstructions = async ({
 /**
  * Build the transactions that set up (or re-schedule) a wallet's claim
  * automation, fund it for `duration` runs and, when `claims` is given, add
- * those claims (see setupAddsClaims). `fitsOneBundle` is false when the
- * transactions do not fit one mainnet Jito bundle, so they could land in part.
- * It applies the mainnet limit on every cluster.
+ * those claims (see setupAddsClaims). A claim setup whose transactions do not
+ * fit one mainnet Jito bundle throws BAD_REQUEST, because they could land in
+ * part. It applies the mainnet limit on every cluster.
  */
 export const buildAutomationSetup = async ({
   walletAddress,
@@ -201,6 +205,7 @@ export const buildAutomationSetup = async ({
       message: string;
       data: { required: number; available: number };
     }) => Error;
+    BAD_REQUEST: (opts: { message: string }) => Error;
   };
 }) => {
   // Accept a preset (daily/weekly/monthly) or a raw crontab; presets map to
@@ -231,6 +236,7 @@ export const buildAutomationSetup = async ({
     !cronJobAccount ||
     (!!cronJobAccount.schedule &&
       scheduleChanged(cronJobAccount.schedule, schedule));
+  const requeuesCronJob = requeuesCronJobFor(cronJobAccount, recreatesCronJob);
   if (recreatesCronJob) {
     // If it exists but schedule changed, remove it first. Skip holes left
     // by individually-removed claims (nextTransactionId is monotonic).
@@ -266,7 +272,7 @@ export const buildAutomationSetup = async ({
         })
         .instruction()
     );
-  } else if (cronJobAccount?.removedFromQueue) {
+  } else if (requeuesCronJob) {
     // If cron exists but was removed from queue due to insufficient SOL,
     // requeue it. Fetch the task queue fresh to get the latest state.
     const freshTask = await nextFreeTaskKey(tuktukProgram);
@@ -328,7 +334,8 @@ export const buildAutomationSetup = async ({
   // setup or a schedule change) init_entity_claim_cron_v0 pays the base
   // rent and the schedule task's crank reward from the wallet, so the cron
   // job transfer below carries neither and the total counts them once. The
-  // new cron job starts empty, so it is funded for the whole duration.
+  // new cron job starts empty, so it is funded for the whole duration. A
+  // requeue pays a new schedule task's rent and crank reward from the wallet.
   const { cronJobFundingLamports, pdaWalletFundingLamports, totalLamports } =
     estimateAutomationFunding({
       cronJobExists: !recreatesCronJob,
@@ -339,6 +346,9 @@ export const buildAutomationSetup = async ({
           )
         : 0,
       minCrankRewardLamports: minCrankReward,
+      requeueTaskRentLamports: requeuesCronJob
+        ? await getRequeueTaskRentLamports(provider.connection)
+        : undefined,
       cronJobBalanceLamports,
       // Each claim the setup adds raises the cron job's cost per run.
       cronJobCostPerClaimLamports:
@@ -371,18 +381,27 @@ export const buildAutomationSetup = async ({
   const totalNeededWithFees =
     totalFundingNeeded + estimatedTxFees + estimatedJitoTipCost;
 
-  // The teardown runs before init and the transfers, so the old cron job's
-  // lamports are back in the wallet by the time they spend. Lamports donated
-  // to a cron job PDA with no data get no teardown, so they never come back.
+  // The teardown runs before init and the transfers, so the old cron job's,
+  // its cron transactions' and its name mapping's lamports are back in the
+  // wallet by the time they spend. Lamports donated to a cron job PDA with no
+  // data get no teardown, so they never come back.
   const teardownRefundLamports =
-    cronJobAccount && recreatesCronJob ? cronJobBalanceLamports : 0;
+    cronJobAccount && recreatesCronJob
+      ? cronJobBalanceLamports +
+        (await teardownAccountsRefundLamports(
+          provider.connection,
+          cronJob,
+          authority,
+          cronJobAccount.nextTransactionId || 0
+        ))
+      : 0;
 
   if (walletBalance + teardownRefundLamports < totalNeededWithFees) {
     throw errors.INSUFFICIENT_FUNDS({
       message: "Insufficient SOL balance to set up automation",
       data: {
         required: totalNeededWithFees,
-        available: walletBalance,
+        available: walletBalance + teardownRefundLamports,
       },
     });
   }
@@ -417,7 +436,16 @@ export const buildAutomationSetup = async ({
       })
     ).map((tx) => toVersionedTx(tx))
   );
-  const fitsBundle = fitsOneBundle(vtxs.length);
+  // Transactions past one bundle could land in part: a schedule change could
+  // leave the new cron without its claims, or only some hotspots get added.
+  const bundleLimitMessage = setupBundleLimitMessage({
+    claimsKind: claims?.kind,
+    tearsDown: !!cronJobAccount && recreatesCronJob,
+    txCount: vtxs.length,
+  });
+  if (bundleLimitMessage) {
+    throw errors.BAD_REQUEST({ message: bundleLimitMessage });
+  }
 
   // Add Jito tip if needed for mainnet bundles
   const useJito = shouldUseJitoBundle(vtxs.length, getCluster());
@@ -445,7 +473,6 @@ export const buildAutomationSetup = async ({
     : {};
 
   return {
-    fitsOneBundle: fitsBundle,
     response: {
       transactionData: {
         transactions: serializeWithTipMetadata(

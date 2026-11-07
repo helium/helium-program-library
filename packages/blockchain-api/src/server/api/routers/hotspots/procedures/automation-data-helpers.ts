@@ -72,6 +72,37 @@ export async function liveCronTransactionIds(
 }
 
 /**
+ * Lamports a teardown refunds to the wallet besides the cron job's own: each
+ * cron transaction in [0, nextTransactionId) and the name mapping
+ * (remove_entity_from_cron_v0, close_entity_claim_cron_v0). Missing accounts
+ * count 0.
+ */
+export async function teardownAccountsRefundLamports(
+  connection: Connection,
+  cronJob: PublicKey,
+  authority: PublicKey,
+  nextTransactionId: number,
+): Promise<number> {
+  const keys = [
+    ...Array.from(
+      { length: nextTransactionId },
+      (_, i) => cronJobTransactionKey(cronJob, i)[0],
+    ),
+    cronJobNameMappingKey(authority, ENTITY_CLAIM_CRON_NAME)[0],
+  ];
+  // getMultipleAccountsInfo caps at 100 keys per call, so chunk the list.
+  let lamports = 0;
+  for (let i = 0; i < keys.length; i += 100) {
+    const infos = await connection.getMultipleAccountsInfo(
+      keys.slice(i, i + 100),
+      { dataSlice: { offset: 0, length: 0 } },
+    );
+    lamports += infos.reduce((sum, info) => sum + (info?.lamports ?? 0), 0);
+  }
+  return lamports;
+}
+
+/**
  * Build the instructions that tear down a wallet's entity-claim cron: remove
  * every live claim (skipping the holes individually-removed claims leave in the
  * monotonic nextTransactionId counter) then close the cron and its name

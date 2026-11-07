@@ -1,5 +1,9 @@
 import * as anchor from "@anchor-lang/core";
-import { cronJobKey, cronJobTransactionKey } from "@helium/cron-sdk";
+import {
+  cronJobKey,
+  cronJobTransactionKey,
+  PROGRAM_ID as CRON_PROGRAM,
+} from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,
   init as initHplCrons,
@@ -25,17 +29,55 @@ import yargs from "yargs/yargs";
 const BACKFILL_SIGNER = new PublicKey(
   "hprdnjkbziK8NqhThmAn5Gu4XqrBbctX8du4PfJdgvW"
 );
-const CRON_PROGRAM = new PublicKey(
-  "cronAjRZnJn3MTP3B9kE62NWDrjSuAPVXf9c4hu4grM"
-);
-const ORACLE_URL = "https://hnt-rewards.oracle.helium.io";
 const FEE_MARGIN_LAMPORTS = 0.05 * LAMPORTS_PER_SOL;
+
+/**
+ * Whether the backfill adds the wallet claim to an existing cron, or why it
+ * skips it. A cron removed from queue is backfilled too.
+ */
+export const backfillSelection = ({
+  nextTransactionId,
+  transactionExists,
+}: {
+  nextTransactionId: number;
+  removedFromQueue: boolean;
+  transactionExists: boolean;
+}): "hasClaims" | "transactionExists" | "ready" =>
+  nextTransactionId !== 0
+    ? "hasClaims"
+    : transactionExists
+      ? "transactionExists"
+      : "ready";
+
+/**
+ * Lamports the backfill signer sends a cron so it keeps at least minRuns runs,
+ * at 2 tasks per run. A cron removed from queue gets the claim's rent only: it
+ * does not run until requeued.
+ */
+export const backfillTopUp = ({
+  removedFromQueue,
+  spendable,
+  minCrankReward,
+  minRuns,
+}: {
+  removedFromQueue: boolean;
+  spendable: anchor.BN;
+  minCrankReward: anchor.BN;
+  minRuns: number;
+}): anchor.BN =>
+  removedFromQueue
+    ? new anchor.BN(0)
+    : anchor.BN.max(
+        minCrankReward.muln(2).muln(minRuns).sub(spendable),
+        new anchor.BN(0)
+      );
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
       alias: "k",
-      describe: "Anchor wallet keypair; must be the backfill signer",
+      describe:
+        "Anchor wallet keypair. Must be the backfill signer with --commit; a dry run still needs a keypair file",
       default: `${os.homedir()}/.config/solana/id.json`,
     },
     url: {
@@ -72,6 +114,10 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const connection = provider.connection;
+  // The oracle URL hpl-crons compiles in for the cluster, which the claim it adds holds.
+  const oracleUrl = argv.url.includes("devnet")
+    ? "https://hnt-rewards.oracle.test-helium.com"
+    : "https://hnt-rewards.oracle.helium.io";
 
   if (argv.commit && !provider.wallet.publicKey.equals(BACKFILL_SIGNER)) {
     throw new Error(
@@ -116,12 +162,12 @@ export async function run(args: any = process.argv) {
   const skipped = {
     missing: 0,
     hasClaims: 0,
-    removedFromQueue: 0,
     transactionExists: 0,
   };
   const ready: ((typeof targets)[number] & {
     taskQueue: PublicKey;
     notScheduled: boolean;
+    removedFromQueue: boolean;
     cronLamports: number;
     cronDataLength: number;
   })[] = [];
@@ -132,17 +178,19 @@ export async function run(args: any = process.argv) {
       return;
     }
     const cron = program.coder.accounts.decode("cronJobV0", info.data);
-    if (cron.nextTransactionId !== 0) {
-      skipped.hasClaims++;
-    } else if (cron.removedFromQueue) {
-      skipped.removedFromQueue++;
-    } else if (transactionAccounts[i]) {
-      skipped.transactionExists++;
+    const selection = backfillSelection({
+      nextTransactionId: cron.nextTransactionId,
+      removedFromQueue: cron.removedFromQueue,
+      transactionExists: !!transactionAccounts[i],
+    });
+    if (selection !== "ready") {
+      skipped[selection]++;
     } else {
       ready.push({
         ...target,
         taskQueue: cron.taskQueue,
         notScheduled: cron.nextScheduleTask.equals(PublicKey.default),
+        removedFromQueue: cron.removedFromQueue,
         cronLamports: info.lamports,
         cronDataLength: info.data.length,
       });
@@ -189,7 +237,7 @@ export async function run(args: any = process.argv) {
   for (const r of ready) {
     rentLamports += await rentFor(
       remoteCronTransactionSpace(
-        `${ORACLE_URL}/v1/tuktuk/wallet/${r.wallet.toBase58()}`
+        `${oracleUrl}/v1/tuktuk/wallet/${r.wallet.toBase58()}`
       )
     );
   }
@@ -198,7 +246,7 @@ export async function run(args: any = process.argv) {
   // instead of 1, at the task queue's minCrankReward each.
   const runsBefore: anchor.BN[] = [];
   const runsAfter: anchor.BN[] = [];
-  // Lamports the backfill signer sends each cron so it keeps at least minRuns runs.
+  // Lamports the backfill signer sends each cron (see backfillTopUp).
   const topUps: anchor.BN[] = [];
   for (const r of ready) {
     const spendable = anchor.BN.max(
@@ -211,10 +259,12 @@ export async function run(args: any = process.argv) {
     runsBefore.push(spendable.div(m));
     runsAfter.push(spendable.div(m.muln(2)));
     topUps.push(
-      anchor.BN.max(
-        m.muln(2).muln(argv.minRuns).sub(spendable),
-        new anchor.BN(0)
-      )
+      backfillTopUp({
+        removedFromQueue: r.removedFromQueue,
+        spendable,
+        minCrankReward: m,
+        minRuns: argv.minRuns,
+      })
     );
   }
   const topUpLamports = topUps.reduce((a, b) => a.add(b), new anchor.BN(0));
@@ -231,7 +281,6 @@ export async function run(args: any = process.argv) {
   console.log(`Owners: ${owners.length}`);
   console.log(`Skipped, no cron: ${skipped.missing}`);
   console.log(`Skipped, cron already has claims: ${skipped.hasClaims}`);
-  console.log(`Skipped, cron removed from queue: ${skipped.removedFromQueue}`);
   console.log(
     `Skipped, transaction 0 already exists: ${skipped.transactionExists}`
   );
@@ -239,6 +288,11 @@ export async function run(args: any = process.argv) {
   console.log(
     `  of which no schedule task set: ${
       ready.filter((r) => r.notScheduled).length
+    }`
+  );
+  console.log(
+    `  of which removed from queue, rent only: ${
+      ready.filter((r) => r.removedFromQueue).length
     }`
   );
   console.log(
