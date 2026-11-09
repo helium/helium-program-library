@@ -1,4 +1,8 @@
-import { GetFundingEstimateInputSchema } from "@helium/blockchain-api";
+import {
+  AutomationClaimsSchema,
+  GetFundingEstimateInputSchema,
+} from "@helium/blockchain-api";
+import { Keypair } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 
@@ -34,5 +38,41 @@ describe("GetFundingEstimateInputSchema claims", () => {
         }).success
       ).to.be.true;
     }
+  });
+});
+
+describe("AutomationClaimsSchema entity keys", () => {
+  const keys = (n: number) =>
+    Array.from({ length: n }, () => Keypair.generate().publicKey.toBase58());
+  const parse = (entityKeys: string[]) =>
+    AutomationClaimsSchema.safeParse({ kind: "entities", entityKeys });
+
+  it("accepts 50 keys", () => {
+    expect(parse(keys(50)).success).to.be.true;
+  });
+
+  it("rejects 51 keys", () => {
+    expect(parse(keys(51)).success).to.be.false;
+  });
+
+  it("rejects an empty list", () => {
+    expect(parse([]).success).to.be.false;
+  });
+
+  it("rejects duplicate keys", () => {
+    const [key] = keys(1);
+    const result = parse([key, key]);
+    expect(result.success).to.be.false;
+    expect(result.error?.issues.map((issue) => issue.message)).to.include(
+      "Duplicate entity keys"
+    );
+  });
+
+  it("rejects a key that is not base58", () => {
+    const result = parse([`0${keys(1)[0].slice(1)}`]);
+    expect(result.success).to.be.false;
+    expect(result.error?.issues.map((issue) => issue.message)).to.include(
+      "Entity key must be base58"
+    );
   });
 });

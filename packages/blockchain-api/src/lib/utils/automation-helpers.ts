@@ -1,4 +1,5 @@
 import {
+  CRON_TRANSACTIONS_PER_QUEUE_CALL,
   entityClaimCronSpaces,
   ENTITY_CLAIM_CRON_NAME,
   ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
@@ -54,10 +55,10 @@ export const requeuesCronJob = (
 ): boolean => !recreatesCronJob && !!cronJobAccount?.removedFromQueue;
 
 /**
- * The BAD_REQUEST message for a claim setup whose transactions do not fit one
- * bundle, or undefined when the setup has no claims or fits. A setup that
- * tears down an existing cron gets its extra transactions from the teardown,
- * so fewer hotspots cannot help it.
+ * The BAD_REQUEST message for a setup whose transactions do not fit one
+ * bundle, or undefined when it fits or neither adds claims nor tears down a
+ * cron. A teardown's transactions grow with the old cron's claims, so closing
+ * first helps; a hotspot setup can also add fewer hotspots.
  */
 export const setupBundleLimitMessage = ({
   claimsKind,
@@ -68,10 +69,13 @@ export const setupBundleLimitMessage = ({
   tearsDown: boolean;
   txCount: number;
 }): string | undefined => {
-  if (claimsKind === undefined || fitsOneBundle(txCount)) return undefined;
-  return claimsKind === "wallet" || tearsDown
-    ? "The automation has too many claims to change its schedule in one step. Close it first, then set it up again."
-    : "Too many hotspots for one setup. Set up with fewer, then add the rest with addEntityToAutomation.";
+  if ((claimsKind === undefined && !tearsDown) || fitsOneBundle(txCount))
+    return undefined;
+  if (claimsKind === "entities" && tearsDown)
+    return "Too many hotspots to change the schedule in one step. Set up with fewer hotspots and add the rest with addEntityToAutomation, or close the automation first and set it up again.";
+  return claimsKind === "entities"
+    ? "Too many hotspots for one setup. Set up with fewer, then add the rest with addEntityToAutomation."
+    : "The automation has too many claims to change its schedule in one step. Close it first, then set it up again.";
 };
 
 /**
@@ -231,7 +235,11 @@ export function calculateCronJobCostPerClaim(
   numCronTransactions: number,
 ): number {
   return (
-    (Math.max(1, Math.ceil(numCronTransactions / 5)) + numCronTransactions) *
+    (Math.max(
+      1,
+      Math.ceil(numCronTransactions / CRON_TRANSACTIONS_PER_QUEUE_CALL),
+    ) +
+      numCronTransactions) *
     minCrankReward
   );
 }

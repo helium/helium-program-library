@@ -1,6 +1,10 @@
 import * as anchor from "@anchor-lang/core";
 import { Program } from "@anchor-lang/core";
-import { cronJobKey, cronJobTransactionKey } from "@helium/cron-sdk";
+import {
+  cronJobKey,
+  cronJobTransactionKey,
+  PROGRAM_ID as CRON_PROGRAM,
+} from "@helium/cron-sdk";
 import {
   ComputeBudgetProgram,
   Keypair,
@@ -13,8 +17,10 @@ import { expect } from "chai";
 import { ProgramTestContext } from "solana-bankrun";
 import { entityCronAuthorityKey } from "../packages/hpl-crons-sdk/src";
 import {
+  backfillRequiredLamports,
   backfillSelection,
   backfillTopUp,
+  cronTransactionExists,
 } from "../packages/helium-admin-cli/src/backfill-entity-claim-wallets";
 import { HplCrons } from "../target/types/hpl_crons";
 import { ensureDumped, readAccount, startBankrun } from "./utils/bankrun";
@@ -80,8 +86,13 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
   /**
    * Put a cron in the state the wallet leaves it in: created by `init_entity_claim_cron_v0`,
    * with no transaction ever added. `removedFromQueue` marks a cron tuktuk dropped for want of SOL.
+   * A nonzero `nextTransactionId` marks a cron that once had claims.
    */
-  const emptyCronFor = async (wallet: PublicKey, removedFromQueue = false) => {
+  const emptyCronFor = async (
+    wallet: PublicKey,
+    removedFromQueue = false,
+    nextTransactionId = 0
+  ) => {
     const authority = entityCronAuthorityKey(wallet)[0];
     const cronJob = cronJobKey(authority, 0)[0];
     const data = await program.coder.accounts.encode("cronJobV0", {
@@ -96,7 +107,7 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
       currentExecTs: new anchor.BN(0),
       currentTransactionId: 0,
       numTransactions: 0,
-      nextTransactionId: 0,
+      nextTransactionId,
       removedFromQueue,
       bumpSeed: cronJobKey(authority, 0)[1],
       nextScheduleTask: PublicKey.default,
@@ -185,6 +196,16 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
     expect(failure).to.include("CronJobHasClaims");
   });
 
+  it("refuses a cron whose claims were all removed", async () => {
+    const wallet = Keypair.generate().publicKey;
+    const { authority, cronJob } = await emptyCronFor(wallet, false, 1);
+
+    const failure = await failureOf(
+      backfill(backfillSigner, wallet, authority, cronJob)
+    );
+    expect(failure).to.include("CronJobHasClaims");
+  });
+
   it("refuses any signer but the backfill signer", async () => {
     const wallet = Keypair.generate().publicKey;
     const { authority, cronJob } = await emptyCronFor(wallet);
@@ -222,7 +243,6 @@ describe("helium-admin-cli backfill selection and top-up", () => {
     expect(
       backfillSelection({
         nextTransactionId: 0,
-        removedFromQueue: true,
         transactionExists: false,
       })
     ).to.equal("ready");
@@ -256,5 +276,35 @@ describe("helium-admin-cli backfill selection and top-up", () => {
         minRuns,
       }).toString()
     ).to.equal("0");
+  });
+
+  it("skips a cron that has had claims", () => {
+    expect(
+      backfillSelection({ nextTransactionId: 1, transactionExists: false })
+    ).to.equal("hasClaims");
+  });
+
+  it("skips a cron whose transaction 0 exists", () => {
+    expect(
+      backfillSelection({ nextTransactionId: 0, transactionExists: true })
+    ).to.equal("transactionExists");
+  });
+
+  it("counts transaction 0 as taken only when the cron program owns it", () => {
+    expect(cronTransactionExists(null)).to.equal(false);
+    expect(cronTransactionExists({ owner: SystemProgram.programId })).to.equal(
+      false
+    );
+    expect(cronTransactionExists({ owner: CRON_PROGRAM })).to.equal(true);
+  });
+
+  it("sums the signer's need past 2^26 lamports", () => {
+    // About 650 crons' claim rent.
+    expect(
+      backfillRequiredLamports({
+        topUpLamports: new anchor.BN(330_000_000),
+        rentLamports: 1_536_031_152,
+      }).toString()
+    ).to.equal("1916031152");
   });
 });

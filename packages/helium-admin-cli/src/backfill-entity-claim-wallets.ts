@@ -40,7 +40,6 @@ export const backfillSelection = ({
   transactionExists,
 }: {
   nextTransactionId: number;
-  removedFromQueue: boolean;
   transactionExists: boolean;
 }): "hasClaims" | "transactionExists" | "ready" =>
   nextTransactionId !== 0
@@ -48,6 +47,13 @@ export const backfillSelection = ({
     : transactionExists
       ? "transactionExists"
       : "ready";
+
+/**
+ * A system-owned account at the transaction PDA, such as one someone pre-funded, does not count: the program's init still succeeds on it.
+ */
+export const cronTransactionExists = (
+  info: { owner: PublicKey } | null | undefined
+): boolean => !!info?.owner.equals(CRON_PROGRAM);
 
 /**
  * Lamports the backfill signer sends a cron so it keeps at least minRuns runs,
@@ -71,6 +77,18 @@ export const backfillTopUp = ({
         minCrankReward.muln(2).muln(minRuns).sub(spendable),
         new anchor.BN(0)
       );
+
+/** Lamports the backfill signer needs: top-ups, claim rent, and a fee margin. */
+export const backfillRequiredLamports = ({
+  topUpLamports,
+  rentLamports,
+}: {
+  topUpLamports: anchor.BN;
+  rentLamports: number;
+}): anchor.BN =>
+  topUpLamports
+    .add(new anchor.BN(rentLamports))
+    .add(new anchor.BN(FEE_MARGIN_LAMPORTS));
 
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
@@ -180,8 +198,7 @@ export async function run(args: any = process.argv) {
     const cron = program.coder.accounts.decode("cronJobV0", info.data);
     const selection = backfillSelection({
       nextTransactionId: cron.nextTransactionId,
-      removedFromQueue: cron.removedFromQueue,
-      transactionExists: !!transactionAccounts[i],
+      transactionExists: cronTransactionExists(transactionAccounts[i]),
     });
     if (selection !== "ready") {
       skipped[selection]++;
@@ -314,15 +331,17 @@ export async function run(args: any = process.argv) {
     } SOL top-ups, plus fees. Balance: ${signerBalance / 1e9} SOL`
   );
 
+  const signerCovers = new anchor.BN(signerBalance).gte(
+    backfillRequiredLamports({ topUpLamports, rentLamports })
+  );
   if (!argv.commit) {
+    console.log(
+      `Signer balance covers rent, top-ups, and fee margin: ${signerCovers}`
+    );
     console.log("Dry run. Re-run with --commit to send.");
     return;
   }
-  if (
-    new anchor.BN(signerBalance).lt(
-      topUpLamports.addn(rentLamports + FEE_MARGIN_LAMPORTS)
-    )
-  ) {
+  if (!signerCovers) {
     throw new Error(
       "Backfill signer cannot pay the rent, top-ups, and fee margin"
     );

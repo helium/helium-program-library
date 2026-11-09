@@ -63,6 +63,9 @@ export const ENTITY_CLAIM_SCHEDULE_TASK_SPACE = 800;
  */
 export const MAX_PRESET_SCHEDULE_LEN = 15;
 
+/** The cron program queues up to 5 transactions per queue call. */
+export const CRON_TRANSACTIONS_PER_QUEUE_CALL = 5;
+
 /** Byte sizes of the accounts init_entity_claim_cron_v0 creates and funds. */
 export const entityClaimCronSpaces = (
   scheduleLen: number = MAX_PRESET_SCHEDULE_LEN

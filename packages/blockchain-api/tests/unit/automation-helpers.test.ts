@@ -1,3 +1,4 @@
+import { remoteCronTransactionSpace } from "@helium/hpl-crons-sdk";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
@@ -389,15 +390,27 @@ describe("setupBundleLimitMessage", () => {
     "The automation has too many claims to change its schedule in one step. Close it first, then set it up again.";
   const fewerHotspots =
     "Too many hotspots for one setup. Set up with fewer, then add the rest with addEntityToAutomation.";
+  const fewerHotspotsOrCloseFirst =
+    "Too many hotspots to change the schedule in one step. Set up with fewer hotspots and add the rest with addEntityToAutomation, or close the automation first and set it up again.";
 
-  it("allows a setup without claims past one bundle", () => {
+  it("allows a setup without claims or a teardown past one bundle", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: undefined,
+        tearsDown: false,
+        txCount: 9,
+      }),
+    ).to.equal(undefined);
+  });
+
+  it("tells a setup without claims that tears down a cron to close first", () => {
     expect(
       setupBundleLimitMessage({
         claimsKind: undefined,
         tearsDown: true,
         txCount: 9,
       }),
-    ).to.equal(undefined);
+    ).to.equal(closeFirst);
   });
 
   it("allows a claim setup that fits one bundle", () => {
@@ -420,14 +433,14 @@ describe("setupBundleLimitMessage", () => {
     ).to.equal(closeFirst);
   });
 
-  it("tells a hotspot setup that tears down a cron to close first", () => {
+  it("tells a hotspot setup that tears down a cron to add fewer hotspots or close first", () => {
     expect(
       setupBundleLimitMessage({
         claimsKind: "entities",
         tearsDown: true,
         txCount: 5,
       }),
-    ).to.equal(closeFirst);
+    ).to.equal(fewerHotspotsOrCloseFirst);
   });
 
   it("tells a hotspot setup without a teardown to add fewer hotspots", () => {
@@ -438,5 +451,15 @@ describe("setupBundleLimitMessage", () => {
         txCount: 5,
       }),
     ).to.equal(fewerHotspots);
+  });
+});
+
+describe("remoteCronTransactionSpace", () => {
+  it("sizes a mainnet wallet claim by its itemized fields", () => {
+    // 8 discriminator + 4 id + 32 cron job + 1 variant + 4 url length
+    // + 98 url + 32 signer + 1 bump + 64 pad.
+    const url =
+      "https://hnt-rewards.oracle.helium.io/v1/tuktuk/wallet/H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7";
+    expect(remoteCronTransactionSpace(url)).to.equal(244);
   });
 });
