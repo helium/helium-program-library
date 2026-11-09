@@ -8,6 +8,14 @@ export const TASK_QUEUE_ID = new PublicKey(
   "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7"
 );
 
+/**
+ * Oracle URL hpl-crons compiles in per cluster and writes into the claims it
+ * adds (utils/shared-utils/src/lib.rs ORACLE_URL).
+ */
+export const HNT_REWARDS_ORACLE_URL = "https://hnt-rewards.oracle.helium.io";
+export const HNT_REWARDS_ORACLE_URL_DEVNET =
+  "https://hnt-rewards.oracle.test-helium.com";
+
 // Byte sizes of the accounts hpl-crons instructions create. Price them with
 // connection.getMinimumBalanceForRentExemption (batch with Promise.all)
 // rather than hardcoding lamports, so fees follow the cluster's Rent sysvar.

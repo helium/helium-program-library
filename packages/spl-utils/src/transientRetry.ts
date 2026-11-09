@@ -17,6 +17,9 @@ const TRANSIENT_ERROR_CODES = new Set([
 /** Statuses an RPC provider sends while it sheds load. */
 const TRANSIENT_HTTP_STATUSES = new Set([429, 502, 503, 504]);
 
+/** Statuses whose `Response` must have a null body. */
+const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+
 /**
  * axios puts the socket code on the error; fetch wraps the socket error in a
  * TypeError("fetch failed") and puts it on `cause`.
@@ -65,4 +68,14 @@ export const withTransientRetry = async <T>(
  * again.
  */
 export const fetchRetryingTransientErrors: typeof fetch = (input, init) =>
-  withTransientRetry(() => fetch(input, init));
+  withTransientRetry(async () => {
+    const r = await fetch(input, init);
+    const body = NULL_BODY_STATUSES.has(r.status)
+      ? null
+      : await r.arrayBuffer();
+    return new Response(body, {
+      status: r.status,
+      statusText: r.statusText,
+      headers: r.headers,
+    });
+  });

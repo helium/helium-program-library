@@ -5,7 +5,7 @@ import {
   ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
   MAX_PRESET_SCHEDULE_LEN,
 } from "@helium/hpl-crons-sdk";
-import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getRentLamports } from "./balance-validation";
 import { fitsOneBundle } from "./jito-bundle";
 
@@ -77,6 +77,27 @@ export const setupBundleLimitMessage = ({
     ? "Too many hotspots for one setup. Set up with fewer, then add the rest with addEntityToAutomation."
     : "The automation has too many claims to change its schedule in one step. Close it first, then set it up again.";
 };
+
+type RefundAccount = { lamports: number; owner: PublicKey } | null;
+
+/**
+ * Lamports a teardown refunds from the accounts it closes besides the cron
+ * job: every closed account, plus each task return account the cron program
+ * owns (close_cron_job_v0 drains only those). Missing accounts count 0.
+ */
+export const teardownRefundLamports = ({
+  closedAccounts,
+  taskReturnAccounts,
+  cronProgramId,
+}: {
+  closedAccounts: RefundAccount[];
+  taskReturnAccounts: RefundAccount[];
+  cronProgramId: PublicKey;
+}): number =>
+  [
+    ...closedAccounts,
+    ...taskReturnAccounts.filter((info) => info?.owner.equals(cronProgramId)),
+  ].reduce((sum, info) => sum + (info?.lamports ?? 0), 0);
 
 /**
  * Convert a schedule type to a cron string.

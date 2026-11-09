@@ -30,6 +30,7 @@ import {
   calculatePdaWalletCostPerClaim,
   ENTITY_CLAIM_CRON_NAME,
   TASK_RETURN_ACCOUNT_FUNDING_SOL,
+  teardownRefundLamports,
 } from "@/lib/utils/automation-helpers";
 import {
   ATA_SPACE,
@@ -73,9 +74,10 @@ export async function liveCronTransactionIds(
 
 /**
  * Lamports a teardown refunds to the wallet besides the cron job's own: each
- * cron transaction in [0, nextTransactionId) and the name mapping
- * (remove_entity_from_cron_v0, close_entity_claim_cron_v0). Missing accounts
- * count 0.
+ * cron transaction in [0, nextTransactionId), the name mapping
+ * (remove_entity_from_cron_v0, close_entity_claim_cron_v0), and
+ * task_return_account_1 and task_return_account_2, which close_cron_job_v0
+ * drains only while the cron program owns them. Missing accounts count 0.
  */
 export async function teardownAccountsRefundLamports(
   connection: Connection,
@@ -83,23 +85,38 @@ export async function teardownAccountsRefundLamports(
   authority: PublicKey,
   nextTransactionId: number,
 ): Promise<number> {
+  const taskReturnAccounts = [
+    "task_return_account_1",
+    "task_return_account_2",
+  ].map(
+    (seed) =>
+      PublicKey.findProgramAddressSync(
+        [Buffer.from(seed), cronJob.toBuffer()],
+        PROGRAM_ID,
+      )[0],
+  );
   const keys = [
     ...Array.from(
       { length: nextTransactionId },
       (_, i) => cronJobTransactionKey(cronJob, i)[0],
     ),
     cronJobNameMappingKey(authority, ENTITY_CLAIM_CRON_NAME)[0],
+    ...taskReturnAccounts,
   ];
   // getMultipleAccountsInfo caps at 100 keys per call, so chunk the list.
-  let lamports = 0;
+  const infos: (AccountInfo<Buffer> | null)[] = [];
   for (let i = 0; i < keys.length; i += 100) {
-    const infos = await connection.getMultipleAccountsInfo(
-      keys.slice(i, i + 100),
-      { dataSlice: { offset: 0, length: 0 } },
+    infos.push(
+      ...(await connection.getMultipleAccountsInfo(keys.slice(i, i + 100), {
+        dataSlice: { offset: 0, length: 0 },
+      })),
     );
-    lamports += infos.reduce((sum, info) => sum + (info?.lamports ?? 0), 0);
   }
-  return lamports;
+  return teardownRefundLamports({
+    closedAccounts: infos.slice(0, -taskReturnAccounts.length),
+    taskReturnAccounts: infos.slice(-taskReturnAccounts.length),
+    cronProgramId: PROGRAM_ID,
+  });
 }
 
 /**

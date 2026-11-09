@@ -1,4 +1,6 @@
+import { PROGRAM_ID as CRON_PROGRAM_ID } from "@helium/cron-sdk";
 import { remoteCronTransactionSpace } from "@helium/hpl-crons-sdk";
+import { SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
@@ -9,6 +11,7 @@ import {
   resolveScheduleToCron,
   scheduleChanged,
   setupBundleLimitMessage,
+  teardownRefundLamports,
 } from "../../src/lib/utils/automation-helpers";
 
 describe("resolveScheduleToCron", () => {
@@ -461,5 +464,48 @@ describe("remoteCronTransactionSpace", () => {
     const url =
       "https://hnt-rewards.oracle.helium.io/v1/tuktuk/wallet/H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7";
     expect(remoteCronTransactionSpace(url)).to.equal(244);
+  });
+});
+
+describe("teardownRefundLamports", () => {
+  const closed = [
+    { lamports: 100, owner: CRON_PROGRAM_ID },
+    { lamports: 20, owner: CRON_PROGRAM_ID },
+  ];
+
+  it("counts task return accounts the cron program owns", () => {
+    expect(
+      teardownRefundLamports({
+        closedAccounts: closed,
+        taskReturnAccounts: [
+          { lamports: 3, owner: CRON_PROGRAM_ID },
+          { lamports: 4, owner: CRON_PROGRAM_ID },
+        ],
+        cronProgramId: CRON_PROGRAM_ID,
+      }),
+    ).to.equal(127);
+  });
+
+  it("skips system-owned task return accounts", () => {
+    expect(
+      teardownRefundLamports({
+        closedAccounts: closed,
+        taskReturnAccounts: [
+          { lamports: 3, owner: SystemProgram.programId },
+          { lamports: 4, owner: CRON_PROGRAM_ID },
+        ],
+        cronProgramId: CRON_PROGRAM_ID,
+      }),
+    ).to.equal(124);
+  });
+
+  it("counts missing accounts as 0", () => {
+    expect(
+      teardownRefundLamports({
+        closedAccounts: [null, ...closed],
+        taskReturnAccounts: [null, null],
+        cronProgramId: CRON_PROGRAM_ID,
+      }),
+    ).to.equal(120);
   });
 });

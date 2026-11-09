@@ -6,6 +6,8 @@ import {
 } from "@helium/cron-sdk";
 import {
   entityCronAuthorityKey,
+  HNT_REWARDS_ORACLE_URL,
+  HNT_REWARDS_ORACLE_URL_DEVNET,
   init as initHplCrons,
   remoteCronTransactionSpace,
 } from "@helium/hpl-crons-sdk";
@@ -90,6 +92,17 @@ export const backfillRequiredLamports = ({
     .add(new anchor.BN(rentLamports))
     .add(new anchor.BN(FEE_MARGIN_LAMPORTS));
 
+const DEVNET_GENESIS_HASH = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
+
+/**
+ * The oracle URL hpl-crons compiles in for a cluster, which the claim the
+ * backfill adds holds. Only a devnet build uses the devnet URL.
+ */
+export const backfillOracleUrl = (genesisHash: string): string =>
+  genesisHash === DEVNET_GENESIS_HASH
+    ? HNT_REWARDS_ORACLE_URL_DEVNET
+    : HNT_REWARDS_ORACLE_URL;
+
 export async function run(args: any = process.argv) {
   const yarg = yargs(args).options({
     wallet: {
@@ -132,10 +145,7 @@ export async function run(args: any = process.argv) {
   anchor.setProvider(anchor.AnchorProvider.local(argv.url));
   const provider = anchor.getProvider() as anchor.AnchorProvider;
   const connection = provider.connection;
-  // The oracle URL hpl-crons compiles in for the cluster, which the claim it adds holds.
-  const oracleUrl = argv.url.includes("devnet")
-    ? "https://hnt-rewards.oracle.test-helium.com"
-    : "https://hnt-rewards.oracle.helium.io";
+  const oracleUrl = backfillOracleUrl(await connection.getGenesisHash());
 
   if (argv.commit && !provider.wallet.publicKey.equals(BACKFILL_SIGNER)) {
     throw new Error(

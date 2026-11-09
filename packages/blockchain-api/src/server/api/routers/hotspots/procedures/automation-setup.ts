@@ -22,6 +22,8 @@ import { keyToAssetKey } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
 import {
   entityCronAuthorityKey,
+  HNT_REWARDS_ORACLE_URL,
+  HNT_REWARDS_ORACLE_URL_DEVNET,
   init as initHplCrons,
   remoteCronTransactionSpace,
 } from "@helium/hpl-crons-sdk";
@@ -41,7 +43,6 @@ import {
 import {
   getRentLamports,
   getTotalTransactionFees,
-  BASE_TX_FEE_LAMPORTS,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { getHeliumLookupTable } from "@/lib/utils/build-transaction";
@@ -70,8 +71,8 @@ export const HNT_DAO = daoKey(HNT_MINT)[0];
  */
 const claimOracleUrl = (): string =>
   getCluster() === "devnet"
-    ? "https://hnt-rewards.oracle.test-helium.com"
-    : "https://hnt-rewards.oracle.helium.io";
+    ? HNT_REWARDS_ORACLE_URL_DEVNET
+    : HNT_REWARDS_ORACLE_URL;
 
 type CronClaimCounts = { numTransactions: number; nextTransactionId: number };
 
@@ -368,43 +369,8 @@ export const buildAutomationSetup = async ({
   const minCrankSolFee = Math.max(0, cronJobFundingLamports);
   const minPdaWalletSolFee = Math.max(0, pdaWalletFundingLamports);
 
-  // Check wallet has sufficient balance (same pattern as fundAutomation).
   // The claim instructions pay their cron transactions' rent from the wallet.
   const totalFundingNeeded = totalLamports + claimRentLamports;
-  const walletBalance = await provider.connection.getBalance(wallet);
-  const estimatedTxFees = BASE_TX_FEE_LAMPORTS * 2; // Estimate for multiple potential txs
-  const cluster = getCluster();
-  const estimatedJitoTipCost =
-    cluster === "mainnet" || cluster === "mainnet-beta"
-      ? getJitoTipAmountLamports()
-      : 0;
-  const totalNeededWithFees =
-    totalFundingNeeded + estimatedTxFees + estimatedJitoTipCost;
-
-  // The teardown runs before init and the transfers, so the old cron job's,
-  // its cron transactions' and its name mapping's lamports are back in the
-  // wallet by the time they spend. Lamports donated to a cron job PDA with no
-  // data get no teardown, so they never come back.
-  const teardownRefundLamports =
-    cronJobAccount && recreatesCronJob
-      ? cronJobBalanceLamports +
-        (await teardownAccountsRefundLamports(
-          provider.connection,
-          cronJob,
-          authority,
-          cronJobAccount.nextTransactionId || 0
-        ))
-      : 0;
-
-  if (walletBalance + teardownRefundLamports < totalNeededWithFees) {
-    throw errors.INSUFFICIENT_FUNDS({
-      message: "Insufficient SOL balance to set up automation",
-      data: {
-        required: totalNeededWithFees,
-        available: walletBalance + teardownRefundLamports,
-      },
-    });
-  }
 
   if (minCrankSolFee > 0) {
     instructions.push(
@@ -456,6 +422,43 @@ export const buildAutomationSetup = async ({
   // Estimated fee includes tx fees + setup rent and crank reward + claim rent
   // + operational funding (cronJob + pdaWallet)
   const txFees = await getTotalTransactionFees(provider.connection, vtxs);
+
+  // Check wallet has sufficient balance (same pattern as fundAutomation).
+  const walletBalance = await provider.connection.getBalance(wallet);
+  const cluster = getCluster();
+  const estimatedJitoTipCost =
+    cluster === "mainnet" || cluster === "mainnet-beta"
+      ? getJitoTipAmountLamports()
+      : 0;
+  const totalNeededWithFees =
+    totalFundingNeeded + txFees + estimatedJitoTipCost;
+
+  // The teardown runs before init and the transfers, so the old cron job's,
+  // its cron transactions', its name mapping's and its task return accounts'
+  // (task_return_account_1 and task_return_account_2) lamports are back in the
+  // wallet by the time they spend. Lamports donated to a cron job PDA with no
+  // data get no teardown, so they never come back.
+  const teardownRefundLamports =
+    cronJobAccount && recreatesCronJob
+      ? cronJobBalanceLamports +
+        (await teardownAccountsRefundLamports(
+          provider.connection,
+          cronJob,
+          authority,
+          cronJobAccount.nextTransactionId || 0
+        ))
+      : 0;
+
+  if (walletBalance + teardownRefundLamports < totalNeededWithFees) {
+    throw errors.INSUFFICIENT_FUNDS({
+      message: "Insufficient SOL balance to set up automation",
+      data: {
+        required: totalNeededWithFees,
+        available: walletBalance + teardownRefundLamports,
+      },
+    });
+  }
+
   const estimatedSolFeeLamports = txFees + totalFundingNeeded;
   const effectiveSchedule = recreatesCronJob
     ? cronSchedule

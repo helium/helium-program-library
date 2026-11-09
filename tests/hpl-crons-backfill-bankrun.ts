@@ -15,8 +15,14 @@ import {
 import { BankrunProvider } from "anchor-bankrun";
 import { expect } from "chai";
 import { ProgramTestContext } from "solana-bankrun";
-import { entityCronAuthorityKey } from "../packages/hpl-crons-sdk/src";
 import {
+  entityCronAuthorityKey,
+  HNT_REWARDS_ORACLE_URL,
+  HNT_REWARDS_ORACLE_URL_DEVNET,
+  remoteCronTransactionSpace,
+} from "../packages/hpl-crons-sdk/src";
+import {
+  backfillOracleUrl,
   backfillRequiredLamports,
   backfillSelection,
   backfillTopUp,
@@ -30,7 +36,7 @@ const HPL_CRONS = new PublicKey("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 const CRON = new PublicKey("cronAjRZnJn3MTP3B9kE62NWDrjSuAPVXf9c4hu4grM");
 // A TESTING build of hpl-crons keeps the mainnet oracle constants, so the claim it adds is the
 // one a mainnet backfill adds.
-const ORACLE_URL = "https://hnt-rewards.oracle.helium.io";
+const ORACLE_URL = HNT_REWARDS_ORACLE_URL;
 const ORACLE_SIGNER = new PublicKey(
   "orc1TYY5L4B4ZWDEMayTqu99ikPM9bQo9fqzoaCPP5Q"
 );
@@ -160,6 +166,14 @@ describe("hpl-crons backfill of an empty entity claim cron", () => {
     );
     expect(cron.nextTransactionId).to.eq(1);
     expect(cron.numTransactions).to.eq(1);
+    expect(
+      (await ctx.banksClient.getAccount(cronJobTransactionKey(cronJob, 0)[0]))!
+        .data.length
+    ).to.eq(
+      remoteCronTransactionSpace(
+        `${ORACLE_URL}/v1/tuktuk/wallet/${wallet.toBase58()}`
+      )
+    );
   });
 
   it("adds the wallet claim to a cron removed from queue", async () => {
@@ -296,6 +310,19 @@ describe("helium-admin-cli backfill selection and top-up", () => {
       false
     );
     expect(cronTransactionExists({ owner: CRON_PROGRAM })).to.equal(true);
+  });
+
+  it("picks the devnet oracle URL only on devnet", () => {
+    expect(
+      backfillOracleUrl("5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d")
+    ).to.equal(HNT_REWARDS_ORACLE_URL);
+    expect(
+      backfillOracleUrl("EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG")
+    ).to.equal(HNT_REWARDS_ORACLE_URL_DEVNET);
+    // localnet, bankrun, and a TESTING build keep the mainnet URL.
+    expect(backfillOracleUrl(PublicKey.default.toBase58())).to.equal(
+      HNT_REWARDS_ORACLE_URL
+    );
   });
 
   it("sums the signer's need past 2^26 lamports", () => {
