@@ -8,6 +8,7 @@ import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
   buildBundleTipDraft,
+  fitsOneBundle,
   maxPackedTxs,
   shouldUseJitoBundle,
 } from "../../src/lib/utils/jito-bundle";
@@ -104,4 +105,14 @@ describe("buildBundleTipDraft", () => {
       });
     });
   }
+});
+
+describe("fitsOneBundle", () => {
+  it("fits a setup that fills the mainnet packed slots", () => {
+    expect(fitsOneBundle(4)).to.equal(true);
+  });
+
+  it("rejects a setup one transaction past the mainnet packed slots", () => {
+    expect(fitsOneBundle(5)).to.equal(false);
+  });
 });
