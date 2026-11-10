@@ -1,5 +1,19 @@
 # Change Log
 
+## 0.11.23
+
+### Patch Changes
+
+- Updated dependencies [[`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/spl-utils@0.16.0
+  - @helium/lazy-distributor-sdk@0.13.2
+
+## 0.11.22
+
+### Patch Changes
+
+- [#1367](https://github.com/helium/helium-program-library/pull/1367) [`e7a9362`](https://github.com/helium/helium-program-library/commit/e7a936255322fb4e4541d7b43525880a175d20fd) Thanks [@bryzettler](https://github.com/bryzettler)! - Use finalized commitment in place of confirmed now that mainnet runs Alpenglow.
+
 ## 0.11.21
 
 ### Patch Changes

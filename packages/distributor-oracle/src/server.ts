@@ -1302,7 +1302,7 @@ export class OracleServer {
     // For performance
     new AccountFetchCache({
       connection: provider.connection,
-      commitment: "confirmed",
+      commitment: "finalized",
       extendConnection: true,
     });
     server.start();

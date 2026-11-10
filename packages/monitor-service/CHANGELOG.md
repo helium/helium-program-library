@@ -1,5 +1,40 @@
 # Change Log
 
+## 0.11.27
+
+### Patch Changes
+
+- Updated dependencies [[`09bb2ff`](https://github.com/helium/helium-program-library/commit/09bb2ff276f4001bee96a9c9e0cf39a0a8f5b0a9), [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/idls@0.12.3
+  - @helium/spl-utils@0.16.0
+  - @helium/circuit-breaker-sdk@0.12.2
+  - @helium/data-credits-sdk@0.13.2
+  - @helium/dc-auto-top-sdk@0.12.2
+  - @helium/helium-entity-manager-sdk@0.12.2
+  - @helium/helium-sub-daos-sdk@0.13.2
+  - @helium/lazy-distributor-sdk@0.13.2
+  - @helium/lazy-transactions-sdk@0.12.2
+  - @helium/price-oracle-sdk@0.12.2
+  - @helium/tuktuk-dca-sdk@0.12.2
+
+## 0.11.26
+
+### Patch Changes
+
+- [#1372](https://github.com/helium/helium-program-library/pull/1372) [`9be1c7a`](https://github.com/helium/helium-program-library/commit/9be1c7a8b0ded7a36853e6586dc79c1b7d40ca69) Thanks [@madninja](https://github.com/madninja)! - Stop monitoring the closed Helium Mobile auto top off. Only the carrier auto top off is monitored, and `HELIUM_MOBILE_AUTO_TOPOFF_KEY` is no longer read.
+
+## 0.11.25
+
+### Patch Changes
+
+- [#1322](https://github.com/helium/helium-program-library/pull/1322) [`eb7ab89`](https://github.com/helium/helium-program-library/commit/eb7ab8923da347ca11ded2a94dd5414cb91e835a) Thanks [@bryzettler](https://github.com/bryzettler)! - Move the service to Fastify 5
+
+## 0.11.24
+
+### Patch Changes
+
+- [#1367](https://github.com/helium/helium-program-library/pull/1367) [`e7a9362`](https://github.com/helium/helium-program-library/commit/e7a936255322fb4e4541d7b43525880a175d20fd) Thanks [@bryzettler](https://github.com/bryzettler)! - Use finalized commitment in place of confirmed now that mainnet runs Alpenglow.
+
 ## 0.11.23
 
 ### Patch Changes

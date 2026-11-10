@@ -93,7 +93,7 @@ async fn run_transactions(
   let rpc_client: Arc<RpcClient> = solana_client::rpc_client::RpcClient::new_with_commitment(
     solana_url.clone(),
     CommitmentConfig {
-      commitment: solana_sdk::commitment_config::CommitmentLevel::Confirmed,
+      commitment: solana_sdk::commitment_config::CommitmentLevel::Finalized,
     },
   )
   .into();

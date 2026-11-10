@@ -560,7 +560,7 @@ export async function sendInstructionsOrCreateProposal({
           console.log("Created lookup table since ix too big", lut.toBase58());
           await tx.sign([walletSigner!]);
           const sent = await provider.connection.sendTransaction(tx);
-          await provider.connection.confirmTransaction(sent, "confirmed");
+          await provider.connection.confirmTransaction(sent, "finalized");
           console.log(`Added tx ${idx}`, sent);
 
           await AddressLookupTableProgram.closeLookupTable({

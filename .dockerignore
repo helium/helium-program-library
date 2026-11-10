@@ -22,3 +22,5 @@ diagrams/
 out/
 yarn.lock
 utils/
+**/.env*
+!**/.env.example

@@ -9,7 +9,7 @@ import {
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
-import { ensureNextServer, stopNextServer } from "./helpers/next";
+import { ensureServer, rpcUrl, stopServer } from "./helpers/server";
 import {
   ensureSurfpool,
   getSurfpoolRpcUrl,
@@ -41,20 +41,20 @@ describe("update-rewards-destination", () => {
     }
     applyMinimalServerEnv();
     await ensureSurfpool();
-    await ensureNextServer();
+    await ensureServer();
     payer = loadKeypairFromEnv();
     connection = new Connection(getSurfpoolRpcUrl(), "confirmed");
     await ensureFunds(payer.publicKey, 0.1 * LAMPORTS_PER_SOL);
 
     // Create ORPC client pointing to the test server
     const link = new RPCLink({
-      url: "http://127.0.0.1:3000/rpc",
+      url: rpcUrl(),
     });
     client = createORPCClient(link);
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

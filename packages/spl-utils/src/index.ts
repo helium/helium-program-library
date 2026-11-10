@@ -41,6 +41,10 @@ export {
   searchAssetsWithPageInfo,
 } from "./mplAssetAPI";
 export {
+  fetchRetryingTransientErrors,
+  withTransientRetry,
+} from "./transientRetry";
+export {
   COMPUTE_BUDGET_IX_DATA_SIZE,
   COMPUTE_BUDGET_IX_LIMIT,
   COMPUTE_BUDGET_IX_PRICE,

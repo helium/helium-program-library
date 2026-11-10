@@ -36,16 +36,24 @@ export function getSurfpoolRpcUrl(): string {
 // that hangs until the CI timeout.
 const HEALTH_REQUEST_TIMEOUT_MS = 5000;
 
+// The Rent sysvar read goes to a public mainnet RPC, not the local surfpool.
+// Every e2e job makes it at the same moment, so the RPC can be slow to answer.
+// Give it a longer timeout and retry it before the suite fails.
+const DATASOURCE_REQUEST_TIMEOUT_MS = 10000;
+const DATASOURCE_ATTEMPTS = 3;
+const DATASOURCE_RETRY_DELAY_MS = 2000;
+
 async function jsonRpc<T = unknown>(
   method: string,
   params?: unknown,
-  rpcUrl = getSurfpoolRpcUrl()
+  rpcUrl = getSurfpoolRpcUrl(),
+  timeoutMs = HEALTH_REQUEST_TIMEOUT_MS
 ): Promise<JsonRpcResponse<T>> {
   const res = await fetch(rpcUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    signal: AbortSignal.timeout(HEALTH_REQUEST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     throw new Error(`${method} failed: HTTP ${res.status}`);
@@ -77,6 +85,31 @@ export async function surfpoolHealthy(
 
 const RENT_SYSVAR = "SysvarRent111111111111111111111111111111111";
 
+const readRentSysvar = async (datasource: string) => {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await jsonRpc<{
+        value: {
+          data: [string, string];
+          owner: string;
+          lamports: number;
+        } | null;
+      }>(
+        "getAccountInfo",
+        [RENT_SYSVAR, { encoding: "base64" }],
+        datasource,
+        DATASOURCE_REQUEST_TIMEOUT_MS
+      );
+    } catch (err) {
+      if (attempt >= DATASOURCE_ATTEMPTS) throw err;
+      console.warn(
+        `[surfpool] Rent sysvar read from ${datasource} failed (attempt ${attempt}/${DATASOURCE_ATTEMPTS}): ${err}`
+      );
+      await new Promise((r) => setTimeout(r, DATASOURCE_RETRY_DELAY_MS));
+    }
+  }
+};
+
 /**
  * Surfpool seeds the Rent sysvar from LiteSVM defaults (3480 lamports per
  * byte-year, 2.0 threshold) instead of cloning it from the datasource. Mainnet
@@ -89,9 +122,7 @@ async function syncRentSysvar(rpcUrl: string): Promise<void> {
   const datasource =
     process.env.SURFPOOL_DATASOURCE_RPC_URL ||
     "https://api.mainnet-beta.solana.com";
-  const res = await jsonRpc<{
-    value: { data: [string, string]; owner: string; lamports: number } | null;
-  }>("getAccountInfo", [RENT_SYSVAR, { encoding: "base64" }], datasource);
+  const res = await readRentSysvar(datasource);
   if (res.error || !res.result?.value) {
     throw new Error(
       `[surfpool] Failed to read Rent sysvar from ${datasource}: ${JSON.stringify(

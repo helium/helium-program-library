@@ -7,7 +7,7 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
-import { stopNextServer } from "./helpers/next";
+import { stopServer } from "./helpers/server";
 import { stopSurfpool } from "./helpers/surfpool";
 import { ensureTokenBalance } from "./helpers/wallet";
 import { signAndSubmitTransactionData } from "./helpers/tx";
@@ -25,7 +25,7 @@ describe("hotspot-updates", () => {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

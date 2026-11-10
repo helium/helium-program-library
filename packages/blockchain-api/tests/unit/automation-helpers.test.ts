@@ -1,10 +1,17 @@
+import { PROGRAM_ID as CRON_PROGRAM_ID } from "@helium/cron-sdk";
+import { remoteCronTransactionSpace } from "@helium/hpl-crons-sdk";
+import { SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
+  calculateCronJobCostPerClaim,
   estimateAutomationFunding,
   maxScheduleCronLength,
+  requeuesCronJob,
   resolveScheduleToCron,
   scheduleChanged,
+  setupBundleLimitMessage,
+  teardownRefundLamports,
 } from "../../src/lib/utils/automation-helpers";
 
 describe("resolveScheduleToCron", () => {
@@ -192,6 +199,44 @@ describe("estimateAutomationFunding", () => {
     expect(estimate.totalLamports).to.equal(30 * 10_000 + 3 * 40_000);
   });
 
+  it("charges a requeue's schedule task rent and crank reward to an existing cron job", () => {
+    const minCrankRewardLamports = 15_000;
+    const requeueTaskRentLamports = 6_458_880;
+    const cronJobRentLamports = 3_000_000;
+    const duration = 30;
+    const cronJobCostPerClaimLamports = 10_000;
+    const pdaWalletRentLamports = 890_880;
+    const pdaWalletCostPerClaimLamports = 40_000;
+
+    const estimate = estimateAutomationFunding({
+      cronJobExists: true,
+      baseAutomationRentLamports: 0,
+      minCrankRewardLamports,
+      requeueTaskRentLamports,
+      // Both pools already hold the claims, so only the requeue costs SOL.
+      cronJobBalanceLamports:
+        cronJobRentLamports + duration * cronJobCostPerClaimLamports,
+      cronJobRentLamports,
+      cronJobCostPerClaimLamports,
+      pdaWalletBalanceLamports:
+        pdaWalletRentLamports + duration * pdaWalletCostPerClaimLamports,
+      pdaWalletCostPerClaimLamports,
+      recipientRentLamports: 0,
+      pdaWalletRentLamports,
+      additionalDuration: 0,
+      ataRentLamports: 0,
+      taskReturnAccountFundingLamports: 0,
+    });
+
+    // requeue_entity_claim_cron_v0 queues a new schedule task from the wallet.
+    expect(estimate.rentFeeLamports).to.equal(
+      requeueTaskRentLamports + minCrankRewardLamports,
+    );
+    expect(estimate.totalLamports).to.equal(
+      requeueTaskRentLamports + minCrankRewardLamports,
+    );
+  });
+
   it("charges the recipient rent once when the PDA balance covers part of it", () => {
     const pdaWalletRentLamports = 890_880;
     const ataRentLamports = 2_039_280;
@@ -300,5 +345,167 @@ describe("estimateAutomationFunding", () => {
     expect(estimate.cronJobFundingLamports).to.equal(
       duration * cronJobCostPerClaimLamports,
     );
+  });
+});
+
+describe("calculateCronJobCostPerClaim", () => {
+  const reward = 10000;
+
+  it("charges one queue call for a cron with no transactions", () => {
+    expect(calculateCronJobCostPerClaim(reward, 0)).to.equal(10000);
+  });
+
+  it("charges one queue call for 5 transactions", () => {
+    expect(calculateCronJobCostPerClaim(reward, 5)).to.equal(60000);
+  });
+
+  it("charges a second queue call for the 6th transaction", () => {
+    expect(calculateCronJobCostPerClaim(reward, 6)).to.equal(80000);
+  });
+
+  it("charges one queue call per 5 transactions for 50", () => {
+    expect(calculateCronJobCostPerClaim(reward, 50)).to.equal(600000);
+  });
+});
+
+describe("requeuesCronJob", () => {
+  it("does not requeue when there is no cron job", () => {
+    expect(requeuesCronJob(null, true)).to.equal(false);
+  });
+
+  it("does not requeue a removed cron job the setup re-creates", () => {
+    expect(requeuesCronJob({ removedFromQueue: true }, true)).to.equal(false);
+  });
+
+  it("requeues a removed cron job the setup keeps", () => {
+    expect(requeuesCronJob({ removedFromQueue: true }, false)).to.equal(true);
+  });
+
+  it("does not requeue a cron job still in the queue", () => {
+    expect(requeuesCronJob({ removedFromQueue: false }, false)).to.equal(
+      false,
+    );
+  });
+});
+
+describe("setupBundleLimitMessage", () => {
+  const closeFirst =
+    "The automation has too many claims to change its schedule in one step. Close it first, then set it up again.";
+  const fewerHotspots =
+    "Too many hotspots for one setup. Set up with fewer, then add the rest with addEntityToAutomation.";
+  const fewerHotspotsOrCloseFirst =
+    "Too many hotspots to change the schedule in one step. Set up with fewer hotspots and add the rest with addEntityToAutomation, or close the automation first and set it up again.";
+
+  it("allows a setup without claims or a teardown past one bundle", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: undefined,
+        tearsDown: false,
+        txCount: 9,
+      }),
+    ).to.equal(undefined);
+  });
+
+  it("tells a setup without claims that tears down a cron to close first", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: undefined,
+        tearsDown: true,
+        txCount: 9,
+      }),
+    ).to.equal(closeFirst);
+  });
+
+  it("allows a claim setup that fits one bundle", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: "entities",
+        tearsDown: true,
+        txCount: 4,
+      }),
+    ).to.equal(undefined);
+  });
+
+  it("tells a wallet claim setup past one bundle to close first", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: "wallet",
+        tearsDown: false,
+        txCount: 5,
+      }),
+    ).to.equal(closeFirst);
+  });
+
+  it("tells a hotspot setup that tears down a cron to add fewer hotspots or close first", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: "entities",
+        tearsDown: true,
+        txCount: 5,
+      }),
+    ).to.equal(fewerHotspotsOrCloseFirst);
+  });
+
+  it("tells a hotspot setup without a teardown to add fewer hotspots", () => {
+    expect(
+      setupBundleLimitMessage({
+        claimsKind: "entities",
+        tearsDown: false,
+        txCount: 5,
+      }),
+    ).to.equal(fewerHotspots);
+  });
+});
+
+describe("remoteCronTransactionSpace", () => {
+  it("sizes a mainnet wallet claim by its itemized fields", () => {
+    // 8 discriminator + 4 id + 32 cron job + 1 variant + 4 url length
+    // + 98 url + 32 signer + 1 bump + 64 pad.
+    const url =
+      "https://hnt-rewards.oracle.helium.io/v1/tuktuk/wallet/H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7";
+    expect(remoteCronTransactionSpace(url)).to.equal(244);
+  });
+});
+
+describe("teardownRefundLamports", () => {
+  const closed = [
+    { lamports: 100, owner: CRON_PROGRAM_ID },
+    { lamports: 20, owner: CRON_PROGRAM_ID },
+  ];
+
+  it("counts task return accounts the cron program owns", () => {
+    expect(
+      teardownRefundLamports({
+        closedAccounts: closed,
+        taskReturnAccounts: [
+          { lamports: 3, owner: CRON_PROGRAM_ID },
+          { lamports: 4, owner: CRON_PROGRAM_ID },
+        ],
+        cronProgramId: CRON_PROGRAM_ID,
+      }),
+    ).to.equal(127);
+  });
+
+  it("skips system-owned task return accounts", () => {
+    expect(
+      teardownRefundLamports({
+        closedAccounts: closed,
+        taskReturnAccounts: [
+          { lamports: 3, owner: SystemProgram.programId },
+          { lamports: 4, owner: CRON_PROGRAM_ID },
+        ],
+        cronProgramId: CRON_PROGRAM_ID,
+      }),
+    ).to.equal(124);
+  });
+
+  it("counts missing accounts as 0", () => {
+    expect(
+      teardownRefundLamports({
+        closedAccounts: [null, ...closed],
+        taskReturnAccounts: [null, null],
+        cronProgramId: CRON_PROGRAM_ID,
+      }),
+    ).to.equal(120);
   });
 });

@@ -66,7 +66,7 @@ export async function getMigrateTransactions(
         const tree = await ConcurrentMerkleTreeAccount.fromAccountAddress(
           provider.connection,
           merkleTree,
-          "confirmed"
+          "finalized"
         );
         const canopyHeight = tree.getCanopyDepth();
         const proofPath = mapProof(proof);

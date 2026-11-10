@@ -2,7 +2,7 @@ import { healthContract } from "@helium/blockchain-api/contracts";
 import { publicProcedure } from "../../procedures";
 import { connectToDb } from "@/lib/utils/db";
 import { implement } from "@orpc/server";
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@sentry/node";
 
 // ============================================================================
 // Procedures

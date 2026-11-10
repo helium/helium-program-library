@@ -13,7 +13,7 @@ import type { appRouter } from "@/server/api";
 import type { RouterClient } from "@orpc/server";
 import { TOKEN_MINTS } from "../../src/lib/constants/tokens";
 import { applyMinimalServerEnv } from "./helpers/env";
-import { ensureNextServer, stopNextServer } from "./helpers/next";
+import { ensureServer, rpcUrl, stopServer } from "./helpers/server";
 import {
   ensureSurfpool,
   getSurfpoolRpcUrl,
@@ -34,18 +34,18 @@ describe("token burn and memo", () => {
     process.env.ASSET_ENDPOINT ||= getSurfpoolRpcUrl();
     applyMinimalServerEnv();
     await ensureSurfpool();
-    await ensureNextServer();
+    await ensureServer();
 
     payer = Keypair.generate();
     connection = new Connection(getSurfpoolRpcUrl(), "confirmed");
     await ensureFunds(payer.publicKey, 0.05 * LAMPORTS_PER_SOL);
 
-    const link = new RPCLink({ url: "http://127.0.0.1:3000/rpc" });
+    const link = new RPCLink({ url: rpcUrl() });
     client = createORPCClient(link);
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

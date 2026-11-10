@@ -67,7 +67,7 @@ export const assign = publicProcedure.governance.assignProxies.handler(
       proxyMarkerPubkey: PublicKey;
     };
 
-    let activeProxyVotes: ProposalVoteData[] = [];
+    const activeProxyVotes: ProposalVoteData[] = [];
 
     if (organization) {
       const proposalKeys = Array(Math.min(10, organization.numProposals))

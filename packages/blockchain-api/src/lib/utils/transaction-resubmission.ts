@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import * as Sentry from "@sentry/node";
 import { VersionedTransaction } from "@solana/web3.js";
 import { Op } from "sequelize";
 import { sequelize } from "../db";

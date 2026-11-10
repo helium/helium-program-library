@@ -47,7 +47,7 @@ async function getSolanaUnixTimestamp(
     const conn = provider.connection;
     new AccountFetchCache({
       connection: conn,
-      commitment: "confirmed",
+      commitment: "finalized",
       extendConnection: true,
     });
     const orgProgram = await initOrg(provider);
@@ -203,7 +203,7 @@ async function getSolanaUnixTimestamp(
         conn,
         Buffer.from(signed.serialize()),
         { skipPreflight: true },
-        "confirmed"
+        "finalized"
       );
     }
 

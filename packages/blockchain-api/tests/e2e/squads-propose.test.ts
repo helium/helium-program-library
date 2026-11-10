@@ -15,7 +15,7 @@ import {
 } from "./helpers/tx";
 import { createTestMultisig } from "./helpers/squads";
 import { TEST_HOTSPOT_ENTITY_KEY } from "./helpers/constants";
-import { stopNextServer } from "./helpers/next";
+import { stopServer } from "./helpers/server";
 import { stopSurfpool } from "./helpers/surfpool";
 
 /**
@@ -111,7 +111,7 @@ describe("squads v4 propose-mode (token transfer)", function () {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 

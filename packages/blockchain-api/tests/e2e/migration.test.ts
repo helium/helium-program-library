@@ -21,7 +21,7 @@ import { MOBILE_MINT } from "@helium/spl-utils";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { applyMinimalServerEnv } from "./helpers/env";
-import { ensureNextServer, stopNextServer } from "./helpers/next";
+import { ensureServer, rpcUrl, stopServer } from "./helpers/server";
 import {
   ensureSurfpool,
   getSurfpoolRpcUrl,
@@ -86,7 +86,7 @@ describe("migration", () => {
     // Set Jito tip account fallback (Jito API not available in test env)
     process.env.JITO_TIP_ACCOUNT = destination.publicKey.toBase58();
 
-    // Set up fee payer — must be set before ensureNextServer so the server's
+    // Set up fee payer — must be set before ensureServer so the server's
     // env picks it up. It has to be a different key from `payer`: the route
     // rejects a source or destination equal to the fee payer, and `payer` is
     // the source wallet throughout this suite.
@@ -96,7 +96,7 @@ describe("migration", () => {
     process.env.FEE_PAYER_WALLET_PATH = keyPath;
 
     await ensureSurfpool();
-    await ensureNextServer();
+    await ensureServer();
     connection = new Connection(getSurfpoolRpcUrl(), "confirmed");
 
     // Ensure payer and fee payer have funds
@@ -109,7 +109,7 @@ describe("migration", () => {
 
     // Create ORPC client
     const link = new RPCLink({
-      url: "http://127.0.0.1:3000/rpc",
+      url: rpcUrl(),
     });
     client = createORPCClient(link);
     safeClient = createSafeClient(client);
@@ -119,7 +119,7 @@ describe("migration", () => {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 
@@ -510,7 +510,7 @@ describe("migration", () => {
     });
 
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip"
+      (t: any) => t.metadata?.type !== "jito_tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -774,7 +774,7 @@ describe("migration", () => {
     expect(result.transactionData.parallel).to.equal(false);
 
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip"
+      (t: any) => t.metadata?.type !== "jito_tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -867,7 +867,7 @@ describe("migration", () => {
     // payer only, but the batcher packs groups greedily, so whether it lands
     // in its own tx depends on instruction sizes.
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip"
+      (t: any) => t.metadata?.type !== "jito_tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     // Pin each tx's signer set rather than an aggregate. An existential over

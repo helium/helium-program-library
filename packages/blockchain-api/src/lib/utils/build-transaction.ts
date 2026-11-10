@@ -20,7 +20,7 @@ import {
   WALLET_SIGNED,
 } from "@helium/spl-utils";
 import BN from "bn.js";
-import { env } from "@/lib/env";
+import { getCluster } from "@/lib/solana";
 import {
   calculateRequiredBalance,
   getTransactionFee,
@@ -28,7 +28,7 @@ import {
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 
 export function getHeliumLookupTable(): PublicKey {
-  return env.NEXT_PUBLIC_SOLANA_CLUSTER?.trim() === "devnet"
+  return getCluster() === "devnet"
     ? HELIUM_COMMON_LUT_DEVNET
     : HELIUM_COMMON_LUT;
 }

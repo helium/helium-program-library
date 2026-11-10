@@ -144,7 +144,7 @@ export class TransactionParser {
     const recipient = instruction.accounts[source.recipient];
     const program = await init(
       new AnchorProvider(this.connection, {} as Wallet, {
-        commitment: "confirmed",
+        commitment: "finalized",
       }),
       PROGRAM_ID,
       await this.loadIdl(PROGRAM_ID)

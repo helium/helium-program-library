@@ -4,6 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import axios from "axios";
 // @ts-ignore
 import base58 from "bs58";
+import { withTransientRetry } from "./transientRetry";
 
 export type AssetProof = {
   root: PublicKey;
@@ -48,17 +49,24 @@ export async function getAsset(
   assetId: PublicKey
 ): Promise<Asset | undefined> {
   try {
-    const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAsset",
-      id: "rpd-op-123",
-      params: { id: assetId.toBase58() },
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    const response = await withTransientRetry(() =>
+      axios.post(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "getAsset",
+          id: "rpd-op-123",
+          params: { id: assetId.toBase58() },
+        },
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      )
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);
@@ -79,17 +87,24 @@ export async function getAssetBatch(
   assetIds: PublicKey[]
 ): Promise<Asset[] | undefined> {
   try {
-    const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAssetBatch",
-      id: "rpd-op-123",
-      params: { ids: assetIds.map((assetId) => assetId.toBase58()) },
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    const response = await withTransientRetry(() =>
+      axios.post(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "getAssetBatch",
+          id: "rpd-op-123",
+          params: { ids: assetIds.map((assetId) => assetId.toBase58()) },
+        },
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      )
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);
@@ -128,17 +143,19 @@ export async function getAssets(
       },
     }));
 
-    const response = await axios({
-      url,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-      data: JSON.stringify(batch),
-    });
+    const response = await withTransientRetry(() =>
+      axios({
+        url,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+        data: JSON.stringify(batch),
+      })
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);
@@ -212,17 +229,24 @@ export async function getAssetProof(
   assetId: PublicKey
 ): Promise<AssetProof | undefined> {
   try {
-    const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAssetProof",
-      id: "rpd-op-123",
-      params: { id: assetId.toBase58() },
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    const response = await withTransientRetry(() =>
+      axios.post(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "getAssetProof",
+          id: "rpd-op-123",
+          params: { id: assetId.toBase58() },
+        },
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      )
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);
@@ -249,17 +273,24 @@ export async function getAssetProofBatch(
   assetIds: PublicKey[]
 ): Promise<Record<string, AssetProof> | undefined> {
   try {
-    const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAssetProofBatch",
-      id: "rpd-op-123",
-      params: { ids: assetIds.map((assetId) => assetId.toBase58()) },
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    const response = await withTransientRetry(() =>
+      axios.post(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "getAssetProofBatch",
+          id: "rpd-op-123",
+          params: { ids: assetIds.map((assetId) => assetId.toBase58()) },
+        },
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      )
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);
@@ -314,17 +345,24 @@ export async function getAssetsByOwnerWithPageInfo(
   after?: string;
 }> {
   try {
-    const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAssetsByOwner",
-      id: "get-assets-by-owner",
-      params: [wallet, sortBy, limit, page, before, after],
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    const response = await withTransientRetry(() =>
+      axios.post(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "getAssetsByOwner",
+          id: "get-assets-by-owner",
+          params: [wallet, sortBy, limit, page, before, after],
+        },
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      )
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);
@@ -415,17 +453,24 @@ export async function searchAssetsWithPageInfo(
   };
 
   try {
-    const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "searchAssets",
-      id: "get-assets-op-1",
-      params,
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    const response = await withTransientRetry(() =>
+      axios.post(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "searchAssets",
+          id: "get-assets-op-1",
+          params,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      )
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);
@@ -489,17 +534,24 @@ export async function getAssetsByGroup(
       params.page = page;
     }
 
-    const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAssetsByGroup",
-      id: "get-assets-by-group",
-      params,
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    const response = await withTransientRetry(() =>
+      axios.post(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "getAssetsByGroup",
+          id: "get-assets-by-group",
+          params,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      )
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);
@@ -543,22 +595,29 @@ export async function getAssetsByCreator(
   items: Asset[];
 }> {
   try {
-    const response = await axios.post(url, {
-      jsonrpc: "2.0",
-      method: "getAssetsByCreator",
-      id: "get-assets-by-creator",
-      params: {
-        creatorAddress,
-        onlyVerified,
-        page,
-        limit,
-      },
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
+    const response = await withTransientRetry(() =>
+      axios.post(
+        url,
+        {
+          jsonrpc: "2.0",
+          method: "getAssetsByCreator",
+          id: "get-assets-by-creator",
+          params: {
+            creatorAddress,
+            onlyVerified,
+            page,
+            limit,
+          },
+        },
+        {
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      )
+    );
 
     if (response.data && response.data.error) {
       throw new Error(response.data.error.message);

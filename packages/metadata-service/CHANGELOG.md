@@ -1,5 +1,28 @@
 # Change Log
 
+## 0.11.24
+
+### Patch Changes
+
+- Updated dependencies [[`09bb2ff`](https://github.com/helium/helium-program-library/commit/09bb2ff276f4001bee96a9c9e0cf39a0a8f5b0a9), [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/idls@0.12.3
+  - @helium/spl-utils@0.16.0
+  - @helium/data-credits-sdk@0.13.2
+  - @helium/helium-entity-manager-sdk@0.12.2
+  - @helium/helium-sub-daos-sdk@0.13.2
+
+## 0.11.23
+
+### Patch Changes
+
+- [#1322](https://github.com/helium/helium-program-library/pull/1322) [`eb7ab89`](https://github.com/helium/helium-program-library/commit/eb7ab8923da347ca11ded2a94dd5414cb91e835a) Thanks [@bryzettler](https://github.com/bryzettler)! - Move the service to Fastify 5
+
+## 0.11.22
+
+### Patch Changes
+
+- [#1367](https://github.com/helium/helium-program-library/pull/1367) [`e7a9362`](https://github.com/helium/helium-program-library/commit/e7a936255322fb4e4541d7b43525880a175d20fd) Thanks [@bryzettler](https://github.com/bryzettler)! - Use finalized commitment in place of confirmed now that mainnet runs Alpenglow.
+
 ## 0.11.21
 
 ### Patch Changes

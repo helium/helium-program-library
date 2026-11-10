@@ -1,5 +1,17 @@
 # Change Log
 
+## 0.15.2
+
+### Patch Changes
+
+- [#1382](https://github.com/helium/helium-program-library/pull/1382) [`b9f2e83`](https://github.com/helium/helium-program-library/commit/b9f2e83885bcb64d0b4303ca61110a59d732c20e) Thanks [@bryzettler](https://github.com/bryzettler)! - Add `remoteCronTransactionSpace` to price the rent of a cron claim transaction.
+
+- Updated dependencies [[`09bb2ff`](https://github.com/helium/helium-program-library/commit/09bb2ff276f4001bee96a9c9e0cf39a0a8f5b0a9), [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/idls@0.12.3
+  - @helium/spl-utils@0.16.0
+  - @helium/helium-sub-daos-sdk@0.13.2
+  - @helium/voter-stake-registry-sdk@0.13.2
+
 ## 0.15.1
 
 ### Patch Changes

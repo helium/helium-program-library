@@ -1,5 +1,30 @@
 # Change Log
 
+## 0.14.5
+
+### Patch Changes
+
+- Updated dependencies [[`b9f2e83`](https://github.com/helium/helium-program-library/commit/b9f2e83885bcb64d0b4303ca61110a59d732c20e), [`09bb2ff`](https://github.com/helium/helium-program-library/commit/09bb2ff276f4001bee96a9c9e0cf39a0a8f5b0a9), [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/hpl-crons-sdk@0.15.2
+  - @helium/idls@0.12.3
+  - @helium/spl-utils@0.16.0
+  - @helium/helium-entity-manager-sdk@0.12.2
+  - @helium/helium-sub-daos-sdk@0.13.2
+  - @helium/lazy-distributor-sdk@0.13.2
+  - @helium/rewards-oracle-sdk@0.12.2
+
+## 0.14.4
+
+### Patch Changes
+
+- [#1322](https://github.com/helium/helium-program-library/pull/1322) [`96a3fb1`](https://github.com/helium/helium-program-library/commit/96a3fb1d56993cc9ee769f5f80b6c7992182cc8d) Thanks [@bryzettler](https://github.com/bryzettler)! - Move the oracle server to Fastify 5 (`fastify` ^5.12.5, `@fastify/cors` ^11.0.1)
+
+## 0.14.3
+
+### Patch Changes
+
+- [#1367](https://github.com/helium/helium-program-library/pull/1367) [`e7a9362`](https://github.com/helium/helium-program-library/commit/e7a936255322fb4e4541d7b43525880a175d20fd) Thanks [@bryzettler](https://github.com/bryzettler)! - Use finalized commitment in place of confirmed now that mainnet runs Alpenglow.
+
 ## 0.14.2
 
 ### Patch Changes

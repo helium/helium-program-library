@@ -22,4 +22,6 @@ pub enum ErrorCode {
   RentRefundAccountMissing,
   #[msg("The rent refund of the task is not writable")]
   RentRefundAccountNotWritable,
+  #[msg("Cron job already has claims")]
+  CronJobHasClaims,
 }

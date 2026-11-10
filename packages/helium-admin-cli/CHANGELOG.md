@@ -1,5 +1,43 @@
 # Change Log
 
+## 0.13.4
+
+### Patch Changes
+
+- [#1382](https://github.com/helium/helium-program-library/pull/1382) [`d283819`](https://github.com/helium/helium-program-library/commit/d28381988fad73f840511e1709589a2aa0cea9d6) Thanks [@bryzettler](https://github.com/bryzettler)! - Add the temporary `backfill-entity-claim-wallets` script.
+
+- Updated dependencies [[`b9f2e83`](https://github.com/helium/helium-program-library/commit/b9f2e83885bcb64d0b4303ca61110a59d732c20e), [`09bb2ff`](https://github.com/helium/helium-program-library/commit/09bb2ff276f4001bee96a9c9e0cf39a0a8f5b0a9), [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/hpl-crons-sdk@0.15.2
+  - @helium/idls@0.12.3
+  - @helium/spl-utils@0.16.0
+  - @helium/circuit-breaker-sdk@0.12.2
+  - @helium/data-credits-sdk@0.13.2
+  - @helium/dc-auto-top-sdk@0.12.2
+  - @helium/distributor-oracle@0.14.5
+  - @helium/fanout-sdk@0.12.2
+  - @helium/helium-entity-manager-sdk@0.12.2
+  - @helium/helium-sub-daos-sdk@0.13.2
+  - @helium/hexboosting-sdk@0.12.2
+  - @helium/lazy-distributor-sdk@0.13.2
+  - @helium/lazy-transactions-sdk@0.12.2
+  - @helium/mini-fanout-sdk@0.12.2
+  - @helium/mobile-entity-manager-sdk@0.12.2
+  - @helium/no-emit-sdk@0.12.2
+  - @helium/price-oracle-sdk@0.12.2
+  - @helium/rewards-oracle-sdk@0.12.2
+  - @helium/treasury-management-sdk@0.12.2
+  - @helium/tuktuk-dca-sdk@0.12.2
+  - @helium/voter-stake-registry-sdk@0.13.2
+
+## 0.13.3
+
+### Patch Changes
+
+- [#1367](https://github.com/helium/helium-program-library/pull/1367) [`e7a9362`](https://github.com/helium/helium-program-library/commit/e7a936255322fb4e4541d7b43525880a175d20fd) Thanks [@bryzettler](https://github.com/bryzettler)! - Use finalized commitment in place of confirmed now that mainnet runs Alpenglow.
+
+- Updated dependencies [[`e7a9362`](https://github.com/helium/helium-program-library/commit/e7a936255322fb4e4541d7b43525880a175d20fd)]:
+  - @helium/distributor-oracle@0.14.3
+
 ## 0.13.2
 
 ### Patch Changes

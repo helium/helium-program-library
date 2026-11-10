@@ -8,6 +8,14 @@ export const TASK_QUEUE_ID = new PublicKey(
   "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7"
 );
 
+/**
+ * Oracle URL hpl-crons compiles in per cluster and writes into the claims it
+ * adds (utils/shared-utils/src/lib.rs ORACLE_URL).
+ */
+export const HNT_REWARDS_ORACLE_URL = "https://hnt-rewards.oracle.helium.io";
+export const HNT_REWARDS_ORACLE_URL_DEVNET =
+  "https://hnt-rewards.oracle.test-helium.com";
+
 // Byte sizes of the accounts hpl-crons instructions create. Price them with
 // connection.getMinimumBalanceForRentExemption (batch with Promise.all)
 // rather than hardcoding lamports, so fees follow the cluster's Rent sysvar.
@@ -63,6 +71,9 @@ export const ENTITY_CLAIM_SCHEDULE_TASK_SPACE = 800;
  */
 export const MAX_PRESET_SCHEDULE_LEN = 15;
 
+/** The cron program queues up to 5 transactions per queue call. */
+export const CRON_TRANSACTIONS_PER_QUEUE_CALL = 5;
+
 /** Byte sizes of the accounts init_entity_claim_cron_v0 creates and funds. */
 export const entityClaimCronSpaces = (
   scheduleLen: number = MAX_PRESET_SCHEDULE_LEN
@@ -73,3 +84,13 @@ export const entityClaimCronSpaces = (
   TASK_RETURN_ACCOUNT_FUNDING_SPACE,
   ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
 ];
+
+/**
+ * Space of a cron transaction that holds a remote source, such as the claim
+ * add_wallet_to_entity_cron_v0 and add_entity_to_cron_v0 add. The cron
+ * program's resize_to_fit sizes it to its serialized length plus a 64-byte
+ * pad: discriminator, id, cron job, variant, url, signer, bump, pad. The payer
+ * pays rent for this size.
+ */
+export const remoteCronTransactionSpace = (url: string) =>
+  8 + 4 + 32 + 1 + 4 + Buffer.byteLength(url) + 32 + 1 + 64;

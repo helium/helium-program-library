@@ -106,6 +106,6 @@ export async function run(args: any = process.argv) {
     provider.connection,
     Buffer.from(signed.serialize()),
     { skipPreflight: true },
-    "confirmed"
+    "finalized"
   );
 }

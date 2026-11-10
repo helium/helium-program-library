@@ -54,7 +54,7 @@ export async function run(args: any = process.argv) {
     },
   });
   const argv = await yarg.argv;
-  const connection = new Connection(argv.url, "confirmed");
+  const connection = new Connection(argv.url, "finalized");
   const readOnlyWallet = (publicKey: PublicKey) =>
     ({
       publicKey,
@@ -67,7 +67,7 @@ export async function run(args: any = process.argv) {
     } as any);
   const providerFor = (url: string, publicKey: PublicKey) =>
     new anchor.AnchorProvider(
-      new Connection(url, "confirmed"),
+      new Connection(url, "finalized"),
       readOnlyWallet(publicKey),
       {}
     );

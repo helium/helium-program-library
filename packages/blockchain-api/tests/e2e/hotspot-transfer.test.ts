@@ -2,7 +2,7 @@ import { Keypair } from "@solana/web3.js";
 import { expect } from "chai";
 import { after, before, describe, it } from "mocha";
 import { isDefinedError } from "@orpc/client";
-import { stopNextServer } from "./helpers/next";
+import { stopServer } from "./helpers/server";
 import { stopSurfpool } from "./helpers/surfpool";
 import { signAndSubmitTransactionData } from "./helpers/tx";
 import { setupTestCtx, TestCtx } from "./helpers/context";
@@ -21,7 +21,7 @@ describe("hotspot-transfer", () => {
   });
 
   after(async () => {
-    await stopNextServer();
+    await stopServer();
     await stopSurfpool();
   });
 
@@ -103,7 +103,10 @@ describe("hotspot-transfer", () => {
     expect(error.message).to.include("Hotspot not found");
   });
 
-  it("returns 409 when hotspot has active reward contract", async () => {
+  it("returns 409 when hotspot has active reward contract", async function () {
+    // Cleanup, create, submit, transfer, and cleanup again: each call can take
+    // 20s+ against the forked RPC, which overruns the 100s default.
+    this.timeout(300_000);
     // #given hotspot with ACTIVE reward contract
     const walletAddress = ctx.payer.publicKey.toBase58();
     const recipient = Keypair.generate().publicKey.toBase58();

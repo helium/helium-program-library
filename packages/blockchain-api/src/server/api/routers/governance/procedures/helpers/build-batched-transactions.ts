@@ -4,7 +4,12 @@ import {
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
 import { getCluster } from "@/lib/solana";
-import { getJitoTipTransaction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import {
+  getJitoTipTransaction,
+  JITO_TIP_METADATA,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito";
+import { maxPackedTxs } from "@/lib/utils/jito-bundle";
 import {
   getAddressLookupTableAccounts,
   getTransactionSizeLimit,
@@ -176,8 +181,7 @@ export async function buildBatchedTransactions({
   }
 
   const cluster = getCluster();
-  const isMainnet = cluster === "mainnet" || cluster === "mainnet-beta";
-  const effectiveMaxTxs = isMainnet ? maxTxs - 1 : maxTxs;
+  const effectiveMaxTxs = maxPackedTxs(cluster, maxTxs);
 
   // The same lookup table goes into every transaction this call produces, and
   // packing needs it to measure sizes, so it is read once up front.
@@ -329,7 +333,7 @@ export async function buildBatchedTransactions({
     const tipTx = await getJitoTipTransaction(feePayer, blockhash);
     transactions.push({
       serializedTransaction: serializeTransaction(tipTx),
-      metadata: { type: "jito_tip", description: "Jito bundle tip" },
+      metadata: JITO_TIP_METADATA,
     });
     versionedTransactions.push(tipTx);
   }

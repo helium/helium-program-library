@@ -12,6 +12,21 @@ pub use state::*;
 
 declare_id!("hcrLPFgFUY6sCUKzqLWxXx5bntDiDCrAZVcrXfx9AHu");
 
+pub const TESTING: bool = std::option_env!("TESTING").is_some();
+
+// A TESTING build substitutes test values for production ones, so it must never be
+// mistaken for a deployable program on any cluster. TESTING on its own can arrive from an
+// inherited environment; HELIUM_TEST_BUILD is set only by a build that means to be a test
+// build. A deployable program refuses to compile when the two disagree.
+#[cfg(all(not(feature = "no-entrypoint"), not(feature = "idl-build"), not(test)))]
+const _: () = {
+  if option_env!("TESTING").is_some() && option_env!("HELIUM_TEST_BUILD").is_none() {
+    panic!(
+      "TESTING is set without HELIUM_TEST_BUILD; a deployable program must not use test values. A deliberate test build sets both."
+    );
+  }
+};
+
 const EPOCH_LENGTH: u64 = 60 * 60 * 24;
 
 pub fn current_epoch(unix_timestamp: i64) -> u64 {
@@ -216,5 +231,10 @@ pub mod hpl_crons {
     args: ReturnPythTaskArgsV0,
   ) -> Result<tuktuk_program::RunTaskReturnV0> {
     return_pyth_task_v0::handler(ctx, args)
+  }
+
+  /// Temporary: see `backfill_entity_claim_wallet_v0`.
+  pub fn backfill_entity_claim_wallet_v0(ctx: Context<BackfillEntityClaimWalletV0>) -> Result<()> {
+    backfill_entity_claim_wallet_v0::handler(ctx)
   }
 }

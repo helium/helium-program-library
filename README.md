@@ -287,11 +287,11 @@ Docker deployments are **decoupled from npm publishing** — you don't need to w
 To release a new image:
 
 ```bash
-git tag docker-web-blockchain-api-0.11.17
-git push origin docker-web-blockchain-api-0.11.17
+git tag docker-web-blockchain-api-0.3.16
+git push origin docker-web-blockchain-api-0.3.16
 ```
 
-The tag format is strict: `docker-<env>-<service>-<version>`. The workflow parses the tag, looks up the source path in `docker-info.json`, logs into the matching ECR with the env-scoped AWS credentials, and pushes `<registry>/<service>:<version>`. Two build styles are supported:
+The tag format is strict: `docker-<env>-<service>-<version>`. The workflow parses the tag, looks up the source path in `docker-info.json`, logs into the matching ECR with the env-scoped AWS credentials, and pushes `<registry>/<service>:<version>`. The `<version>` is the image's own counter, independent of the package's npm version: bump the latest existing `docker-<env>-<service>-*` tag. Tag the merge commit on `develop`. Two build styles are supported:
 
 - If the service's `Dockerfile` uses `turbo prune` (most JS services), the build context is the repo root and only the workspace packages it depends on are copied in.
 - Otherwise (the Rust utils and `geocoder-service`), the build context is the service directory itself.
