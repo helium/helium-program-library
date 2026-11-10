@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.11.23
+
+### Patch Changes
+
+- Updated dependencies [[`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/spl-utils@0.16.0
+  - @helium/helium-entity-manager-sdk@0.12.2
+  - @helium/mobile-entity-manager-sdk@0.12.2
+
 ## 0.11.22
 
 ### Patch Changes

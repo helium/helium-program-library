@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.12.3
+
+### Patch Changes
+
+- [#1382](https://github.com/helium/helium-program-library/pull/1382) [`09bb2ff`](https://github.com/helium/helium-program-library/commit/09bb2ff276f4001bee96a9c9e0cf39a0a8f5b0a9) Thanks [@bryzettler](https://github.com/bryzettler)! - Add the `backfillEntityClaimWalletV0` instruction and the `CronJobHasClaims` error to the hpl-crons IDL.
+
 ## 0.12.2
 
 ### Patch Changes

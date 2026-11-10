@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.18.0
+
+### Minor Changes
+
+- [#1382](https://github.com/helium/helium-program-library/pull/1382) [`b9f2e83`](https://github.com/helium/helium-program-library/commit/b9f2e83885bcb64d0b4303ca61110a59d732c20e) Thanks [@bryzettler](https://github.com/bryzettler)! - Add `createWalletClaimAutomation` and `createEntityClaimAutomation`, which set up an automation and add its claims in one signing round. `getFundingEstimate` takes an optional `claims` input to price them. The cron cost per run now counts one schedule task per 5 claims, so funding for crons with 6 or more claims rises slightly (`createAutomation`, `fundAutomation`, `getAutomationStatus`, `getFundingEstimate`). `createAutomation` now declares `BAD_REQUEST` in its contract. A setup throws it when its transactions do not fit one bundle, including a schedule change whose teardown of the old claims is too large.
+
 ## 0.17.0
 
 ### Minor Changes

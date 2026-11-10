@@ -1,5 +1,31 @@
 # Change Log
 
+## 0.14.0
+
+### Minor Changes
+
+- [#1382](https://github.com/helium/helium-program-library/pull/1382) [`b9f2e83`](https://github.com/helium/helium-program-library/commit/b9f2e83885bcb64d0b4303ca61110a59d732c20e) Thanks [@bryzettler](https://github.com/bryzettler)! - Add `createWalletClaimAutomation` and `createEntityClaimAutomation`, which set up an automation and add its claims in one signing round. `getFundingEstimate` takes an optional `claims` input to price them. The cron cost per run now counts one schedule task per 5 claims, so funding for crons with 6 or more claims rises slightly (`createAutomation`, `fundAutomation`, `getAutomationStatus`, `getFundingEstimate`). `createAutomation` now declares `BAD_REQUEST` in its contract. A setup throws it when its transactions do not fit one bundle, including a schedule change whose teardown of the old claims is too large.
+
+### Patch Changes
+
+- [#1382](https://github.com/helium/helium-program-library/pull/1382) [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3) Thanks [@bryzettler](https://github.com/bryzettler)! - DAS calls in spl-utils now retry dropped connections and 429/502/503/504 twice with backoff. spl-utils exports `withTransientRetry` and `fetchRetryingTransientErrors`, a `fetch` for read-only web3.js `Connection`s. blockchain-api uses it for the key-to-asset lookup without Postgres.
+
+- Updated dependencies [[`b9f2e83`](https://github.com/helium/helium-program-library/commit/b9f2e83885bcb64d0b4303ca61110a59d732c20e), [`b9f2e83`](https://github.com/helium/helium-program-library/commit/b9f2e83885bcb64d0b4303ca61110a59d732c20e), [`09bb2ff`](https://github.com/helium/helium-program-library/commit/09bb2ff276f4001bee96a9c9e0cf39a0a8f5b0a9), [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/blockchain-api@0.18.0
+  - @helium/hpl-crons-sdk@0.15.2
+  - @helium/idls@0.12.3
+  - @helium/spl-utils@0.16.0
+  - @helium/circuit-breaker-sdk@0.12.2
+  - @helium/data-credits-sdk@0.13.2
+  - @helium/distributor-oracle@0.14.5
+  - @helium/helium-entity-manager-sdk@0.12.2
+  - @helium/helium-sub-daos-sdk@0.13.2
+  - @helium/lazy-distributor-sdk@0.13.2
+  - @helium/mini-fanout-sdk@0.12.2
+  - @helium/sus@0.12.2
+  - @helium/voter-stake-registry-sdk@0.13.2
+  - @helium/welcome-pack-sdk@0.13.2
+
 ## 0.13.1
 
 ### Patch Changes
