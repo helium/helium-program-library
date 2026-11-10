@@ -1,5 +1,24 @@
 # Change Log
 
+## 0.11.25
+
+### Patch Changes
+
+- Updated dependencies [[`09bb2ff`](https://github.com/helium/helium-program-library/commit/09bb2ff276f4001bee96a9c9e0cf39a0a8f5b0a9), [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/idls@0.12.3
+  - @helium/spl-utils@0.16.0
+  - @helium/distributor-oracle@0.14.5
+  - @helium/fanout-sdk@0.12.2
+  - @helium/helium-entity-manager-sdk@0.12.2
+  - @helium/helium-sub-daos-sdk@0.13.2
+  - @helium/lazy-distributor-sdk@0.13.2
+  - @helium/mobile-entity-manager-sdk@0.12.2
+  - @helium/no-emit-sdk@0.12.2
+  - @helium/price-oracle-sdk@0.12.2
+  - @helium/rewards-oracle-sdk@0.12.2
+  - @helium/treasury-management-sdk@0.12.2
+  - @helium/voter-stake-registry-sdk@0.13.2
+
 ## 0.11.24
 
 ### Patch Changes
