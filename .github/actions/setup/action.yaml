@@ -7,6 +7,15 @@ runs:
     # serve corrupt indexes and fail apt-get update; nothing here needs them.
     - run: sudo rm -f /etc/apt/sources.list.d/microsoft-prod* /etc/apt/sources.list.d/azure-cli*
       shell: bash
+    # The runner image points apt at a mirror list headed by azure.archive.ubuntu.com.
+    # On 2026-11-10/11 that host stopped resolving for hours and failed every apt-get
+    # install, while archive.ubuntu.com kept answering. Use the global archive directly.
+    - run: |
+        for f in /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list; do
+          [ -f "$f" ] && sudo sed -i 's#mirror+file:/etc/apt/apt-mirrors.txt#http://archive.ubuntu.com/ubuntu/#g; s#azure\.archive\.ubuntu\.com#archive.ubuntu.com#g' "$f"
+        done
+        grep -rh '^URIs:\|^deb ' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true
+      shell: bash
     # apt has no timeout by default, so a mirror that accepts the connection and then
     # stalls hangs the step until the job's own cap. Observed repeatedly: a fetch of
     # archive.ubuntu.com InRelease going silent for 44 minutes. Retries cover a mirror
