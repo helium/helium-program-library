@@ -23,6 +23,11 @@ exclude = [
   "utils/atomic-data-publisher",
 ]
 
+# solana-verify reads this to pick its build image, here and for anyone who runs
+# `verify-from-repo`. 4.3.0 is the newest image solana-verify 0.5.2 ships.
+[workspace.metadata.cli]
+solana = "4.3.0"
+
 [workspace.dependencies]
 anchor-lang = { version = "0.31.2", features = ["init-if-needed"] }
 anchor-spl = { version = "0.31.2", features = ["mint", "token", "metadata"] }

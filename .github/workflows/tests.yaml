@@ -348,6 +348,28 @@ jobs:
         env:
           DATABASE_URL: postgres://test:test@localhost:5432/atomic_test
 
+  # The release and devnet deploys ship the solana-verify container build, not the `build-anchor`
+  # one, and they run only on a tag or a develop push. This builds one program the same way on
+  # every PR, so a broken image pin or arch fails here first.
+  verified-build:
+    name: Verified Build (SBPFv3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-verified/
+        with:
+          program: circuit_breaker
+          program-id: circAbx64bbsscPbQzZAUvuXpHqrCe6fLMzc2uKXz9g
+      - name: The build is SBPFv3
+        run: |
+          E_FLAGS=$(od -An -tu4 -j 48 -N 4 target/deploy/circuit_breaker.so | tr -d ' ')
+          echo "circuit_breaker.so e_flags: ${E_FLAGS}"
+          if [ "$E_FLAGS" != "3" ]; then
+            echo "::error::the verified build is not SBPFv3 (e_flags ${E_FLAGS})"
+            exit 1
+          fi
+
   build:
     name: Build Anchor
     runs-on: ubuntu-latest
@@ -622,6 +644,19 @@ jobs:
         with:
           testing: true
           target-artifact: anchor-build
+      # solana-bankrun cannot load SBPFv3, and no web3.js 1.x litesvm can. The bankrun suites run
+      # test-only v0 builds of the workspace programs they load, over the v3 ones from the artifact.
+      # The localnet suites keep the v3 runtime coverage. Removed with the kit port to litesvm.
+      - name: Build v0 programs for bankrun
+        if: endsWith(matrix.test, '-bankrun.ts')
+        run: |
+          set -euo pipefail
+          for P in mini_fanout dc_auto_top tuktuk_dca data_credits circuit_breaker; do
+            ~/.cargo/bin/anchor build --no-idl -p "$P" -- --arch v0
+          done
+        env:
+          TESTING: true
+          HELIUM_TEST_BUILD: true
       - uses: ./.github/actions/setup-ts/
       - uses: ./.github/actions/localnet-accounts/
       - uses: ./.github/actions/start-localnet/
