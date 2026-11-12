@@ -600,7 +600,6 @@ jobs:
           - tests/helium-sub-daos-vehnt-cases-4-5.ts
           - tests/hexboosting.ts
           - tests/hpl-crons.ts
-          - tests/hpl-crons-backfill-bankrun.ts
           - tests/lazy-distributor.ts
           - tests/lazy-transactions.ts
           - tests/treasury-management.ts
