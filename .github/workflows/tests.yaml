@@ -64,7 +64,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - run: scripts/check-release-bumps.sh ${{ github.event.pull_request.base.sha }}
+      # The checkout is the PR merge commit, so HEAD^1 is the develop tip it was merged onto.
+      # `pull_request.base.sha` is not used: it can be older than that tip, and then the diff
+      # takes in develop's own changes, whose changesets a Version Packages PR already consumed.
+      - run: scripts/check-release-bumps.sh HEAD^1
 
   backstop:
     name: Release Declaration
