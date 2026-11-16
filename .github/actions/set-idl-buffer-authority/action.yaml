@@ -1,8 +1,9 @@
 # Hands the IDL buffer from `write-idl-buffer` to the vault. The caller runs it right before
 # the Squads proposal step. Until then the deployer key owns the buffer, so a run that stops
 # before the proposal (a skip, a failure, a runner that dies) leaves a buffer the deployer
-# key can close: this action's close step or the weekly sweep returns the rent. After the
-# transfer only a multisig proposal can close it.
+# key can close: this action's close step or the release's `close-idl-buffer` job returns the
+# rent. A runner that dies leaves it for a person to close. After the transfer only a multisig
+# proposal can close it.
 #
 # The caller installs the Solana and Anchor CLIs first (`setup-anchor` does it).
 name: "Set IDL Buffer Authority"
