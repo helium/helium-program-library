@@ -136,6 +136,14 @@ export async function startBankrun(
           `\`TESTING=true HELIUM_TEST_BUILD=true anchor build\`; anything else needs ensureDumped() or usePinnedProgram().`
       );
     }
+    // The ELF e_flags field (u32 LE at offset 48) holds the SBPF version.
+    const sbpfVersion = readFileSync(path).readUInt32LE(48);
+    if (sbpfVersion !== 0) {
+      throw new Error(
+        `${path} is SBPF v${sbpfVersion}, but solana-bankrun 0.4.0 loads only SBPF v0. ` +
+          `Build it with \`--arch v0\` or load a pinned v0 build with usePinnedProgram().`
+      );
+    }
     void programId;
   }
   return start(programs, accounts);
