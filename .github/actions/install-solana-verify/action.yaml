@@ -4,8 +4,8 @@ name: "Install Solana Verify"
 description: "Installs the pinned solana-verify to ~/.cargo/bin"
 inputs:
   # 0.5.2 is the first release with a native `--arch` and an Agave 4.3.0 image. It needs
-  # rustc >= 1.89, which setup-anchor pins. The image comes from `[workspace.metadata.cli]`
-  # in the root Cargo.toml.
+  # rustc >= 1.89: setup-anchor pins it, and the jobs without setup-anchor use the runner's
+  # stable rustc. The image comes from `[workspace.metadata.cli]` in the root Cargo.toml.
   version:
     description: "The solana-verify version"
     required: false
