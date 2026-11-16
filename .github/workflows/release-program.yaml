@@ -432,6 +432,11 @@ jobs:
     environment: mainnet-deploy
     timeout-minutes: 15
     steps:
+      # `anchor idl` runs only inside an Anchor workspace.
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Download the Anchor CLI
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -458,24 +463,66 @@ jobs:
           PROGRAM_ID: ${{ needs.build.outputs.program-id }}
           NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
           IDL_BUFFER: ${{ needs.buffers.outputs.idl-buffer }}
-          DEPLOYER: ${{ secrets.DEPLOYER_ADDRESS }}
+          VAULT: ${{ secrets.MULTISIG_VAULT }}
           DEPLOY_KEYPAIR: ${{ secrets.DEPLOYER_KEYPAIR }}
         run: |
-          set +e
-          AUTHORITY_OUT=$(anchor idl authority "$IDL_BUFFER" --provider.cluster "$NETWORK" 2>&1)
-          EXIT_CODE=$?
-          set -e
-          # The RPC URL is a secret and the CLI puts it in some errors.
-          AUTHORITY_OUT=${AUTHORITY_OUT//"$NETWORK"/<rpc-url>}
-          if [ "$EXIT_CODE" -ne 0 ]; then
-            # `set-idl-buffer-authority` closes the buffer when it fails, and a closed buffer has
-            # no authority to read.
-            echo "$AUTHORITY_OUT"
-            echo "::warning::IDL buffer $IDL_BUFFER authority not read, so not closed: $(echo "$AUTHORITY_OUT" | tail -n 1)"
+          if [ -z "$VAULT" ]; then
+            echo "::error::MULTISIG_VAULT is not set"
+            exit 1
+          fi
+
+          REQUEST=$(jq -cn --arg buffer "$IDL_BUFFER" \
+            '{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":[$buffer,{"encoding":"base64","commitment":"confirmed"}]}')
+          ACCOUNT_OK=false
+          for i in 1 2 3; do
+            set +e
+            ACCOUNT_OUT=$(curl -sS --fail -X POST -H 'Content-Type: application/json' -d "$REQUEST" "$NETWORK" 2>&1)
+            EXIT_CODE=$?
+            set -e
+            # The RPC URL is a secret and curl puts it in some errors.
+            ACCOUNT_OUT=${ACCOUNT_OUT//"$NETWORK"/<rpc-url>}
+            if [ "$EXIT_CODE" -eq 0 ] && echo "$ACCOUNT_OUT" | jq -e 'has("error") | not' > /dev/null 2>&1; then
+              ACCOUNT_OK=true
+              break
+            fi
+            echo "Attempt $i to read IDL buffer $IDL_BUFFER failed: $ACCOUNT_OUT"
+            if [ "$i" -lt 3 ]; then
+              sleep $((i * 5))
+            fi
+          done
+          if [ "$ACCOUNT_OK" != true ]; then
+            echo "::error::IDL buffer $IDL_BUFFER not read after 3 attempts"
+            exit 1
+          fi
+          # `set-idl-buffer-authority` closes the buffer when it fails.
+          if echo "$ACCOUNT_OUT" | jq -e '.result.value == null' > /dev/null; then
+            echo "IDL buffer $IDL_BUFFER is already closed."
             exit 0
           fi
-          if ! echo "$AUTHORITY_OUT" | grep -q "$DEPLOYER"; then
-            echo "IDL buffer $IDL_BUFFER is not the deployer's: $AUTHORITY_OUT"
+
+          AUTHORITY_OK=false
+          for i in 1 2 3; do
+            set +e
+            AUTHORITY_OUT=$(anchor idl authority "$IDL_BUFFER" --provider.cluster "$NETWORK" 2>&1)
+            EXIT_CODE=$?
+            set -e
+            # The RPC URL is a secret and the CLI puts it in some errors.
+            AUTHORITY_OUT=${AUTHORITY_OUT//"$NETWORK"/<rpc-url>}
+            if [ "$EXIT_CODE" -eq 0 ]; then
+              AUTHORITY_OK=true
+              break
+            fi
+            echo "$AUTHORITY_OUT"
+            if [ "$i" -lt 3 ]; then
+              sleep $((i * 5))
+            fi
+          done
+          if [ "$AUTHORITY_OK" != true ]; then
+            echo "::error::IDL buffer $IDL_BUFFER authority not read: $(echo "$AUTHORITY_OUT" | tail -n 1)"
+            exit 1
+          fi
+          if echo "$AUTHORITY_OUT" | grep -qF -- "$VAULT"; then
+            echo "IDL buffer $IDL_BUFFER is the vault's, so it stays."
             exit 0
           fi
 

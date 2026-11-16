@@ -226,7 +226,7 @@ Every leaf under `programs/`, `packages/`, and `utils/` has its own README that 
 
 ## CI / deployment overview
 
-Everything this repo publishes to the world runs through one of seven GitHub Actions workflows:
+Everything this repo publishes to the world runs through one of five GitHub Actions workflows:
 
 | What changes                                                  | Triggered by                                                                                                                                        | Workflow                                                                         |
 | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -324,7 +324,7 @@ A re-run skips a program only when both its on-chain hash and its on-chain IDL m
 
 In the release workflow, the deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key. A cleanup job that closes the IDL buffer also holds it.
 
-A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. The vault takes the IDL buffer only right before the proposal. When a run stops earlier (the pending-proposal skip, a failure, a cancel), its `close-idl-buffer` job closes the IDL buffer the deployer key still owns and returns the rent. A runner that dies before the vault takes a buffer leaves it with the deployer key; close it by hand with `solana program close` or `anchor idl close`.
+A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. The vault takes the IDL buffer only right before the proposal. When a run stops earlier (the pending-proposal skip, a failure, a cancel), its `close-idl-buffer` job closes the IDL buffer the deployer key still owns and returns the rent. Some buffers still stay with the deployer key: a runner that dies before the vault takes them, a failed close (the run shows a warning), or an IDL buffer write that fails part way and prints no address. Close them by hand with `solana program close` or `anchor idl close`.
 
 After a failed run, "Re-run failed jobs" and "Re-run all jobs" are both safe. A re-run reuses the program buffer and the IDL buffer the vault took in the failed attempt, so it pays no rent twice. Two cases fail loudly: when the `close-idl-buffer` job closed the failed run's IDL buffer, or when the failed attempt's proposal job closed its own IDL buffer because it failed before the vault took it, "Re-run failed jobs" stops at the IDL buffer hand-off and makes no proposal. Use "Re-run all jobs" there; it writes a new IDL buffer. Each executed upgrade leaves its IDL buffer with the vault, because setting the IDL copies the buffer and does not close it. A release that is abandoned or replaced by a new version also leaves its buffers with the vault. `helium-admin close-buffers` closes vault program buffers only; a vault IDL buffer needs a Squads proposal with an Anchor IDL Close instruction.
 
