@@ -1,5 +1,14 @@
 # Change Log
 
+## 0.13.5
+
+### Patch Changes
+
+- [#1386](https://github.com/helium/helium-program-library/pull/1386) [`8a68610`](https://github.com/helium/helium-program-library/commit/8a686103458e6785006ac925863849ccade8d7ef) Thanks [@bryzettler](https://github.com/bryzettler)! - Remove the temporary `backfill-entity-claim-wallets` script.
+
+- Updated dependencies [[`8a68610`](https://github.com/helium/helium-program-library/commit/8a686103458e6785006ac925863849ccade8d7ef)]:
+  - @helium/idls@0.12.4
+
 ## 0.13.4
 
 ### Patch Changes
