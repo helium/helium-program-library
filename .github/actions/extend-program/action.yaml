@@ -52,14 +52,14 @@ runs:
           echo "::error title=Could not read $PROGRAM on the target cluster::solana program show failed 3 times for $PROGRAM_ID. If the program does not exist there, deploy it once with its program keypair, then re-run. Otherwise re-run the failed job."
           exit 1
         fi
-        CURRENT_SIZE=$(echo "$PROGRAM_INFO" | grep "Data Length:" | sed -E 's/.*Data Length: ([0-9]+).*/\1/' | cut -d ' ' -f1)
+        CURRENT_SIZE=$(echo "$PROGRAM_INFO" | grep "Data Length:" | sed -E 's/.*Data Length: ([0-9]+).*/\1/' | cut -d ' ' -f1 || true)
         if ! [[ "$CURRENT_SIZE" =~ ^[0-9]+$ ]]; then
           echo "::error::Could not read the data length of $PROGRAM_ID (got: $CURRENT_SIZE)"
           exit 1
         fi
         UPGRADE_AUTHORITY=$(echo "$PROGRAM_INFO" | sed -nE 's/^Authority: ([1-9A-HJ-NP-Za-km-z]+)$/\1/p')
         if [ -z "$BUFFER_AUTHORITY" ] || [ "$UPGRADE_AUTHORITY" != "$BUFFER_AUTHORITY" ]; then
-          echo "::error title=$PROGRAM upgrade authority is not the buffer authority::$PROGRAM_ID upgrade authority is ${UPGRADE_AUTHORITY:-unknown}, not the buffer authority, so the multisig cannot apply a buffer. Nothing was extended or written."
+          echo "::error title=$PROGRAM upgrade authority is not the buffer authority::$PROGRAM_ID upgrade authority is ${UPGRADE_AUTHORITY:-unknown}, not the buffer authority, so the multisig cannot apply a buffer. This step extended nothing."
           exit 1
         fi
 

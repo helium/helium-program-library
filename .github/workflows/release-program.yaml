@@ -165,9 +165,9 @@ jobs:
           echo "Artifact hash: $ARTIFACT_SHA256"
           echo "artifact-sha256=${ARTIFACT_SHA256}" >> "$GITHUB_OUTPUT"
 
-      # The `release`, `plan` and `buffers` jobs take the build from this artifact. `plan` runs
-      # workspace JavaScript, and that code can replace the artifact, so `buffers` checks it
-      # against the hash taken here.
+      # The `release`, `plan`, `buffers`, `wait` and `propose` jobs take the build from this
+      # artifact. `plan` and `wait` run workspace JavaScript, and that code can replace the
+      # artifact, so `buffers` and `propose` check it against the hash taken here.
       - name: Store the build
         uses: actions/upload-artifact@v4
         with:
@@ -418,9 +418,11 @@ jobs:
             echo "::error::Anchor CLI hash ${ACTUAL} does not match '${EXPECTED}' from the buffers job"
             exit 1
           fi
-          # Artifacts do not keep file modes.
-          chmod +x "${ANCHOR_DIR}/anchor"
-          echo "$ANCHOR_DIR" >> "$GITHUB_PATH"
+          # Only the hashed `anchor` goes on PATH. Any other file in the artifact could shadow
+          # `solana`, `grep` or `sed` in the steps that hold the deployer key.
+          BIN_DIR="${RUNNER_TEMP}/anchor-bin"
+          install -D -m 755 "${ANCHOR_DIR}/anchor" "${BIN_DIR}/anchor"
+          echo "$BIN_DIR" >> "$GITHUB_PATH"
       # `buffers` extended the programdata, but an earlier proposal for this program can execute
       # during `wait` and shrink it again under SIMD-0433. Extend again here, so the gap is only
       # the time between this proposal and its execute. The extend reads the ELF length from the
