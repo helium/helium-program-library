@@ -151,8 +151,10 @@ impl PositionV0 {
     )
   }
 
+  // A Constant lockup never expires, whatever end_ts says. Its tokens unlock
+  // only after a reset to Cliff and a full Cliff countdown.
   pub fn amount_unlocked(&self, curr_ts: i64) -> u64 {
-    if self.lockup.end_ts <= curr_ts {
+    if self.lockup.expired(curr_ts) {
       self.amount_deposited_native
     } else {
       0
@@ -201,4 +203,47 @@ macro_rules! position_seeds {
       &[$position.bump_seed],
     ]
   };
+}
+
+#[cfg(test)]
+mod amount_unlocked_tests {
+  use super::*;
+
+  const AMOUNT: u64 = 10_000;
+  const START: i64 = 1_000;
+  const END: i64 = 2_000;
+
+  fn position(kind: LockupKind) -> PositionV0 {
+    PositionV0 {
+      amount_deposited_native: AMOUNT,
+      lockup: Lockup {
+        start_ts: START,
+        end_ts: END,
+        kind,
+      },
+      ..Default::default()
+    }
+  }
+
+  #[test]
+  fn constant_stays_locked_after_end_ts() {
+    let position = position(LockupKind::Constant);
+    assert_eq!(position.amount_unlocked(END), 0);
+    assert_eq!(position.amount_unlocked(END * 100), 0);
+    assert_eq!(position.amount_locked(END * 100), AMOUNT);
+  }
+
+  #[test]
+  fn cliff_unlocks_at_end_ts() {
+    let position = position(LockupKind::Cliff);
+    assert_eq!(position.amount_unlocked(END - 1), 0);
+    assert_eq!(position.amount_unlocked(END), AMOUNT);
+  }
+
+  #[test]
+  fn none_is_always_unlocked() {
+    let mut position = position(LockupKind::None);
+    position.lockup.end_ts = START;
+    assert_eq!(position.amount_unlocked(START), AMOUNT);
+  }
 }
