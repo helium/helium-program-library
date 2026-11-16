@@ -353,6 +353,7 @@ jobs:
   # every PR, so a broken image pin or arch fails here first.
   verified-build:
     name: Verified Build (SBPFv3)
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
