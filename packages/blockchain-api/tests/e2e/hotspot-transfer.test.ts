@@ -103,7 +103,10 @@ describe("hotspot-transfer", () => {
     expect(error.message).to.include("Hotspot not found");
   });
 
-  it("returns 409 when hotspot has active reward contract", async () => {
+  it("returns 409 when hotspot has active reward contract", async function () {
+    // Cleanup, create, submit, transfer, and cleanup again: each call can take
+    // 20s+ against the forked RPC, which overruns the 100s default.
+    this.timeout(300_000);
     // #given hotspot with ACTIVE reward contract
     const walletAddress = ctx.payer.publicKey.toBase58();
     const recipient = Keypair.generate().publicKey.toBase58();

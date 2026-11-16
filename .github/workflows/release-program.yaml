@@ -12,10 +12,10 @@ on:
 permissions:
   contents: read
 
-# In this workflow the deployer key reaches `buffers` and `propose` only, and neither installs
-# the workspace. The key must exist only as a `mainnet-deploy` environment secret, never as a
-# repository secret: the environment admits `program-*` tags and master, so only those runs of
-# a job that names it can read the key. The sweep workflow holds it too. `@sqds/multisig` runs
+# In this workflow the deployer key reaches `buffers`, `propose` and `close-idl-buffer` only, and
+# none installs the workspace. The key must exist only as a `mainnet-deploy` environment secret,
+# never as a repository secret: the environment admits `program-*` tags and master, so only
+# those runs of a job that names it can read the key. `@sqds/multisig` runs
 # in `plan` and `wait`, which name no environment and hold no key and no write token.
 jobs:
   build:
@@ -149,7 +149,7 @@ jobs:
             exit 1
           fi
 
-      # The release hash. The scheduled hash check compares the on-chain program with it.
+      # The release hash. Compare it with `solana-verify get-program-hash` to verify a deploy.
       # `artifact-sha256` covers the two files the build artifact stores, taken before `plan-deploy`.
       - name: Take the release hash
         id: hash
@@ -418,7 +418,7 @@ jobs:
           chmod +x "${ANCHOR_DIR}/anchor"
           echo "$ANCHOR_DIR" >> "$GITHUB_PATH"
       # Right before the proposal, so a run that stops earlier (the `wait` skip, a failure)
-      # leaves an IDL buffer the deployer key owns and the sweep can close.
+      # leaves an IDL buffer the deployer key owns and `close-idl-buffer` can close.
       - uses: ./.github/actions/set-idl-buffer-authority/
         with:
           network: ${{ secrets.SOLANA_DEPLOY_URL }}
@@ -453,3 +453,123 @@ jobs:
           LINE="${PROGRAM} ${VERSION}: proposal ${PENDING} is still pending"
           echo "::notice title=Older pending proposal::${LINE}"
           echo "$LINE" >> "$GITHUB_STEP_SUMMARY"
+
+  # A run that stops after `buffers` and before the vault takes the IDL buffer (the `wait` skip,
+  # a failed or cancelled `wait`, a `propose` that fails before `set-idl-buffer-authority`)
+  # leaves that buffer with the deployer key. `plan-deploy` reuses vault buffers only, so no
+  # later run finds it. This job closes it and returns the rent. A buffer the vault holds, or
+  # one `set-idl-buffer-authority` already closed, is left alone.
+  close-idl-buffer:
+    needs: [build, buffers, propose]
+    if: always() && needs.buffers.result == 'success' && needs.buffers.outputs.idl-buffer != '' && needs.propose.result != 'success'
+    runs-on: ubuntu-latest
+    environment: mainnet-deploy
+    timeout-minutes: 15
+    steps:
+      # `anchor idl` runs only inside an Anchor workspace.
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Download the Anchor CLI
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: anchor-cli
+          path: ${{ runner.temp }}/anchor-cli/
+      # `plan` and `wait` run workspace JavaScript and can replace the artifact. The hash comes
+      # from `buffers`, which runs none.
+      - name: Check the Anchor CLI against the hash taken in buffers
+        env:
+          ANCHOR_DIR: ${{ runner.temp }}/anchor-cli
+          EXPECTED: ${{ needs.buffers.outputs.anchor-sha256 }}
+        run: |
+          ACTUAL=$(sha256sum "${ANCHOR_DIR}/anchor" | cut -d' ' -f1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::Anchor CLI hash ${ACTUAL} does not match '${EXPECTED}' from the buffers job"
+            exit 1
+          fi
+          # Artifacts do not keep file modes.
+          chmod +x "${ANCHOR_DIR}/anchor"
+          echo "$ANCHOR_DIR" >> "$GITHUB_PATH"
+      - name: Close the IDL buffer the deployer key still owns
+        env:
+          PROGRAM: ${{ needs.build.outputs.program-name }}
+          PROGRAM_ID: ${{ needs.build.outputs.program-id }}
+          NETWORK: ${{ secrets.SOLANA_DEPLOY_URL }}
+          IDL_BUFFER: ${{ needs.buffers.outputs.idl-buffer }}
+          VAULT: ${{ secrets.MULTISIG_VAULT }}
+          DEPLOY_KEYPAIR: ${{ secrets.DEPLOYER_KEYPAIR }}
+        run: |
+          if [ -z "$VAULT" ]; then
+            echo "::error::MULTISIG_VAULT is not set"
+            exit 1
+          fi
+
+          REQUEST=$(jq -cn --arg buffer "$IDL_BUFFER" \
+            '{"jsonrpc":"2.0","id":1,"method":"getAccountInfo","params":[$buffer,{"encoding":"base64","commitment":"confirmed"}]}')
+          ACCOUNT_OK=false
+          for i in 1 2 3; do
+            set +e
+            ACCOUNT_OUT=$(curl -sS --fail -X POST -H 'Content-Type: application/json' -d "$REQUEST" "$NETWORK" 2>&1)
+            EXIT_CODE=$?
+            set -e
+            # The RPC URL is a secret and curl puts it in some errors.
+            ACCOUNT_OUT=${ACCOUNT_OUT//"$NETWORK"/<rpc-url>}
+            if [ "$EXIT_CODE" -eq 0 ] && echo "$ACCOUNT_OUT" | jq -e 'has("error") | not' > /dev/null 2>&1; then
+              ACCOUNT_OK=true
+              break
+            fi
+            echo "Attempt $i to read IDL buffer $IDL_BUFFER failed: $ACCOUNT_OUT"
+            if [ "$i" -lt 3 ]; then
+              sleep $((i * 5))
+            fi
+          done
+          if [ "$ACCOUNT_OK" != true ]; then
+            echo "::error::IDL buffer $IDL_BUFFER not read after 3 attempts"
+            exit 1
+          fi
+          # `set-idl-buffer-authority` closes the buffer when it fails.
+          if echo "$ACCOUNT_OUT" | jq -e '.result.value == null' > /dev/null; then
+            echo "IDL buffer $IDL_BUFFER is already closed."
+            exit 0
+          fi
+
+          AUTHORITY_OK=false
+          for i in 1 2 3; do
+            set +e
+            AUTHORITY_OUT=$(anchor idl authority "$IDL_BUFFER" --provider.cluster "$NETWORK" 2>&1)
+            EXIT_CODE=$?
+            set -e
+            # The RPC URL is a secret and the CLI puts it in some errors.
+            AUTHORITY_OUT=${AUTHORITY_OUT//"$NETWORK"/<rpc-url>}
+            if [ "$EXIT_CODE" -eq 0 ]; then
+              AUTHORITY_OK=true
+              break
+            fi
+            echo "$AUTHORITY_OUT"
+            if [ "$i" -lt 3 ]; then
+              sleep $((i * 5))
+            fi
+          done
+          if [ "$AUTHORITY_OK" != true ]; then
+            echo "::error::IDL buffer $IDL_BUFFER authority not read: $(echo "$AUTHORITY_OUT" | tail -n 1)"
+            exit 1
+          fi
+          if echo "$AUTHORITY_OUT" | grep -qF -- "$VAULT"; then
+            echo "IDL buffer $IDL_BUFFER is the vault's, so it stays."
+            exit 0
+          fi
+
+          trap 'rm -f ./deploy-keypair.json' EXIT
+          echo "$DEPLOY_KEYPAIR" > ./deploy-keypair.json && chmod 600 ./deploy-keypair.json
+          set +e
+          CLOSE_OUT=$(anchor idl close "$PROGRAM_ID" --idl-address "$IDL_BUFFER" --provider.cluster "$NETWORK" --provider.wallet ./deploy-keypair.json 2>&1)
+          EXIT_CODE=$?
+          set -e
+          CLOSE_OUT=${CLOSE_OUT//"$NETWORK"/<rpc-url>}
+          echo "$CLOSE_OUT"
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "::error::IDL buffer $IDL_BUFFER not closed: $(echo "$CLOSE_OUT" | tail -n 1)"
+            exit 1
+          fi
+          echo "- \`$PROGRAM\`: closed IDL buffer \`$IDL_BUFFER\`. The rent is back with the deployer." >> "$GITHUB_STEP_SUMMARY"

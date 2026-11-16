@@ -510,7 +510,7 @@ describe("migration", () => {
     });
 
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip"
+      (t: any) => t.metadata?.type !== "jito_tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -774,7 +774,7 @@ describe("migration", () => {
     expect(result.transactionData.parallel).to.equal(false);
 
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip"
+      (t: any) => t.metadata?.type !== "jito_tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     for (const t of migrationTxs) {
@@ -867,7 +867,7 @@ describe("migration", () => {
     // payer only, but the batcher packs groups greedily, so whether it lands
     // in its own tx depends on instruction sizes.
     const migrationTxs = result.transactionData.transactions.filter(
-      (t: any) => t.metadata?.description !== "Jito tip"
+      (t: any) => t.metadata?.type !== "jito_tip"
     );
     expect(migrationTxs.length).to.be.greaterThan(0);
     // Pin each tx's signer set rather than an aggregate. An existential over

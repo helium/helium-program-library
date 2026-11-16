@@ -1,5 +1,5 @@
-# The one solana-verify pin. The release hash, the deploy skip and the daily hash check must
-# all come from the same binary, so every job installs it through this action.
+# The one solana-verify pin. The release hash and the deploy skip must come from the same
+# binary, so every job installs it through this action.
 name: "Install Solana Verify"
 description: "Installs the pinned solana-verify to ~/.cargo/bin"
 inputs:

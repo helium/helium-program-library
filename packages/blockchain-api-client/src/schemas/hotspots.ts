@@ -118,18 +118,58 @@ export const SetupAutomationInputSchema = z.object({
   duration: z.number().int().min(1), // Number of claims to pre-fund
 });
 
+// Hotspots a per-hotspot claim setup adds, one claim each. The server
+// also rejects a list that does not fit one mainnet bundle, on every cluster.
+const SetupEntityKeysSchema = z
+  .array(
+    HeliumPublicKeySchema.refine((key) => /^[1-9A-HJ-NP-Za-km-z]+$/.test(key), {
+      message: "Entity key must be base58",
+    })
+  )
+  .min(1)
+  .max(50)
+  .refine((keys) => new Set(keys).size === keys.length, {
+    message: "Duplicate entity keys",
+  });
+
+// Claims a setup adds to a new cron, or to an existing cron that holds none.
+export const AutomationClaimsSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("wallet") }),
+  z.object({ kind: z.literal("entities"), entityKeys: SetupEntityKeysSchema }),
+]);
+
+// Set up the cron and add the whole-wallet claim in one signing round.
+export const CreateWalletClaimAutomationInputSchema =
+  SetupAutomationInputSchema;
+
+// Set up the cron and add one claim per hotspot in one signing round.
+export const CreateEntityClaimAutomationInputSchema =
+  SetupAutomationInputSchema.extend({
+    entityKeys: SetupEntityKeysSchema,
+  });
+
 export const FundAutomationInputSchema = z.object({
   walletAddress: WalletAddressSchema,
   additionalDuration: z.number().int().min(1), // Additional number of claims
 });
 
-export const GetFundingEstimateInputSchema = z.object({
-  walletAddress: WalletAddressSchema,
-  duration: z.coerce.number().int().min(1), // Number of claims to estimate funding for
-  // The schedule createAutomation will be given. Prices the cron job at its
-  // crontab length; without it the estimate assumes the longest preset.
-  schedule: SetupAutomationInputSchema.shape.schedule.optional(),
-});
+export const GetFundingEstimateInputSchema = z
+  .object({
+    walletAddress: WalletAddressSchema,
+    duration: z.coerce.number().int().min(1), // Number of claims to estimate funding for
+    // The schedule createAutomation will be given. Prices the cron job at its
+    // crontab length; without it the estimate assumes the longest preset.
+    schedule: SetupAutomationInputSchema.shape.schedule.optional(),
+    // The claims createWalletClaimAutomation or createEntityClaimAutomation will
+    // add. Prices their rent and the crank reward each claim adds per run.
+    claims: AutomationClaimsSchema.optional(),
+  })
+  // A claim setup always gives a schedule, and a schedule change re-creates
+  // the cron, so without it the estimate cannot price that re-create.
+  .refine((i) => !i.claims || i.schedule !== undefined, {
+    message: "schedule is required with claims",
+    path: ["schedule"],
+  });
 
 export const CloseAutomationInputSchema = z.object({
   walletAddress: WalletAddressSchema,
@@ -273,6 +313,10 @@ export const CloseAutomationOutputSchema = createTransactionResponse();
 export const RequeueAutomationOutputSchema = createTransactionResponse();
 export const IssueDataOnlyHotspotOutputSchema = createTransactionResponse();
 export const OnboardDataOnlyHotspotOutputSchema = createTransactionResponse();
+export const CreateWalletClaimAutomationOutputSchema =
+  createTransactionResponse();
+export const CreateEntityClaimAutomationOutputSchema =
+  createTransactionResponse();
 export const AddWalletToAutomationOutputSchema = createTransactionResponse();
 export const AddEntityToAutomationOutputSchema = createTransactionResponse();
 export const RemoveEntityFromAutomationOutputSchema =
@@ -434,6 +478,13 @@ export type GetAutomationStatusInput = z.infer<
 >;
 export type AutomationStatus = z.infer<typeof AutomationStatusOutputSchema>;
 export type SetupAutomationInput = z.infer<typeof SetupAutomationInputSchema>;
+export type AutomationClaims = z.infer<typeof AutomationClaimsSchema>;
+export type CreateWalletClaimAutomationInput = z.infer<
+  typeof CreateWalletClaimAutomationInputSchema
+>;
+export type CreateEntityClaimAutomationInput = z.infer<
+  typeof CreateEntityClaimAutomationInputSchema
+>;
 export type FundAutomationInput = z.infer<typeof FundAutomationInputSchema>;
 export type CloseAutomationInput = z.infer<typeof CloseAutomationInputSchema>;
 export type GetFundingEstimateInput = z.infer<
