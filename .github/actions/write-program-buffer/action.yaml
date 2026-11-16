@@ -231,6 +231,7 @@ runs:
         if [ "$EXIT_CODE" -eq 0 ]; then
           echo "- \`$PROGRAM\`: closed buffer \`$BUFFER\` after the failure. The rent is back with the deployer." >> "$GITHUB_STEP_SUMMARY"
         else
+          echo "::warning::Buffer $BUFFER not closed: $(echo "$CLOSE_OUT" | tail -n 1)"
           echo "- \`$PROGRAM\`: buffer \`$BUFFER\` not closed: $(echo "$CLOSE_OUT" | tail -n 1)" >> "$GITHUB_STEP_SUMMARY"
         fi
       env:

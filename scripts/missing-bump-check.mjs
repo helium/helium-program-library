@@ -22,9 +22,19 @@ import {
   run,
 } from "./changed-programs.mjs";
 import { ENTRY } from "./missing-changesets.mjs";
-import { parseProgramTag } from "./program-hash-check.mjs";
 
 const git = (...args) => run("git", args);
+
+// A `program-<name>-<x.y.z>` tag and nothing else: the tag list holds a
+// `v`-prefixed tag, a `-test` suffixed one, and a misspelled program name, and a
+// loose parse reads a program or a version out of all three.
+const PROGRAM_TAG = /^program-([a-z0-9]+(?:-[a-z0-9]+)*)-(\d+\.\d+\.\d+)$/;
+
+/** The program name and version a `program-<name>-<x.y.z>` tag names, or null. */
+export const parseProgramTag = (tag) => {
+  const match = PROGRAM_TAG.exec(tag ?? "");
+  return match ? { name: match[1], version: match[2] } : null;
+};
 
 // The programs with no base to diff from ask `changedProgramsForBases` for a
 // ref that has no files, so one call answers for the candidates alone.

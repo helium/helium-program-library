@@ -8,7 +8,13 @@ import {
   generateTransactionTag,
   TRANSACTION_TYPES,
 } from "@/lib/utils/transaction-tags";
-import { getJitoTipInstruction, shouldUseJitoBundle } from "@/lib/utils/jito";
+import { getJitoTipInstruction } from "@/lib/utils/jito";
+import {
+  buildBundleTipDraft,
+  JITO_TIP_METADATA,
+  maxPackedTxs,
+  shouldUseJitoBundle,
+} from "@/lib/utils/jito-bundle";
 import {
   ATA_SPACE,
   FANOUT_FUNDING_AMOUNT,
@@ -52,10 +58,8 @@ import {
   chunks,
   getAsset,
   getAssetProof,
-  getTransactionSizeLimit,
   HNT_MINT,
   proofArgsAndAccounts,
-  resolveTxVersion,
   toVersionedTx,
   type TransactionDraft,
   type TransactionSigning,
@@ -116,7 +120,6 @@ function markLeafOwnerAsSigner(
   return ix;
 }
 
-const MAX_JITO_BUNDLE_TXS = 5;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
 const migrationPairRateLimiter = createRateLimiter({
@@ -835,9 +838,10 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const lut =
       getHeliumLookupTable();
     const cluster = getCluster();
+    const packBudget = maxPackedTxs(cluster);
 
     // Work with TransactionDrafts (instructions + metadata) until the very end,
-    // so we can easily append the Jito tip ix before converting to VersionedTransaction.
+    // so we can append a Jito tip transaction before converting to VersionedTransaction.
     const allDrafts: TransactionDraft[] = [];
     const txMetadata: {
       type: string;
@@ -902,7 +906,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const { drafts: tokenDrafts, includedCount: includedTokenCount } =
       await fitGroupsWithinLimit(
         tokenWorkList.map((w) => w.group),
-        MAX_JITO_BUNDLE_TXS,
+        packBudget,
       );
     addDrafts(tokenDrafts, "Migration: transfers");
 
@@ -913,7 +917,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const { drafts: positionDrafts, includedCount: includedPositionCount } =
       await fitGroupsWithinLimit(
         positionTransferGroups,
-        MAX_JITO_BUNDLE_TXS - allDrafts.length,
+        packBudget - allDrafts.length,
       );
     addDrafts(positionDrafts, "Migration: transfers");
     const hasMorePositions =
@@ -925,7 +929,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
     const { drafts: simpleHotspotDrafts, includedCount: includedSimpleCount } =
       await fitGroupsWithinLimit(
         simpleHotspotWorkList.map((w) => w.instructions),
-        MAX_JITO_BUNDLE_TXS - allDrafts.length,
+        packBudget - allDrafts.length,
       );
     addDrafts(simpleHotspotDrafts, "Migration: transfers");
 
@@ -939,7 +943,7 @@ export const migrate = publicProcedure.migration.migrate.handler(
         batchOpts,
       );
 
-      if (allDrafts.length + hotspotDrafts.length > MAX_JITO_BUNDLE_TXS) {
+      if (allDrafts.length + hotspotDrafts.length > packBudget) {
         break;
       }
 
@@ -976,61 +980,18 @@ export const migrate = publicProcedure.migration.migrate.handler(
         : undefined;
     const hasMore = nextParams !== undefined;
 
-    // Step 4: Inject Jito tip instruction into an existing draft.
-    // Try each draft (prefer last) — if the tip fits, keep it. Otherwise try
-    // the next. If no existing draft has room, add a dedicated tip draft only
-    // if we haven't hit MAX_JITO_BUNDLE_TXS. If that's not possible, error out.
-    const useJito = shouldUseJitoBundle(allDrafts.length, cluster);
-    if (useJito && allDrafts.length > 0) {
+    // Step 4: Packing left one bundle slot free for the bundle's tip tx.
+    if (shouldUseJitoBundle(allDrafts.length, cluster)) {
       const tipIx = await getJitoTipInstruction(feePayer);
-      let tipPlaced = false;
-
-      // Try fitting the tip into an existing draft (last first, then others)
-      for (let i = allDrafts.length - 1; i >= 0; i--) {
-        allDrafts[i].instructions.push(tipIx);
-        const testTx = await toVersionedTx(allDrafts[i]);
-        // MIGRATION_SIGNING's wallet co-signer keeps these drafts on v0.
-        if (testTx.serialize().length <= getTransactionSizeLimit(0)) {
-          tipPlaced = true;
-          break;
-        }
-        // Doesn't fit — revert and try the next draft
-        allDrafts[i].instructions.pop();
-      }
-
-      if (!tipPlaced) {
-        if (allDrafts.length < MAX_JITO_BUNDLE_TXS) {
-          allDrafts.push({
-            instructions: [
-              // A tip-only tx would be fully signed by the fee payer alone,
-              // letting anyone who calls this open endpoint submit it
-              // standalone and drain tip + fees from the fee payer. Require
-              // the source wallet's signature via a no-op self-transfer so
-              // the tx is only valid as part of the client-signed bundle.
-              SystemProgram.transfer({
-                fromPubkey: sourcePubkey,
-                toPubkey: sourcePubkey,
-                lamports: 0,
-              }),
-              tipIx,
-            ],
-            feePayer,
-            addressLookupTableAddresses: [lut],
-            version: await resolveTxVersion(connection, {
-              signing: MIGRATION_SIGNING,
-            }),
-          } as TransactionDraft);
-          txMetadata.push({
-            type: TRANSACTION_TYPES.MIGRATION,
-            description: "Migration: Jito tip",
-          });
-        } else {
-          throw errors.BAD_REQUEST({
-            message:
-              "Unable to fit Jito tip instruction into the transaction bundle",
-          });
-        }
-      }
+      allDrafts.push(
+        buildBundleTipDraft({
+          tipIx,
+          signer: sourcePubkey,
+          feePayer,
+          template: allDrafts[0],
+        }),
+      );
+      txMetadata.push(JITO_TIP_METADATA);
     }
 
     // Step 5: Convert drafts to VersionedTransactions and sign with fee payer

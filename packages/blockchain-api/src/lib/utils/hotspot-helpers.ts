@@ -5,7 +5,11 @@ import {
   keyToAssetKey,
 } from "@helium/helium-entity-manager-sdk";
 import { daoKey } from "@helium/helium-sub-daos-sdk";
-import { HNT_MINT, type Asset } from "@helium/spl-utils";
+import {
+  fetchRetryingTransientErrors,
+  HNT_MINT,
+  type Asset,
+} from "@helium/spl-utils";
 import { PROGRAM_ID as BUBBLEGUM_PROGRAM_ID } from "@metaplex-foundation/mpl-bubblegum";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -94,7 +98,9 @@ export const getAssetIdFromPubkey = async (
   if (env.NO_PG === "true") {
     // Use ASSET_ENDPOINT when available — surfpool may not have KeyToAsset PDAs
     const rpcUrl = env.ASSET_ENDPOINT || env.SOLANA_RPC_URL;
-    const connection = new Connection(rpcUrl);
+    const connection = new Connection(rpcUrl, {
+      fetch: fetchRetryingTransientErrors,
+    });
     const wallet = {
       publicKey: Keypair.generate().publicKey,
       signTransaction: async () => {

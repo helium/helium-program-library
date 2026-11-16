@@ -167,7 +167,7 @@ runs:
         buffer-authority: ${{ inputs.buffer-authority }}
 
     # The IDL buffer goes after the program buffer, so a failed program buffer write leaves no
-    # IDL buffer for the sweep to close.
+    # IDL buffer to close.
     - uses: ./.github/actions/write-idl-buffer/
       id: write-idl-buffer
       with:

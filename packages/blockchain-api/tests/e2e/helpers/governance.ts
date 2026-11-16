@@ -65,6 +65,11 @@ export async function getSeasonBoundedProxyExpirationTime(
   return Math.min(now + PROXY_ASSIGNMENT_DURATION_SECONDS, maxExpiration);
 }
 
+export async function readClockTimestamp(ctx: TestCtx): Promise<number> {
+  const clockInfo = await ctx.connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
+  return Number(clockInfo!.data.readBigInt64LE(32));
+}
+
 const EPOCH_LENGTH = 86400;
 const VEHNT_LAST_CALCULATED_TS_OFFSET = 8 + 176;
 

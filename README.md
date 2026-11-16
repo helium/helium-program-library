@@ -226,7 +226,7 @@ Every leaf under `programs/`, `packages/`, and `utils/` has its own README that 
 
 ## CI / deployment overview
 
-Everything this repo publishes to the world runs through one of seven GitHub Actions workflows:
+Everything this repo publishes to the world runs through one of five GitHub Actions workflows:
 
 | What changes                                                  | Triggered by                                                                                                                                        | Workflow                                                                         |
 | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
@@ -235,8 +235,6 @@ Everything this repo publishes to the world runs through one of seven GitHub Act
 | Solana programs on **mainnet**                                | Git tag `program-<name>-<version>`                                                                                                                  | [`release-program.yaml`](.github/workflows/release-program.yaml)                 |
 | Solana programs on **devnet**                                 | Merge to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate it depends on, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
 | Any program on devnet, manually                               | GitHub UI ("Run workflow")                                                                                                                          | [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml)       |
-| Compares each program's on-chain hash with its release hashes | Daily schedule, or GitHub UI ("Run workflow")                                                                                                       | [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml)           |
-| Closes program and IDL buffers the deployer key still owns    | Weekly schedule, or GitHub UI ("Run workflow")                                                                                                      | [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml)   |
 
 Each is described in more detail below.
 
@@ -324,15 +322,13 @@ Mainnet program upgrades go through Squads (multisig) — this repo only builds 
 
 A re-run skips a program only when both its on-chain hash and its on-chain IDL match the build. An IDL-only change upgrades the program to the same bytes and sets the new IDL. A pending proposal stops the run only when it names the same program buffer and its IDL buffer holds the build IDL.
 
-In the release workflow, the deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key. The weekly sweep also holds the key.
+In the release workflow, the deployer key reaches only the jobs that write buffers and open the proposal. The jobs that run workspace JavaScript hold no key. A cleanup job that closes the IDL buffer also holds it.
 
-A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. A runner that dies there leaves the buffers with the deployer key. The vault takes the IDL buffer only right before the proposal, so a run that stops earlier also leaves the IDL buffer with the deployer key. [`sweep-deployer-buffers.yaml`](.github/workflows/sweep-deployer-buffers.yaml) runs each week, closes the program buffers and IDL buffers the deployer key still owns, and returns the rent. It stops while a release runs.
+A run closes its own program buffer and IDL buffer when it fails or is cancelled before the vault takes them. The vault takes the IDL buffer only right before the proposal. When a run stops earlier (the pending-proposal skip, a failure, a cancel), its `close-idl-buffer` job closes the IDL buffer the deployer key still owns and returns the rent. Some buffers still stay with the deployer key: a runner that dies before the vault takes them, a failed close (the run shows a warning), or an IDL buffer write that fails part way and prints no address. Close them by hand with `solana program close` or `anchor idl close`.
 
-After a failed run, "Re-run failed jobs" and "Re-run all jobs" are both safe. A re-run reuses the program buffer and the IDL buffer the vault took in the failed attempt, so it pays no rent twice. Two cases fail loudly: when the sweep closed the failed run's IDL buffer, or when the failed attempt's proposal job closed its own IDL buffer because it failed before the vault took it, "Re-run failed jobs" stops at the IDL buffer hand-off and makes no proposal. Use "Re-run all jobs" there; it writes a new IDL buffer. Each executed upgrade leaves its IDL buffer with the vault, because setting the IDL copies the buffer and does not close it. A release that is abandoned or replaced by a new version also leaves its buffers with the vault. `helium-admin close-buffers` closes vault program buffers only; a vault IDL buffer needs a Squads proposal with an Anchor IDL Close instruction.
+After a failed run, "Re-run failed jobs" and "Re-run all jobs" are both safe. A re-run reuses the program buffer and the IDL buffer the vault took in the failed attempt, so it pays no rent twice. Two cases fail loudly: when the `close-idl-buffer` job closed the failed run's IDL buffer, or when the failed attempt's proposal job closed its own IDL buffer because it failed before the vault took it, "Re-run failed jobs" stops at the IDL buffer hand-off and makes no proposal. Use "Re-run all jobs" there; it writes a new IDL buffer. Each executed upgrade leaves its IDL buffer with the vault, because setting the IDL copies the buffer and does not close it. A release that is abandoned or replaced by a new version also leaves its buffers with the vault. `helium-admin close-buffers` closes vault program buffers only; a vault IDL buffer needs a Squads proposal with an Anchor IDL Close instruction.
 
 The proposal job does not install Anchor. It downloads the Anchor CLI the buffer job built and checks its sha256 against the hash that job recorded.
-
-[`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) runs each day and compares each program's on-chain hash with its release hashes. Each program reads as deployed, pending, unknown binary, rolled back, or error when a lookup fails. A program with no `.so.sha256` release asset is skipped and named in the summary. A pending program gets a warning when its newest tag is more than 3 days old. An unknown binary, a rollback, or a lookup error fails the run. To quiet a rejected proposal, delete that release's `.so.sha256` asset.
 
 **`helium-admin close-buffers`: run it only when no upgrade proposal is pending.**
 
@@ -373,7 +369,7 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `setup/`, `setup-ts/`, `setup-anchor/`, `setup-solana/` — tool installation.
 - `build-anchor/` — `anchor build` (with optional `testing`/`devnet` lazy-signer seeds).
 - `build-verified/` — verifiable build via `solana-verify` that produces a deterministic `.so`.
-- `install-solana-verify/` — the one `solana-verify` pin. The release hash, the deploy skip and the daily hash check use it.
+- `install-solana-verify/` — the one `solana-verify` pin. The release hash and the deploy skip use it.
 - `plan-deploy/` — the re-run rules: skip a deploy the chain already has, reuse a matching vault buffer, stop on a pending proposal for it. It takes no keypair.
 - `find-vault-buffer/`, `find-vault-idl-buffer/` — find a vault-owned program buffer or IDL buffer that holds the build, so a re-run reuses it.
 - `deploy-buffers/`, `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` to a buffer account owned by the multisig, and the IDL to a buffer account the deployer key owns.

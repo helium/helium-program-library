@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.16.0
+
+### Minor Changes
+
+- [#1382](https://github.com/helium/helium-program-library/pull/1382) [`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3) Thanks [@bryzettler](https://github.com/bryzettler)! - DAS calls in spl-utils now retry dropped connections and 429/502/503/504 twice with backoff. spl-utils exports `withTransientRetry` and `fetchRetryingTransientErrors`, a `fetch` for read-only web3.js `Connection`s. blockchain-api uses it for the key-to-asset lookup without Postgres.
+
 ## 0.15.0
 
 ### Minor Changes

@@ -1,10 +1,13 @@
 import {
+  CRON_TRANSACTIONS_PER_QUEUE_CALL,
   entityClaimCronSpaces,
   ENTITY_CLAIM_CRON_NAME,
+  ENTITY_CLAIM_SCHEDULE_TASK_SPACE,
   MAX_PRESET_SCHEDULE_LEN,
 } from "@helium/hpl-crons-sdk";
-import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getRentLamports } from "./balance-validation";
+import { fitsOneBundle } from "./jito-bundle";
 
 export type Schedule = "daily" | "weekly" | "monthly";
 
@@ -32,6 +35,69 @@ export async function getBaseAutomationRentLamports(
   );
   return rents.reduce((sum, rent) => sum + rent, 0);
 }
+
+/**
+ * Rent of the schedule task requeue_entity_claim_cron_v0 queues. The wallet
+ * pays it, plus the task queue's minCrankReward.
+ */
+export const getRequeueTaskRentLamports = (
+  connection: Connection,
+): Promise<number> =>
+  getRentLamports(connection, ENTITY_CLAIM_SCHEDULE_TASK_SPACE);
+
+/**
+ * A setup requeues an existing cron job that tuktuk removed from the queue,
+ * unless it re-creates the cron job.
+ */
+export const requeuesCronJob = (
+  cronJobAccount: { removedFromQueue: boolean } | null | undefined,
+  recreatesCronJob: boolean,
+): boolean => !recreatesCronJob && !!cronJobAccount?.removedFromQueue;
+
+/**
+ * The BAD_REQUEST message for a setup whose transactions do not fit one
+ * bundle, or undefined when it fits or neither adds claims nor tears down a
+ * cron. A teardown's transactions grow with the old cron's claims, so closing
+ * first helps; a hotspot setup can also add fewer hotspots.
+ */
+export const setupBundleLimitMessage = ({
+  claimsKind,
+  tearsDown,
+  txCount,
+}: {
+  claimsKind: "wallet" | "entities" | undefined;
+  tearsDown: boolean;
+  txCount: number;
+}): string | undefined => {
+  if ((claimsKind === undefined && !tearsDown) || fitsOneBundle(txCount))
+    return undefined;
+  if (claimsKind === "entities" && tearsDown)
+    return "Too many hotspots to change the schedule in one step. Set up with fewer hotspots and add the rest with addEntityToAutomation, or close the automation first and set it up again.";
+  return claimsKind === "entities"
+    ? "Too many hotspots for one setup. Set up with fewer, then add the rest with addEntityToAutomation."
+    : "The automation has too many claims to change its schedule in one step. Close it first, then set it up again.";
+};
+
+type RefundAccount = { lamports: number; owner: PublicKey } | null;
+
+/**
+ * Lamports a teardown refunds from the accounts it closes besides the cron
+ * job: every closed account, plus each task return account the cron program
+ * owns (close_cron_job_v0 drains only those). Missing accounts count 0.
+ */
+export const teardownRefundLamports = ({
+  closedAccounts,
+  taskReturnAccounts,
+  cronProgramId,
+}: {
+  closedAccounts: RefundAccount[];
+  taskReturnAccounts: RefundAccount[];
+  cronProgramId: PublicKey;
+}): number =>
+  [
+    ...closedAccounts,
+    ...taskReturnAccounts.filter((info) => info?.owner.equals(cronProgramId)),
+  ].reduce((sum, info) => sum + (info?.lamports ?? 0), 0);
 
 /**
  * Convert a schedule type to a cron string.
@@ -180,13 +246,23 @@ export function interpretCronString(cronString: string): CronScheduleInfo {
 
 /**
  * Calculate cost per claim for cron job pool.
- * Each cron job triggering uses (1 + numCronTransactions) * minCrankReward.
+ * The cron queues at most 5 transactions per queue call, and each call adds
+ * one schedule task. A firing makes one call per 5 transactions, at least
+ * one, so it uses (Math.max(1, Math.ceil(numCronTransactions / 5)) +
+ * numCronTransactions) * minCrankReward.
  */
 export function calculateCronJobCostPerClaim(
   minCrankReward: number,
   numCronTransactions: number,
 ): number {
-  return (1 + numCronTransactions) * minCrankReward;
+  return (
+    (Math.max(
+      1,
+      Math.ceil(numCronTransactions / CRON_TRANSACTIONS_PER_QUEUE_CALL),
+    ) +
+      numCronTransactions) *
+    minCrankReward
+  );
 }
 
 /**
@@ -453,6 +529,7 @@ export interface EstimateAutomationFundingParams extends CalculateFundingForAddi
   cronJobExists: boolean; // False when init_entity_claim_cron_v0 creates the cron job the funding lands in, including the re-init after a schedule change tears the old one down
   baseAutomationRentLamports: number; // Rent init_entity_claim_cron_v0 locks up; only charged when the cron job does not exist yet
   minCrankRewardLamports: number; // Task queue min_crank_reward init's queue_task_v0 moves from the wallet to the schedule task; only charged when the cron job does not exist yet
+  requeueTaskRentLamports?: number; // Set only when requeue_entity_claim_cron_v0 requeues an existing cron job removed from the queue: the wallet pays this task rent plus minCrankRewardLamports
 }
 
 /**
@@ -469,14 +546,20 @@ export const estimateAutomationFunding = (
   operationalLamports: number;
   totalLamports: number;
 } => {
-  const { cronJobExists, baseAutomationRentLamports, minCrankRewardLamports } =
-    params;
+  const {
+    cronJobExists,
+    baseAutomationRentLamports,
+    minCrankRewardLamports,
+    requeueTaskRentLamports,
+  } = params;
 
   // The task-return funding is left out: the cron job transfer below already
   // carries it.
-  const rentFeeLamports = cronJobExists
-    ? 0
-    : baseAutomationRentLamports + minCrankRewardLamports;
+  const rentFeeLamports = !cronJobExists
+    ? baseAutomationRentLamports + minCrankRewardLamports
+    : requeueTaskRentLamports !== undefined
+      ? requeueTaskRentLamports + minCrankRewardLamports
+      : 0;
 
   const {
     cronJobFundingLamports,

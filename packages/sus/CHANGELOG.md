@@ -1,5 +1,12 @@
 # Change Log
 
+## 0.12.2
+
+### Patch Changes
+
+- Updated dependencies [[`a2c4c17`](https://github.com/helium/helium-program-library/commit/a2c4c1781fde099142fb437825df591d133cb4c3)]:
+  - @helium/spl-utils@0.16.0
+
 ## 0.12.1
 
 ### Patch Changes
