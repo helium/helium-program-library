@@ -235,7 +235,6 @@ Everything this repo publishes to the world runs through one of seven GitHub Act
 | Solana programs on **mainnet**                                | Git tag `program-<name>-<version>`                                                                                                                  | [`release-program.yaml`](.github/workflows/release-program.yaml)                 |
 | Solana programs on **devnet**                                 | Merge to `develop` that changes a program's `src/`, `Cargo.toml` or `idls/`, or a workspace crate it depends on, or the `deploy-to-devnet` PR label | [`develop-release-program.yaml`](.github/workflows/develop-release-program.yaml) |
 | Any program on devnet, manually                               | GitHub UI ("Run workflow")                                                                                                                          | [`manual-devnet-deploy.yaml`](.github/workflows/manual-devnet-deploy.yaml)       |
-| Compares each program's on-chain hash with its release hashes | Daily schedule, or GitHub UI ("Run workflow")                                                                                                       | [`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml)           |
 
 Each is described in more detail below.
 
@@ -331,8 +330,6 @@ After a failed run, "Re-run failed jobs" and "Re-run all jobs" are both safe. A 
 
 The proposal job does not install Anchor. It downloads the Anchor CLI the buffer job built and checks its sha256 against the hash that job recorded.
 
-[`program-hash-check.yaml`](.github/workflows/program-hash-check.yaml) runs each day and compares each program's on-chain hash with its release hashes. Each program reads as deployed, pending, unknown binary, rolled back, or error when a lookup fails. A program with no `.so.sha256` release asset is skipped and named in the summary. A pending program gets a warning when its newest tag is more than 3 days old. An unknown binary, a rollback, or a lookup error fails the run. To quiet a rejected proposal, delete that release's `.so.sha256` asset.
-
 **`helium-admin close-buffers`: run it only when no upgrade proposal is pending.**
 
 ### Verify a deployed program
@@ -369,7 +366,7 @@ Each workflow above delegates to composite actions in [`.github/actions/`](.gith
 - `setup/`, `setup-ts/`, `setup-anchor/`, `setup-solana/` — tool installation.
 - `build-anchor/` — `anchor build` (with optional `testing`/`devnet` lazy-signer seeds).
 - `build-verified/` — verifiable build via `solana-verify` that produces a deterministic `.so`.
-- `install-solana-verify/` — the one `solana-verify` pin. The release hash, the deploy skip and the daily hash check use it.
+- `install-solana-verify/` — the one `solana-verify` pin. The release hash and the deploy skip use it.
 - `plan-deploy/` — the re-run rules: skip a deploy the chain already has, reuse a matching vault buffer, stop on a pending proposal for it. It takes no keypair.
 - `find-vault-buffer/`, `find-vault-idl-buffer/` — find a vault-owned program buffer or IDL buffer that holds the build, so a re-run reuses it.
 - `deploy-buffers/`, `write-program-buffer/`, `write-idl-buffer/` — upload the `.so` to a buffer account owned by the multisig, and the IDL to a buffer account the deployer key owns.

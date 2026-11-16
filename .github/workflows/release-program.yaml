@@ -115,7 +115,7 @@ jobs:
           cache: false
           setup-anchor: false
 
-      # The release hash. The scheduled hash check compares the on-chain program with it.
+      # The release hash. Compare it with `solana-verify get-program-hash` to verify a deploy.
       # `artifact-sha256` covers the two files the build artifact stores, taken before `plan-deploy`.
       - name: Take the release hash
         id: hash

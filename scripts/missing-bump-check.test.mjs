@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import {
   missingBumpCheck,
   packageVersion,
+  parseProgramTag,
   readPrograms,
   reviewedShas,
   showFile,
@@ -619,4 +620,20 @@ test("a none added on a merged branch reviews up to the merge commit", () => {
 
     assert.equal(reviewedShas("HEAD").x, git("rev-parse", "HEAD"));
   });
+});
+
+test("a program tag parses to its name and version", () => {
+  assert.deepEqual(parseProgramTag("program-fanout-0.1.0"), {
+    name: "fanout",
+    version: "0.1.0",
+  });
+});
+
+test("a v-prefixed tag is not a program tag", () => {
+  assert.equal(parseProgramTag("vprogram-fanout-0.1.0"), null);
+  assert.equal(parseProgramTag("v0.1.0"), null);
+});
+
+test("a -test suffixed tag is not a program tag", () => {
+  assert.equal(parseProgramTag("program-fanout-0.1.0-test"), null);
 });
