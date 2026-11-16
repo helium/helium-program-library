@@ -10,16 +10,8 @@ import { env } from "../env";
 import { classifyBundleSimulationFailure } from "./simulation-classifier";
 import { getChewingGlassExplorerUrl, getExplorerUrl } from "./explorer";
 import { createTtlCache } from "./ttl-cache";
-
-export function shouldUseJitoBundle(
-  transactionsLength: number,
-  cluster: string,
-): boolean {
-  return (
-    (cluster === "mainnet" || cluster === "mainnet-beta") &&
-    transactionsLength > 1
-  );
-}
+import { JITO_TIP_METADATA } from "./jito-bundle";
+export { JITO_TIP_METADATA, shouldUseJitoBundle } from "./jito-bundle";
 
 export async function jitoBlockEngineRequest(
   method: string,
@@ -121,7 +113,7 @@ export async function getJitoTipInstruction(
   return SystemProgram.transfer({
     fromPubkey: wallet,
     toPubkey: new PublicKey(tipAccount),
-    lamports: env.JITO_TIP_AMOUNT ? parseInt(env.JITO_TIP_AMOUNT) : 10000,
+    lamports: getJitoTipAmountLamports(),
   });
 }
 
@@ -436,6 +428,10 @@ export async function submitJitoBundle(
   }
 }
 
+/**
+ * Build a tip transaction that the wallet both pays and signs alone. Use
+ * buildBundleTipDraft instead when the server's fee payer pays the tip.
+ */
 export async function getJitoTipTransaction(
   wallet: PublicKey,
   // The blockhash the rest of the bundle was built on. Passing it saves a
@@ -452,9 +448,7 @@ export async function getJitoTipTransaction(
           SystemProgram.transfer({
             fromPubkey: wallet,
             toPubkey: new PublicKey(tipAccount),
-            lamports: env.JITO_TIP_AMOUNT
-              ? parseInt(env.JITO_TIP_AMOUNT)
-              : 10000,
+            lamports: getJitoTipAmountLamports(),
           }),
         ],
         feePayer: wallet,
@@ -464,11 +458,6 @@ export async function getJitoTipTransaction(
     ),
   );
 }
-
-export const JITO_TIP_METADATA = {
-  type: "jito_tip",
-  description: "Jito bundle tip",
-};
 
 /**
  * Serialize transactions into {serializedTransaction, metadata} entries,

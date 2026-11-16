@@ -12,6 +12,7 @@ import {
 import {
   getJitoTipAmountLamports,
   getJitoTipTransaction,
+  JITO_TIP_METADATA,
   shouldUseJitoBundle,
 } from "@/lib/utils/jito";
 import {
@@ -122,10 +123,7 @@ export const mint = publicProcedure.dataCredits.mint.handler(
       const tipTx = await getJitoTipTransaction(ownerPubkey);
       transactions.push({
         serializedTransaction: serializeTransaction(tipTx),
-        metadata: {
-          type: "jito_tip",
-          description: "Jito bundle tip",
-        },
+        metadata: JITO_TIP_METADATA,
       });
     }
 

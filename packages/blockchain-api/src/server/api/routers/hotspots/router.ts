@@ -10,6 +10,8 @@ import { createSplit } from "./procedures/createSplit";
 import { deleteSplit } from "./procedures/deleteSplit";
 import { getAutomationStatus } from "./procedures/getAutomationStatus";
 import { createAutomation } from "./procedures/createAutomation";
+import { createWalletClaimAutomation } from "./procedures/createWalletClaimAutomation";
+import { createEntityClaimAutomation } from "./procedures/createEntityClaimAutomation";
 import { fundAutomation } from "./procedures/fundAutomation";
 import { closeAutomation } from "./procedures/closeAutomation";
 import { getFundingEstimate } from "./procedures/getFundingEstimate";
@@ -52,6 +54,10 @@ export const hotspotsRouter = implement(hotspotsContract).router({
   getAutomationStatus,
   /** Create transactions to set up claim automation */
   createAutomation,
+  /** Create transactions to set up claim automation with the wallet claim */
+  createWalletClaimAutomation,
+  /** Create transactions to set up claim automation with hotspot claims */
+  createEntityClaimAutomation,
   /** Create transactions to fund existing automation */
   fundAutomation,
   /** Get funding estimate for automation without constructing transactions */

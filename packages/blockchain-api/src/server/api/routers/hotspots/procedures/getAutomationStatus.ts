@@ -36,7 +36,10 @@ export const getAutomationStatus =
       } = await fetchAutomationData(walletAddress, provider);
 
       // Price the status with the same helper as getFundingEstimate, at
-      // additionalDuration: 0 (current state), so its fields sum to that estimate.
+      // additionalDuration: 0 (current state). The status reports the current
+      // state only: for a cron job removed from the queue, the estimate and the
+      // setup also add the requeue's schedule task rent and crank reward, which
+      // the status does not, so its fields do not sum to that estimate then.
       const { rentFeeLamports, recipientFeeLamports, operationalLamports } =
         estimateAutomationFunding({
           cronJobExists: !!cronJobAccount,
