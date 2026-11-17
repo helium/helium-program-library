@@ -52,10 +52,10 @@ const JupiterBuildResponseSchema = z.object({
   outAmount: AmountSchema,
   otherAmountThreshold: AmountSchema,
   routePlan: z.array(z.object({ swapInfo: z.object({ label: z.string() }) })),
-  setupInstructions: z.array(JupiterInstructionSchema).optional(),
+  setupInstructions: z.array(JupiterInstructionSchema).nullish(),
   swapInstruction: JupiterInstructionSchema,
   cleanupInstruction: JupiterInstructionSchema.nullish(),
-  otherInstructions: z.array(JupiterInstructionSchema).optional(),
+  otherInstructions: z.array(JupiterInstructionSchema).nullish(),
   addressesByLookupTableAddress: z
     .record(z.string(), z.array(z.string()))
     .nullish(),
@@ -63,6 +63,26 @@ const JupiterBuildResponseSchema = z.object({
 
 /** The only swap mode `/build` builds. */
 const BUILD_SWAP_MODE = "ExactIn";
+
+/**
+ * How many times `/build` is asked again, with a narrower slippage, when its
+ * re-quote enforces a lower minimum output than the caller's quote.
+ */
+const MIN_OUTPUT_RETRIES = 1;
+
+/** Basis points in a whole. */
+const BPS = BigInt(10_000);
+
+/** The refusal a wallet maps to "refresh the quote". */
+const QUOTE_EXPIRED_MESSAGE =
+  "Quote expired: the current route's minimum output is below the quote's; refresh the quote";
+
+/**
+ * The slippage, in basis points rounded down, that keeps a re-quote of
+ * `outAmount` at or above `minimum`. 0 when no slippage does.
+ */
+const slippageBpsKeeping = (outAmount: bigint, minimum: bigint): bigint =>
+  outAmount < minimum ? BigInt(0) : ((outAmount - minimum) * BPS) / outAmount;
 
 const toInstruction = (instruction: JupiterInstruction) =>
   new TransactionInstruction({
@@ -91,7 +111,8 @@ const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
  * mint, amount and slippage, and its output amount is the one `/build`
  * returned, not the earlier quote's. The built swap's minimum output must not
  * fall below the quote's, so the chain enforces at least the floor the caller
- * was shown.
+ * was shown; a re-quote that falls below it is built once more at a narrower
+ * slippage, or refused as an expired quote.
  */
 export const getInstructions = publicProcedure.swap.getInstructions.handler(
   async ({ input, errors }) => {
@@ -113,90 +134,120 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       });
     }
 
-    const buildUrl = new URL(`${env.JUPITER_API_URL}/swap/v2/build`);
-    buildUrl.searchParams.set("inputMint", quoteResponse.inputMint);
-    buildUrl.searchParams.set("outputMint", quoteResponse.outputMint);
-    buildUrl.searchParams.set("amount", quoteResponse.inAmount);
-    buildUrl.searchParams.set("taker", userPublicKey);
-    buildUrl.searchParams.set("slippageBps", String(quoteResponse.slippageBps));
-    if (excludeDexes) {
-      buildUrl.searchParams.set("excludeDexes", excludeDexes);
-    }
-    if (destinationTokenAccount) {
-      buildUrl.searchParams.set(
-        "destinationTokenAccount",
-        destinationTokenAccount,
-      );
-    }
-
-    const buildResponse = await fetch(buildUrl.toString(), {
-      headers: {
-        "x-api-key": env.JUPITER_API_KEY,
-      },
-    });
-
-    if (!buildResponse.ok) {
-      const errorText = await buildResponse.text();
-      console.error("Jupiter API error:", errorText);
-
-      const classification = classifyJupiterError({
-        status: buildResponse.status,
-        body: errorText,
-        operation: "Failed to build swap with Jupiter",
-      });
-      if (classification.kind === "BAD_REQUEST") {
-        throw errors.BAD_REQUEST({ message: classification.message });
+    /** One `/build` request at `slippageBps`, validated against the quote. */
+    const requestBuild = async (slippageBps: number) => {
+      const buildUrl = new URL(`${env.JUPITER_API_URL}/swap/v2/build`);
+      buildUrl.searchParams.set("inputMint", quoteResponse.inputMint);
+      buildUrl.searchParams.set("outputMint", quoteResponse.outputMint);
+      buildUrl.searchParams.set("amount", quoteResponse.inAmount);
+      buildUrl.searchParams.set("taker", userPublicKey);
+      buildUrl.searchParams.set("slippageBps", String(slippageBps));
+      if (excludeDexes) {
+        buildUrl.searchParams.set("excludeDexes", excludeDexes);
       }
-      if (classification.kind === "RATE_LIMITED") {
-        throw errors.RATE_LIMITED();
+      if (destinationTokenAccount) {
+        buildUrl.searchParams.set(
+          "destinationTokenAccount",
+          destinationTokenAccount,
+        );
       }
-      throw errors.JUPITER_ERROR({ message: classification.message });
-    }
 
-    const raw: unknown = await buildResponse.json();
-
-    if (
-      typeof raw === "object" &&
-      raw !== null &&
-      "error" in raw &&
-      typeof raw.error === "string" &&
-      raw.error.length > 0
-    ) {
-      throw errors.JUPITER_ERROR({
-        message: `Jupiter API returned error: ${raw.error}`,
+      const buildResponse = await fetch(buildUrl.toString(), {
+        headers: {
+          "x-api-key": env.JUPITER_API_KEY,
+        },
       });
-    }
 
-    const parsed = JupiterBuildResponseSchema.safeParse(raw);
-    if (!parsed.success) {
-      console.error("Invalid Jupiter /build response:", parsed.error);
-      throw errors.JUPITER_ERROR({
-        message: "Invalid response from Jupiter API",
-      });
-    }
-    const build = parsed.data;
+      if (!buildResponse.ok) {
+        const errorText = await buildResponse.text();
+        console.error("Jupiter API error:", errorText);
 
-    // The metadata below describes this response, so it must be a swap of the
-    // mints and amount the caller asked to build.
-    if (
-      build.inputMint !== quoteResponse.inputMint ||
-      build.outputMint !== quoteResponse.outputMint ||
-      build.inAmount !== quoteResponse.inAmount
-    ) {
-      throw errors.JUPITER_ERROR({
-        message: "Jupiter built a swap that differs from the requested quote",
-      });
-    }
+        const classification = classifyJupiterError({
+          status: buildResponse.status,
+          body: errorText,
+          operation: "Failed to build swap with Jupiter",
+        });
+        if (classification.kind === "BAD_REQUEST") {
+          throw errors.BAD_REQUEST({ message: classification.message });
+        }
+        if (classification.kind === "RATE_LIMITED") {
+          throw errors.RATE_LIMITED();
+        }
+        throw errors.JUPITER_ERROR({ message: classification.message });
+      }
+
+      const raw: unknown = await buildResponse.json();
+
+      if (
+        typeof raw === "object" &&
+        raw !== null &&
+        "error" in raw &&
+        typeof raw.error === "string" &&
+        raw.error.length > 0
+      ) {
+        throw errors.JUPITER_ERROR({
+          message: `Jupiter API returned error: ${raw.error}`,
+        });
+      }
+
+      const parsed = JupiterBuildResponseSchema.safeParse(raw);
+      if (!parsed.success) {
+        console.error("Invalid Jupiter /build response:", parsed.error);
+        throw errors.JUPITER_ERROR({
+          message: "Invalid response from Jupiter API",
+        });
+      }
+      const build = parsed.data;
+
+      // The metadata below describes this response, so it must be a swap of the
+      // mints and amount the caller asked to build.
+      if (
+        build.inputMint !== quoteResponse.inputMint ||
+        build.outputMint !== quoteResponse.outputMint ||
+        build.inAmount !== quoteResponse.inAmount
+      ) {
+        throw errors.JUPITER_ERROR({
+          message: "Jupiter built a swap that differs from the requested quote",
+        });
+      }
+      return build;
+    };
 
     // otherAmountThreshold is the minimum output the swap instruction enforces
-    // on chain. A re-quote below the caller's quote would let the signer
-    // receive less than the minimum it was shown.
-    if (
-      BigInt(build.otherAmountThreshold) <
-      BigInt(quoteResponse.otherAmountThreshold)
-    ) {
-      throw errors.JUPITER_ERROR({
-        message: `Jupiter built a swap with a minimum output of ${build.otherAmountThreshold}, below the quote's ${quoteResponse.otherAmountThreshold}`,
+    // on chain, and a re-quote at the quote's slippage enforces less than the
+    // quote whenever its output is lower. While the re-quote's output still
+    // clears the quote's minimum, a narrower slippage restores that minimum,
+    // so /build is asked again with it. Otherwise the swap is refused, so the
+    // chain enforces at least the minimum the signer was shown.
+    const quoteMinimum = BigInt(quoteResponse.otherAmountThreshold);
+    let build = await requestBuild(quoteResponse.slippageBps);
+    const attempts: { otherAmountThreshold: string; outAmount: string }[] = [];
+    while (BigInt(build.otherAmountThreshold) < quoteMinimum) {
+      attempts.push({
+        otherAmountThreshold: build.otherAmountThreshold,
+        outAmount: build.outAmount,
+      });
+      const slippageBps = slippageBpsKeeping(
+        BigInt(build.outAmount),
+        quoteMinimum,
+      );
+      if (attempts.length > MIN_OUTPUT_RETRIES || slippageBps === BigInt(0)) {
+        console.warn("Jupiter /build minimum output below the quote's", {
+          quoteMinimum: quoteResponse.otherAmountThreshold,
+          attempts,
+          retried: attempts.length > 1,
+          passed: false,
+        });
+        throw errors.BAD_REQUEST({ message: QUOTE_EXPIRED_MESSAGE });
+      }
+      build = await requestBuild(Number(slippageBps));
+    }
+    if (attempts.length > 0) {
+      console.warn("Jupiter /build minimum output below the quote's", {
+        quoteMinimum: quoteResponse.otherAmountThreshold,
+        attempts,
+        retried: true,
+        passed: true,
       });
     }
 

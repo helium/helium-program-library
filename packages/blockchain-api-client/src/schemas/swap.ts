@@ -46,7 +46,7 @@ export const QuoteResponseSchema = z
 
 export const GetInstructionsInputSchema = z.object({
   quoteResponse: QuoteResponseSchema.describe(
-    "A getQuote response. The swap is built for its inputMint, outputMint, inAmount and slippageBps; Jupiter quotes the route again, so the output amount can differ from this quote's outAmount; a built swap whose minimum output is below this quote's otherAmountThreshold is refused with JUPITER_ERROR. Only ExactIn quotes are accepted.",
+    "A getQuote response. The swap is built for its inputMint, outputMint, inAmount and slippageBps; Jupiter quotes the route again, so the output amount can differ from this quote's outAmount. A built swap whose minimum output is below this quote's otherAmountThreshold is built once more at the narrower slippage that keeps that minimum, and otherwise refused with BAD_REQUEST as an expired quote: refresh the quote and try again. Only ExactIn quotes are accepted.",
   ),
   userPublicKey: z.string().min(1),
   destinationTokenAccount: z

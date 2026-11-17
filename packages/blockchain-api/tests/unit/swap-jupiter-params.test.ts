@@ -3,7 +3,7 @@ import { AddressInfo } from "net";
 import { call, ORPCError } from "@orpc/server";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { expect } from "chai";
-import { after, afterEach, before, describe, it } from "mocha";
+import { after, afterEach, before, beforeEach, describe, it } from "mocha";
 
 /**
  * Type-only, so naming the handlers here does not import them: they read a
@@ -50,6 +50,8 @@ interface JupiterCall {
 let jupiterCalls: JupiterCall[] = [];
 /** Fields each case lays over the stubbed `/build` answer. */
 let buildOverrides: Record<string, unknown> = {};
+/** Fields laid over one `/build` answer each, in call order, after buildOverrides. */
+let buildAnswers: Record<string, unknown>[] = [];
 /** Every RPC method the handlers called, in order. */
 let rpcMethods: string[] = [];
 const realFetch = globalThis.fetch;
@@ -195,6 +197,7 @@ const stubFetch: typeof fetch = async (input, init) => {
       tipInstruction: null,
       addressesByLookupTableAddress: {},
       ...buildOverrides,
+      ...(buildAnswers.shift() ?? {}),
     });
   }
   return new Response("unstubbed Jupiter path", { status: 404 });
@@ -235,22 +238,26 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     return { quoteResponse, calls, result };
   };
 
-  /** The error code a getInstructions call rejects with. */
-  const rejectionCode = async (
-    input: {
-      quoteResponse: Awaited<ReturnType<typeof quote>>;
-      userPublicKey: string;
-      excludeDexes?: string;
-    }
-  ) => {
+  type InstructionsInput = {
+    quoteResponse: Awaited<ReturnType<typeof quote>>;
+    userPublicKey: string;
+    excludeDexes?: string;
+  };
+
+  /** The error a getInstructions call rejects with. */
+  const rejection = async (input: InstructionsInput) => {
     try {
       await call(getInstructions, input);
     } catch (error) {
       expect(error).to.be.instanceOf(ORPCError);
-      return (error as ORPCError<string, unknown>).code;
+      return error as ORPCError<string, unknown>;
     }
     expect.fail("getInstructions resolved");
   };
+
+  /** The error code a getInstructions call rejects with. */
+  const rejectionCode = async (input: InstructionsInput) =>
+    (await rejection(input)).code;
 
   before(async () => {
     // Every server variable the env schema requires without a default, set
@@ -281,6 +288,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
   afterEach(() => {
     jupiterCalls = [];
     buildOverrides = {};
+    buildAnswers = [];
     rpcMethods = [];
   });
 
@@ -432,27 +440,110 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     }
 
     describe("minimum output", () => {
-      // The stubbed /build answer enforces a minimum output of 773.
-      it("refuses a /build minimum one below the quote's", async () => {
+      // The stubbed /build answer has an outAmount of 777 and enforces a
+      // minimum output of 773.
+      const QUOTE_EXPIRED = /^Quote expired: .*refresh the quote$/;
+      const realWarn = console.warn;
+      let warnings: unknown[][] = [];
+
+      beforeEach(() => {
+        warnings = [];
+        // Only the minimum-output log: building the transaction warns too.
+        console.warn = (...args: unknown[]) => {
+          if (String(args[0]).startsWith("Jupiter /build minimum output")) {
+            warnings.push(args);
+          }
+        };
+      });
+
+      afterEach(() => {
+        console.warn = realWarn;
+      });
+
+      /** A quote whose minimum output is `threshold`, and no Jupiter calls since. */
+      const quoteWithMinimum = async (threshold: string) => {
         const quoteResponse = {
           ...(await quote()),
-          otherAmountThreshold: "774",
+          otherAmountThreshold: threshold,
         };
+        jupiterCalls = [];
+        return quoteResponse;
+      };
 
-        const code = await rejectionCode({
+      const buildCalls = () =>
+        jupiterCalls.filter((c) => c.url.pathname === "/swap/v2/build");
+
+      it("asks /build again at the slippage that keeps the quote's minimum and builds that answer", async () => {
+        const quoteResponse = await quoteWithMinimum("951");
+        // floor((1003 - 951) * 10000 / 1003) = 518
+        buildAnswers = [
+          { outAmount: "1003", otherAmountThreshold: "900" },
+          { outAmount: "1002", otherAmountThreshold: "951" },
+        ];
+
+        const result = await call(getInstructions, {
           quoteResponse,
           userPublicKey: WALLET,
         });
 
-        expect(code).to.eq("JUPITER_ERROR");
+        expect(
+          buildCalls().map((c) => c.url.searchParams.get("slippageBps"))
+        ).to.deep.eq(["50", "518"]);
+        expect(result.transactions[0].metadata?.outputAmount).to.eq("1002");
+        expect(warnings).to.have.length(1);
+        expect(warnings[0][1]).to.deep.include({
+          quoteMinimum: "951",
+          retried: true,
+          passed: true,
+        });
+        expect((warnings[0][1] as { attempts: unknown }).attempts).to.deep.eq([
+          { otherAmountThreshold: "900", outAmount: "1003" },
+        ]);
+      });
+
+      it("refuses as an expired quote when the second answer is still below, after one retry", async () => {
+        const quoteResponse = await quoteWithMinimum("774");
+        // Both answers are 777 out, 773 minimum: the second could be retried
+        // again, but is not.
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("BAD_REQUEST");
+        expect(error.message).to.match(QUOTE_EXPIRED);
+        expect(buildCalls()).to.have.length(2);
+        expect(warnings).to.have.length(1);
+        expect(warnings[0][1]).to.deep.include({ retried: true, passed: false });
+      });
+
+      it("refuses as an expired quote without a retry when the output is below the quote's minimum", async () => {
+        const quoteResponse = await quoteWithMinimum("778");
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("BAD_REQUEST");
+        expect(error.message).to.match(QUOTE_EXPIRED);
+        expect(buildCalls()).to.have.length(1);
+        expect(warnings).to.have.length(1);
+        expect(warnings[0][1]).to.deep.include({
+          quoteMinimum: "778",
+          retried: false,
+          passed: false,
+        });
+      });
+
+      it("refuses as an expired quote without a retry when the output equals the quote's minimum", async () => {
+        // No slippage above 0 keeps 777 out at a minimum of 777.
+        const quoteResponse = await quoteWithMinimum("777");
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("BAD_REQUEST");
+        expect(error.message).to.match(QUOTE_EXPIRED);
+        expect(buildCalls()).to.have.length(1);
       });
 
       for (const threshold of ["773", "772"]) {
-        it(`accepts a /build minimum of 773 against a quote minimum of ${threshold}`, async () => {
-          const quoteResponse = {
-            ...(await quote()),
-            otherAmountThreshold: threshold,
-          };
+        it(`accepts a /build minimum of 773 against a quote minimum of ${threshold} without a retry`, async () => {
+          const quoteResponse = await quoteWithMinimum(threshold);
 
           const result = await call(getInstructions, {
             quoteResponse,
@@ -460,6 +551,8 @@ describe("swap endpoints' optional Jupiter parameters", () => {
           });
 
           expect(result.transactions).to.have.length(1);
+          expect(buildCalls()).to.have.length(1);
+          expect(warnings).to.have.length(0);
         });
       }
 
@@ -517,6 +610,14 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
 
       expect(code).to.eq("JUPITER_ERROR");
+    });
+
+    it("treats null setupInstructions and otherInstructions as empty", async () => {
+      buildOverrides = { setupInstructions: null, otherInstructions: null };
+
+      const { result } = await swapInstructions();
+
+      expect(result.transactions).to.have.length(1);
     });
 
     it("refuses a /build answer with otherInstructions", async () => {
