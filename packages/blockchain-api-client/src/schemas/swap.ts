@@ -12,13 +12,6 @@ export const GetQuoteInputSchema = z
     amount: z.string().min(1),
     swapMode: z.enum(["ExactIn", "ExactOut"]).default("ExactIn"),
     slippageBps: z.coerce.number().min(0).max(10000).default(50),
-    // Absent leaves Jupiter's default in place.
-    instructionVersion: z
-      .enum(["V1", "V2"])
-      .optional()
-      .describe(
-        "Jupiter route instruction version; V2 emits route_v2 / shared_accounts_route_v2",
-      ),
   })
   // A quote from a mint to itself is circular arbitrage, which Jupiter refuses
   // with CIRCULAR_ARBITRAGE_IS_DISABLED. Reject it here so the caller gets a
@@ -54,7 +47,7 @@ export const GetInstructionsInputSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      "Route through Jupiter's shared program accounts, so AMMs never receive the user's authority",
+      "Build the route through Jupiter's shared program accounts, so no AMM receives the user's authority.",
     ),
   prioritizationFeeLamports: z
     .object({

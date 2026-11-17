@@ -188,59 +188,6 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     jupiterCalls = [];
   });
 
-  describe("quote instructionVersion", () => {
-    it("asks Jupiter for the version the caller names", async () => {
-      await quote({ instructionVersion: "V2" });
-
-      expect(jupiterCalls).to.have.length(1);
-      expect(jupiterCalls[0].url.searchParams.get("instructionVersion")).to.eq(
-        "V2"
-      );
-    });
-
-    it("sends no instructionVersion when the caller names none", async () => {
-      await quote();
-
-      expect(jupiterCalls).to.have.length(1);
-      expect(jupiterCalls[0].url.searchParams.has("instructionVersion")).to.eq(
-        false
-      );
-    });
-
-    it("does not serve a quote built without a version to a V2 request", async () => {
-      const amount = freshAmount();
-      await quote({}, amount);
-      await quote({ instructionVersion: "V2" }, amount);
-
-      expect(jupiterCalls).to.have.length(2);
-      expect(jupiterCalls[0].url.searchParams.has("instructionVersion")).to.eq(
-        false
-      );
-      expect(jupiterCalls[1].url.searchParams.get("instructionVersion")).to.eq(
-        "V2"
-      );
-    });
-
-    it("does not serve a V2 quote to a request without a version", async () => {
-      const amount = freshAmount();
-      await quote({ instructionVersion: "V2" }, amount);
-      await quote({}, amount);
-
-      expect(jupiterCalls).to.have.length(2);
-      expect(jupiterCalls[1].url.searchParams.has("instructionVersion")).to.eq(
-        false
-      );
-    });
-
-    it("still serves a repeated identical request from the cache", async () => {
-      const amount = freshAmount();
-      await quote({ instructionVersion: "V2" }, amount);
-      await quote({ instructionVersion: "V2" }, amount);
-
-      expect(jupiterCalls).to.have.length(1);
-    });
-  });
-
   describe("swap instructions useSharedAccounts", () => {
     it("forwards useSharedAccounts: true to Jupiter", async () => {
       const calls = await swapInstructions({ useSharedAccounts: true });
@@ -262,6 +209,36 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       expect(calls).to.have.length(1);
       expect(calls[0].body).to.not.have.property("useSharedAccounts");
       expect(calls[0].body).to.have.property("userPublicKey", WALLET);
+    });
+  });
+
+  describe("swap instructions quoteResponse", () => {
+    it("hands Jupiter the quote as received, instructionVersion and unknown keys included", async () => {
+      const quoteResponse = {
+        inputMint: HNT_MINT,
+        inAmount: freshAmount(),
+        outputMint: USDC_MINT,
+        outAmount: "1",
+        otherAmountThreshold: "1",
+        swapMode: "ExactIn",
+        slippageBps: 50,
+        priceImpactPct: "0",
+        routePlan: [],
+        instructionVersion: "V2",
+        someUnknownKey: { nested: true },
+      };
+      await call(getInstructions, {
+        quoteResponse,
+        userPublicKey: WALLET,
+        dynamicComputeUnitLimit: true,
+      });
+
+      const calls = jupiterCalls.filter(
+        (c) => c.url.pathname === "/swap/v1/swap-instructions"
+      );
+      expect(calls).to.have.length(1);
+      expect(calls[0].body).to.have.property("quoteResponse");
+      expect(calls[0].body!.quoteResponse).to.deep.eq(quoteResponse);
     });
   });
 });

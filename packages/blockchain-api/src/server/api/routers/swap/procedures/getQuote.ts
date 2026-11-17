@@ -15,19 +15,9 @@ const quoteCache = createTtlCache<QuoteResponse>({ ttlMs: QUOTE_CACHE_TTL_MS });
  */
 export const getQuote = publicProcedure.swap.getQuote.handler(
   async ({ input, errors }) => {
-    const {
-      inputMint,
-      outputMint,
-      amount,
-      swapMode,
-      slippageBps,
-      instructionVersion,
-    } = input;
+    const { inputMint, outputMint, amount, swapMode, slippageBps } = input;
 
-    // An absent instructionVersion keys apart from "V2" (the empty segment), so
-    // a quote Jupiter built with its default instructions is never served to a
-    // request that asked for V2.
-    const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}:${instructionVersion ?? ""}`;
+    const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}`;
 
     return quoteCache(cacheKey, async () => {
       // Get quote from Jupiter
@@ -37,9 +27,6 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       quoteUrl.searchParams.set("amount", amount);
       quoteUrl.searchParams.set("swapMode", swapMode);
       quoteUrl.searchParams.set("slippageBps", slippageBps.toString());
-      if (instructionVersion) {
-        quoteUrl.searchParams.set("instructionVersion", instructionVersion);
-      }
       // Exclude RFQ (JupiterZ) routes: those return maker-co-signed transactions
       // the requesting wallet cannot sign on its own, so a self-signed swap can't
       // be completed. The paid api-key host respects `excludeRouters=jupiterz` but
