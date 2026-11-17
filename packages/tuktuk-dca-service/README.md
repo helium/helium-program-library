@@ -2,7 +2,7 @@
 
 This is no longer used, as we are no longer burning Helium Mobile Revenue
 
-HTTP endpoint the tuktuk cranker calls when it's time to execute a scheduled DCA swap. Fetches a Jupiter Lite quote, builds the swap transaction, wires it into the [tuktuk-dca program](../../programs/tuktuk-dca), signs, and returns it for the cranker to submit.
+HTTP endpoint the tuktuk cranker calls when it's time to execute a scheduled DCA swap. Builds the swap through Jupiter's Swap V2 `GET /swap/v2/build` with the DCA's swap payer as taker and a byte budget that keeps the task transaction under Solana's size limit, wires it into the [tuktuk-dca program](../../programs/tuktuk-dca), signs, and returns it for the cranker to submit.
 
 ## Environment
 

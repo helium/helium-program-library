@@ -7,19 +7,13 @@ import {
   init,
   RemoteTaskTransactionV0,
 } from "@helium/tuktuk-sdk";
-import {
-  Connection,
-  Keypair,
-  PublicKey,
-  TransactionInstruction,
-  VersionedTransaction,
-  Transaction,
-} from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
 import { dcaTaskBindingError } from "./binding";
 import { wrapRoute } from "./wrap";
+import { buildJupiterSwap } from "./jupiter";
 import {
   DCA_SIGNER,
   JUPITER_API_KEY,
@@ -54,124 +48,6 @@ function getTuktukProgram() {
     tuktukProgram = init(provider);
   }
   return tuktukProgram;
-}
-
-// Jupiter Lite API types
-interface JupiterQuoteResponse {
-  inputMint: string;
-  inAmount: string;
-  outputMint: string;
-  outAmount: string;
-  otherAmountThreshold: string;
-  swapMode: string;
-  slippageBps: number;
-  platformFee?: {
-    amount: string;
-    feeBps: number;
-  };
-  priceImpactPct: string;
-  routePlan: Array<{
-    swapInfo: {
-      ammKey: string;
-      label: string;
-      inputMint: string;
-      inAmount: string;
-      outputMint: string;
-      outAmount: string;
-      notEnoughLiquidity: boolean;
-      minInAmount: string;
-      minOutAmount: string;
-      priceImpactPct: string;
-    };
-    percent: number;
-  }>;
-  contextSlot: number;
-  timeTaken: number;
-}
-
-interface JupiterSwapInstructionsResponse {
-  otherInstructions: TransactionInstruction[];
-  computeBudgetInstructions: TransactionInstruction[];
-  setupInstructions: TransactionInstruction[];
-  swapInstruction: TransactionInstruction;
-  cleanupInstruction?: TransactionInstruction;
-  addressLookupTableAddresses: string[];
-}
-
-// Get quote from Jupiter Lite API
-async function getJupiterQuote(
-  inputMint: string,
-  outputMint: string,
-  amount: string,
-  slippageBps: number
-): Promise<JupiterQuoteResponse> {
-  const params = new URLSearchParams({
-    inputMint,
-    outputMint,
-    amount,
-    slippageBps: slippageBps.toString(),
-    swapMode: "ExactIn",
-    onlyDirectRoutes: "true",
-  });
-
-  const response = await fetch(`${JUPITER_API_URL}/swap/v1/quote?${params}`, {
-    headers: {
-      "x-api-key": JUPITER_API_KEY!,
-    },
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Jupiter Lite API error: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
-}
-
-// Get swap instructions from Jupiter Lite API
-async function getJupiterSwapInstructions(
-  quoteResponse: JupiterQuoteResponse,
-  sourcePublicKey: string,
-  destinationTokenAccount: string
-): Promise<JupiterSwapInstructionsResponse> {
-  const jupUrl = `${JUPITER_API_URL}/swap/v1/swap-instructions`;
-  console.log("Jupiter URL", jupUrl);
-  const response = await fetch(jupUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": JUPITER_API_KEY!,
-    },
-    body: JSON.stringify({
-      userPublicKey: sourcePublicKey,
-      destinationTokenAccount,
-      quoteResponse,
-      dynamicComputeUnitLimit: true,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Jupiter Lite swap-instructions API error: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
-}
-
-// Convert Jupiter instruction format to Solana TransactionInstruction
-function convertJupiterInstruction(
-  jupiterInstruction: any
-): TransactionInstruction {
-  return {
-    programId: new PublicKey(jupiterInstruction.programId),
-    keys: jupiterInstruction.accounts.map((account: any) => ({
-      pubkey: new PublicKey(account.pubkey),
-      isSigner: account.isSigner,
-      isWritable: account.isWritable,
-    })),
-    data: Buffer.from(jupiterInstruction.data, "base64"),
-  };
 }
 
 server.post<{
@@ -223,17 +99,6 @@ server.post<{
     console.log(`Output mint: ${dcaAccount.outputMint.toBase58()}`);
     console.log("Swap payer", swapPayer.toBase58());
 
-    // Get quote from Jupiter
-    const quote = await getJupiterQuote(
-      dcaAccount.inputMint.toBase58(),
-      dcaAccount.outputMint.toBase58(),
-      swapAmount.toString(),
-      Number(SLIPPAGE_BPS)
-    );
-
-    console.log(`Jupiter quote: ${quote.outAmount} output tokens`);
-    console.log(`Price impact: ${quote.priceImpactPct}%`);
-
     // Create lend instruction to transfer input tokens
     const lendIx = await dcaProgram.methods
       .lendV0()
@@ -247,27 +112,26 @@ server.post<{
       })
       .instruction();
 
-    // Get Jupiter swap instructions
-    const swapInstructions = await getJupiterSwapInstructions(
-      quote,
-      swapPayer.toBase58(),
-      dcaAccount.destinationTokenAccount.toBase58()
-    );
+    // Build the swap through Jupiter, with the swap payer as the taker
+    const swap = await buildJupiterSwap({
+      apiUrl: JUPITER_API_URL,
+      apiKey: JUPITER_API_KEY,
+      inputMint: dcaAccount.inputMint.toBase58(),
+      outputMint: dcaAccount.outputMint.toBase58(),
+      amount: swapAmount.toString(),
+      taker: swapPayer.toBase58(),
+      destinationTokenAccount: dcaAccount.destinationTokenAccount.toBase58(),
+      slippageBps: Number(SLIPPAGE_BPS),
+    });
 
     console.log(
-      "Lookup table addresses",
-      swapInstructions.addressLookupTableAddresses
+      `Jupiter build: ${swap.outAmount} output tokens, at least ${
+        swap.otherAmountThreshold
+      }, via ${swap.routeLabels.join(", ")}`
     );
+    console.log("Lookup table addresses", swap.lookupTables);
 
-    // Convert Jupiter instructions to Solana TransactionInstructions
-    const jupiterInstructions = [
-      ...swapInstructions.setupInstructions.map(convertJupiterInstruction),
-      convertJupiterInstruction(swapInstructions.swapInstruction),
-      ...(swapInstructions.cleanupInstruction
-        ? [convertJupiterInstruction(swapInstructions.cleanupInstruction)]
-        : []),
-      ...swapInstructions.otherInstructions.map(convertJupiterInstruction),
-    ];
+    const jupiterInstructions = swap.instructions;
 
     console.log("Jupiter instructions", jupiterInstructions);
 
@@ -319,7 +183,7 @@ server.post<{
         is_signer: acc.isSigner,
         is_writable: acc.isWritable,
       })),
-      lookup_tables: swapInstructions.addressLookupTableAddresses,
+      lookup_tables: swap.lookupTables,
     });
   } catch (err: any) {
     console.error("DCA swap error:", err);
