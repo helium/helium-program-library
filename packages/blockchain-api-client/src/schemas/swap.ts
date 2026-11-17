@@ -51,7 +51,7 @@ export const GetInstructionsInputSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      "Build the route through Jupiter's shared program accounts, so no AMM receives the user's authority.",
+      "Build the route through Jupiter's shared program accounts instead of the user's own intermediate token accounts.",
     ),
   prioritizationFeeLamports: z
     .object({

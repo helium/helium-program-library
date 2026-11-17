@@ -223,6 +223,15 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       );
     });
 
+    it("treats an empty excludeDexes as absent and shares its cache entry", async () => {
+      const amount = freshAmount();
+      await quote({ excludeDexes: "" }, amount);
+      await quote({}, amount);
+
+      expect(quoteCalls()).to.have.length(1);
+      expect(quoteCalls()[0].url.searchParams.has("excludeDexes")).to.eq(false);
+    });
+
     it("serves an identical repeat from the cache", async () => {
       const amount = freshAmount();
       await quote({ excludeDexes: "Kipseli" }, amount);
