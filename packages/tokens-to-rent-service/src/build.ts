@@ -1,5 +1,4 @@
 import {
-  ComputeBudgetInstruction,
   ComputeBudgetProgram,
   PublicKey,
   TransactionInstruction,
@@ -22,8 +21,8 @@ const TRANSACTION_SIZE_LIMIT = 1232;
 const FUND_FEES_OVERHEAD_BYTES = 182;
 
 /**
- * Room for what the overhead measurement left out: Jupiter's byte count excludes the platform
- * fee account, and one that no lookup table holds adds about 33 bytes.
+ * Room for what the overhead measurement left out: Jupiter's own byte count may differ a little
+ * from the compiled size.
  */
 const FUND_FEES_MARGIN_BYTES = 100;
 
@@ -44,10 +43,21 @@ export const FUND_FEES_MAX_ACCOUNTS = 20;
 const ERROR_BODY_MAX_CHARS = 300;
 
 /**
- * The compute unit limit the fee-funding transaction asks for when `/build` returns none (it
- * returns the unit price only).
+ * Jupiter RFQ v2. Its fills need a market maker's co-signature that this service does not
+ * collect. `/build` refuses RFQ v2 unless an undocumented `enableRfqV2` parameter is sent, which
+ * this service never sends, so the exclusion on every request and the refusal of a built route
+ * through it are defence in depth in case that default changes.
  */
-export const COMPUTE_UNIT_LIMIT = 1_400_000;
+export const RFQ_V2_LABEL = "JupiterRfqV2";
+
+/** Solana's largest compute unit limit for one transaction. */
+export const MAX_COMPUTE_UNIT_LIMIT = 1_400_000;
+
+/**
+ * The headroom over the simulated compute units: the route's pools can move between the
+ * simulation and the landed transaction.
+ */
+const COMPUTE_UNIT_MARGIN = 1.2;
 
 /**
  * The lamports the user repays for the transaction's fees. The transaction carries no compute
@@ -74,13 +84,11 @@ export interface BuildSwapRequest {
   inputMint: string;
   outputMint: string;
   amount: string;
+  /** Sent as `x-api-key`; without it Jupiter applies its keyless rate limit. */
+  apiKey?: string;
   /** The account that signs the swap and holds the input. */
   taker: string;
   slippageBps: number;
-  /** The platform fee in basis points; 0 or less sends no fee. */
-  platformFeeBps: number;
-  /** The token account the fee goes to; required when `platformFeeBps` is positive. */
-  feeAccount?: string;
   /** Bound the swap so it fits the fee-funding transaction; a price quote leaves this off. */
   fitFundFeesTransaction: boolean;
 }
@@ -93,15 +101,7 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
   url.searchParams.set("amount", request.amount);
   url.searchParams.set("taker", request.taker);
   url.searchParams.set("slippageBps", String(request.slippageBps));
-  if (request.platformFeeBps > 0) {
-    if (!request.feeAccount) {
-      throw new Error(
-        "JUPITER_FEE_BPS is set without JUPITER_FEE_ACCOUNT: /build needs a fee account for a platform fee"
-      );
-    }
-    url.searchParams.set("platformFeeBps", String(request.platformFeeBps));
-    url.searchParams.set("feeAccount", request.feeAccount);
-  }
+  url.searchParams.set("excludeDexes", RFQ_V2_LABEL);
   if (request.fitFundFeesTransaction) {
     url.searchParams.set("maxAccounts", String(FUND_FEES_MAX_ACCOUNTS));
     url.searchParams.set("maxBytes", String(FUND_FEES_MAX_BYTES));
@@ -120,8 +120,7 @@ export function estimateRequest(params: {
   /** The SOL to swap, in lamports. */
   solAmount: string;
   platformWallet: string;
-  platformFeeBps: number;
-  feeAccount?: string;
+  apiKey?: string;
 }): BuildSwapRequest {
   return {
     apiUrl: params.apiUrl,
@@ -130,8 +129,7 @@ export function estimateRequest(params: {
     outputMint: params.mint,
     taker: params.platformWallet,
     slippageBps: SLIPPAGE_BPS,
-    platformFeeBps: params.platformFeeBps,
-    feeAccount: params.feeAccount,
+    apiKey: params.apiKey,
     fitFundFeesTransaction: false,
   };
 }
@@ -145,8 +143,7 @@ export function fundFeesRequest(params: {
   mint: string;
   inputAmount: string;
   userWallet: string;
-  platformFeeBps: number;
-  feeAccount?: string;
+  apiKey?: string;
 }): BuildSwapRequest {
   return {
     apiUrl: params.apiUrl,
@@ -155,21 +152,18 @@ export function fundFeesRequest(params: {
     outputMint: NATIVE_MINT,
     taker: params.userWallet,
     slippageBps: SLIPPAGE_BPS,
-    platformFeeBps: params.platformFeeBps,
-    feeAccount: params.feeAccount,
+    apiKey: params.apiKey,
     fitFundFeesTransaction: true,
   };
 }
 
 export interface BuiltSwap {
-  /** What `/build` returns for the compute budget: the unit price, and no limit. */
-  computeBudgetInstructions: TransactionInstruction[];
   setupInstructions: TransactionInstruction[];
   swapInstruction: TransactionInstruction;
   cleanupInstruction: TransactionInstruction | null;
   /** The lookup tables the route's accounts live in, by key. */
   lookupTables: string[];
-  /** What the swap pays out, net of the platform fee. */
+  /** What the swap pays out. */
   outAmount: string;
 }
 
@@ -247,12 +241,28 @@ const readInstructions = (
   return value.map((ix, i) => readInstruction(ix, `${field}[${i}]`));
 };
 
+/** The labels of the route's hops; a hop without a string label reads as "". */
+const routeLabels = (routePlan: unknown): string[] => {
+  if (!Array.isArray(routePlan)) {
+    throw invalid("routePlan");
+  }
+  return routePlan.map((hop) =>
+    isRecord(hop) &&
+    isRecord(hop.swapInfo) &&
+    typeof hop.swapInfo.label === "string"
+      ? hop.swapInfo.label
+      : ""
+  );
+};
+
 /**
  * Reads a `/build` answer into the instructions of the fee-funding transaction.
  *
- * Refuses an answer that is not a swap of the requested mints and amount, and one that carries
- * `otherInstructions`, which nothing here has characterised for a transaction the user signs.
- * `tipInstruction` is present only when `tipAmount` is sent, which this service never does.
+ * Refuses an answer that is not a swap of the requested mints and amount, a route through RFQ
+ * v2, and an answer that carries `otherInstructions`, which nothing here has characterised for
+ * a transaction the user signs. `computeBudgetInstructions` are dropped: the transaction sets
+ * its own limit and no price. `tipInstruction` is present only when `tipAmount` is sent, which
+ * this service never does.
  */
 export function readBuildResponse(
   raw: unknown,
@@ -278,6 +288,12 @@ export function readBuildResponse(
     );
   }
 
+  if (routeLabels(raw.routePlan).includes(RFQ_V2_LABEL)) {
+    throw new Error(
+      `Jupiter built a route through ${RFQ_V2_LABEL}, which needs a market maker's signature`
+    );
+  }
+
   const other = readInstructions(raw, "otherInstructions");
   if (other.length > 0) {
     throw new Error(
@@ -291,10 +307,6 @@ export function readBuildResponse(
   }
 
   return {
-    computeBudgetInstructions: readInstructions(
-      raw,
-      "computeBudgetInstructions"
-    ),
     setupInstructions: readInstructions(raw, "setupInstructions"),
     swapInstruction: readInstruction(raw.swapInstruction, "swapInstruction"),
     cleanupInstruction:
@@ -313,7 +325,9 @@ export async function buildJupiterSwap(
   request: BuildSwapRequest,
   fetchImpl: typeof fetch = fetch
 ): Promise<BuiltSwap> {
-  const response = await fetchImpl(buildSwapUrl(request).toString());
+  const response = await fetchImpl(buildSwapUrl(request).toString(), {
+    headers: request.apiKey ? { "x-api-key": request.apiKey } : {},
+  });
   if (!response.ok) {
     const body = (await response.text()).slice(0, ERROR_BODY_MAX_CHARS);
     throw new Error(
@@ -368,44 +382,40 @@ export function refuseExtraAccountCreations(
 }
 
 /**
+ * The compute unit limit for a transaction that used `unitsConsumed` in simulation: 20% over
+ * it, capped at Solana's largest limit.
+ */
+export function computeUnitLimit(unitsConsumed: number): number {
+  if (!Number.isSafeInteger(unitsConsumed) || unitsConsumed <= 0) {
+    throw new Error(
+      `The fee-funding transaction's simulation reported ${unitsConsumed} compute units`
+    );
+  }
+  return Math.min(
+    Math.ceil(unitsConsumed * COMPUTE_UNIT_MARGIN),
+    MAX_COMPUTE_UNIT_LIMIT
+  );
+}
+
+/**
  * The compute budget instructions the transaction carries, and the lamports the user repays for
  * its fees.
  *
- * `/build` returns a unit price without a limit. The price is dropped, so the transaction pays
- * the base fee only and the user repays `FEE_LAMPORTS`. A limit of `COMPUTE_UNIT_LIMIT` is added
- * unless the answer carries one.
+ * The limit comes from the caller. `/build`'s unit price is dropped, so the transaction pays
+ * the base fee only and the user repays `FEE_LAMPORTS`.
  */
-export function planComputeBudget(budget: TransactionInstruction[]): {
+export function planComputeBudget(units: number): {
   instructions: TransactionInstruction[];
   fee: number;
 } {
-  const instructions: TransactionInstruction[] = [];
-  let hasLimit = false;
-  for (const instr of budget) {
-    switch (ComputeBudgetInstruction.decodeInstructionType(instr)) {
-      case "SetComputeUnitPrice":
-        continue;
-      case "SetComputeUnitLimit":
-      case "RequestUnits":
-        hasLimit = true;
-        break;
-    }
-    instructions.push(instr);
-  }
-  if (!hasLimit) {
-    instructions.unshift(
-      ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_UNIT_LIMIT })
-    );
-  }
-  return { instructions, fee: FEE_LAMPORTS };
+  return {
+    instructions: [ComputeBudgetProgram.setComputeUnitLimit({ units })],
+    fee: FEE_LAMPORTS,
+  };
 }
 
 /** What the fee-funding transaction is assembled from. */
 export interface FundFeesSwap {
-  /** The compute budget the transaction carries: a unit limit and no unit price. */
-  budgetInstructions: TransactionInstruction[];
-  /** The lamports the user repays for the transaction's fees. */
-  fee: number;
   setupInstructions: TransactionInstruction[];
   swapInstruction: TransactionInstruction;
   cleanupInstruction: TransactionInstruction | null;
@@ -415,7 +425,8 @@ export interface FundFeesSwap {
 /**
  * Builds the swap the user signs for the fee-funding transaction: the bounded `/build` request
  * for the user, refused when its setup creates a token account besides the user's wrapped SOL
- * account (the rent loan covers that one), with the compute budget planned.
+ * account (the rent loan covers that one). The compute budget is planned after a simulation of
+ * the assembled transaction, so it is not part of this result.
  */
 export async function buildFundFeesSwap(
   params: Parameters<typeof fundFeesRequest>[0],
@@ -423,12 +434,7 @@ export async function buildFundFeesSwap(
 ): Promise<FundFeesSwap> {
   const built = await buildJupiterSwap(fundFeesRequest(params), fetchImpl);
   refuseExtraAccountCreations(built.setupInstructions, params.userWallet);
-  const { instructions, fee } = planComputeBudget(
-    built.computeBudgetInstructions
-  );
   return {
-    budgetInstructions: instructions,
-    fee,
     setupInstructions: built.setupInstructions,
     swapInstruction: built.swapInstruction,
     cleanupInstruction: built.cleanupInstruction,
