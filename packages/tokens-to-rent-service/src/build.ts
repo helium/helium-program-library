@@ -1,7 +1,6 @@
 import {
   ComputeBudgetInstruction,
   ComputeBudgetProgram,
-  LAMPORTS_PER_SOL,
   PublicKey,
   TransactionInstruction,
 } from "@solana/web3.js";
@@ -18,14 +17,13 @@ const TRANSACTION_SIZE_LIMIT = 1232;
  * What the fee-funding transaction adds around Jupiter's bare swap (setup, swap and cleanup
  * instructions compiled alone): a compute unit limit and price, the two SOL transfers, and the
  * second signature. Measured from live `/build` answers for HNT and MOBILE to SOL, the compiled
- * transaction is 182 bytes larger than the bare swap for every route, however many hops it has.
+ * transaction is 182 bytes larger than the bare swap for the routes measured.
  */
 const FUND_FEES_OVERHEAD_BYTES = 182;
 
 /**
- * Room for what the overhead measurement left out: a platform fee account that no lookup table
- * holds adds about 33 bytes, and Jupiter's own byte count may differ a little from the compiled
- * size.
+ * Room for what the overhead measurement left out: Jupiter's byte count excludes the platform
+ * fee account, and one that no lookup table holds adds about 33 bytes.
  */
 const FUND_FEES_MARGIN_BYTES = 100;
 
@@ -47,15 +45,29 @@ const ERROR_BODY_MAX_CHARS = 300;
 
 /**
  * The compute unit limit the fee-funding transaction asks for when `/build` returns none (it
- * returns the unit price only). The priority fee the user repays is this limit times the price.
+ * returns the unit price only).
  */
 export const COMPUTE_UNIT_LIMIT = 1_400_000;
 
-/** The lamports the user repays for the transaction's base fee, before the priority fee. */
-const BASE_FEE_LAMPORTS = 10000;
+/**
+ * The lamports the user repays for the transaction's fees. The transaction carries no compute
+ * unit price, so the user pays no priority fee.
+ */
+export const FEE_LAMPORTS = 10000;
 
-/** The priority fee, in SOL, above which no transaction is built. */
-const MAX_FEE_SOL = 0.01;
+/** The slippage every swap is built with, in basis points (1%). */
+export const SLIPPAGE_BPS = 100;
+
+/** Wrapped SOL, the mint the fee-funding swap pays out in. */
+const NATIVE_MINT = "So11111111111111111111111111111111111111112";
+
+const TOKEN_PROGRAM_ID = new PublicKey(
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+);
+
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+);
 
 export interface BuildSwapRequest {
   apiUrl: string;
@@ -95,6 +107,58 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
     url.searchParams.set("maxBytes", String(FUND_FEES_MAX_BYTES));
   }
   return url;
+}
+
+/**
+ * The `/build` request that prices the swap: SOL into `mint`, built for the platform wallet,
+ * whose instructions are discarded. `/build` has no quote-only form, so the request is not
+ * bounded to fit the fee-funding transaction.
+ */
+export function estimateRequest(params: {
+  apiUrl: string;
+  mint: string;
+  /** The SOL to swap, in lamports. */
+  solAmount: string;
+  platformWallet: string;
+  platformFeeBps: number;
+  feeAccount?: string;
+}): BuildSwapRequest {
+  return {
+    apiUrl: params.apiUrl,
+    amount: params.solAmount,
+    inputMint: NATIVE_MINT,
+    outputMint: params.mint,
+    taker: params.platformWallet,
+    slippageBps: SLIPPAGE_BPS,
+    platformFeeBps: params.platformFeeBps,
+    feeAccount: params.feeAccount,
+    fitFundFeesTransaction: false,
+  };
+}
+
+/**
+ * The `/build` request for the swap the user signs: `inputAmount` of `mint` into SOL, built for
+ * the user and bounded to fit the fee-funding transaction.
+ */
+export function fundFeesRequest(params: {
+  apiUrl: string;
+  mint: string;
+  inputAmount: string;
+  userWallet: string;
+  platformFeeBps: number;
+  feeAccount?: string;
+}): BuildSwapRequest {
+  return {
+    apiUrl: params.apiUrl,
+    amount: params.inputAmount,
+    inputMint: params.mint,
+    outputMint: NATIVE_MINT,
+    taker: params.userWallet,
+    slippageBps: SLIPPAGE_BPS,
+    platformFeeBps: params.platformFeeBps,
+    feeAccount: params.feeAccount,
+    fitFundFeesTransaction: true,
+  };
 }
 
 export interface BuiltSwap {
@@ -264,50 +328,74 @@ export async function buildJupiterSwap(
 }
 
 /**
+ * Refuses a fee-funding build whose setup creates a token account other than the taker's
+ * wrapped SOL account.
+ *
+ * The transaction borrows the rent of that one account and nothing more, so a route that creates
+ * an intermediate account for the taker would fail on chain for a user low on SOL, or leave the
+ * user a dust account that locks its rent. Create and CreateIdempotent are checked;
+ * RecoverNested creates nothing.
+ */
+export function refuseExtraAccountCreations(
+  setupInstructions: TransactionInstruction[],
+  taker: string
+): void {
+  const takerKey = new PublicKey(taker);
+  const wsolAccount = PublicKey.findProgramAddressSync(
+    [
+      takerKey.toBuffer(),
+      TOKEN_PROGRAM_ID.toBuffer(),
+      new PublicKey(NATIVE_MINT).toBuffer(),
+    ],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  )[0];
+  for (const ix of setupInstructions) {
+    if (!ix.programId.equals(ASSOCIATED_TOKEN_PROGRAM_ID)) {
+      continue;
+    }
+    if (ix.data.length > 0 && ix.data[0] !== 0 && ix.data[0] !== 1) {
+      continue;
+    }
+    const account = ix.keys[1]?.pubkey;
+    if (!account || !account.equals(wsolAccount)) {
+      throw new Error(
+        `Jupiter built a swap that creates a token account besides the wrapped SOL account${
+          account ? ` (${account.toBase58()})` : ""
+        }, which the rent loan does not cover`
+      );
+    }
+  }
+}
+
+/**
  * The compute budget instructions the transaction carries, and the lamports the user repays for
  * its fees.
  *
- * `/build` returns the unit price without a limit, so a limit of `COMPUTE_UNIT_LIMIT` is added
- * unless the answer carries one. The fee is the base fee plus limit times price; a fee above
- * 0.01 SOL is refused.
+ * `/build` returns a unit price without a limit. The price is dropped, so the transaction pays
+ * the base fee only and the user repays `FEE_LAMPORTS`. A limit of `COMPUTE_UNIT_LIMIT` is added
+ * unless the answer carries one.
  */
 export function planComputeBudget(budget: TransactionInstruction[]): {
   instructions: TransactionInstruction[];
   fee: number;
 } {
-  let units: number | undefined;
-  let price = 0;
+  const instructions: TransactionInstruction[] = [];
+  let hasLimit = false;
   for (const instr of budget) {
     switch (ComputeBudgetInstruction.decodeInstructionType(instr)) {
-      case "SetComputeUnitLimit":
-        units = ComputeBudgetInstruction.decodeSetComputeUnitLimit(instr).units;
-        break;
-      case "RequestUnits":
-        units = ComputeBudgetInstruction.decodeRequestUnits(instr).units;
-        break;
       case "SetComputeUnitPrice":
-        price = Number(
-          ComputeBudgetInstruction.decodeSetComputeUnitPrice(instr)
-            .microLamports
-        );
+        continue;
+      case "SetComputeUnitLimit":
+      case "RequestUnits":
+        hasLimit = true;
         break;
     }
+    instructions.push(instr);
   }
-
-  const instructions =
-    units === undefined
-      ? [
-          ComputeBudgetProgram.setComputeUnitLimit({
-            units: COMPUTE_UNIT_LIMIT,
-          }),
-          ...budget,
-        ]
-      : budget;
-  const fee =
-    BASE_FEE_LAMPORTS +
-    Math.ceil(((units ?? COMPUTE_UNIT_LIMIT) * price) / 1000000);
-  if (fee / LAMPORTS_PER_SOL > MAX_FEE_SOL) {
-    throw new Error("Priority fees are too high right now, try again later");
+  if (!hasLimit) {
+    instructions.unshift(
+      ComputeBudgetProgram.setComputeUnitLimit({ units: COMPUTE_UNIT_LIMIT })
+    );
   }
-  return { instructions, fee };
+  return { instructions, fee: FEE_LAMPORTS };
 }

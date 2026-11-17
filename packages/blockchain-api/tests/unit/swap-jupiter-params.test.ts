@@ -7,7 +7,6 @@ import {
   ExtensionType,
   MintLayout,
   TOKEN_2022_PROGRAM_ID,
-  getMintLen,
 } from "@solana/spl-token";
 import { expect } from "chai";
 import { after, afterEach, before, beforeEach, describe, it } from "mocha";
@@ -67,6 +66,8 @@ let rpcMethods: string[] = [];
 let chainAccounts: Map<string, { data: Buffer; owner: string }> = new Map();
 /** The taker's SOL balance on the stubbed chain. */
 let walletLamports = 5_000_000_000;
+/** Whether the stubbed chain answers getMultipleAccounts with an RPC error. */
+let failMultipleAccounts = false;
 const realFetch = globalThis.fetch;
 let rpc: Server;
 
@@ -146,6 +147,13 @@ function startStubRpc(): Promise<string> {
           params: unknown;
         }) => {
           rpcMethods.push(method);
+          if (method === "getMultipleAccounts" && failMultipleAccounts) {
+            return {
+              jsonrpc: "2.0",
+              id,
+              error: { code: -32005, message: "node is unhealthy" },
+            };
+          }
           const result = rpcResult(method, params);
           return result === undefined
             ? {
@@ -327,6 +335,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     rpcMethods = [];
     chainAccounts = new Map();
     walletLamports = 5_000_000_000;
+    failMultipleAccounts = false;
   });
 
   describe("quote excludeDexes", () => {
@@ -677,6 +686,9 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       /** For a TransferFeeConfig mint: TransferFeeAmount (8) and ImmutableOwner. */
       const TOKEN_2022_FEE_ACCOUNT = 165 + 1 + (4 + 8) + 4;
 
+      /** An extension type this spl-token version has no account-side mapping for. */
+      const UNKNOWN_MINT_EXTENSION = 200 as ExtensionType;
+
       const address = () => Keypair.generate().publicKey.toBase58();
 
       /** A CreateIdempotent of `account` for `mint` under `tokenProgram`, paid by `payer`. */
@@ -709,13 +721,23 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const MINT_EXTENSION_LENGTHS = new Map([
         [ExtensionType.TransferFeeConfig, 108],
         [ExtensionType.MintCloseAuthority, 32],
+        [UNKNOWN_MINT_EXTENSION, 4],
       ]);
 
       /** A Token-2022 mint carrying `extensions` (TransferFeeConfig by default). */
       const transferFeeMintData = (
         extensions: ExtensionType[] = [ExtensionType.TransferFeeConfig]
       ) => {
-        const data = Buffer.alloc(getMintLen(extensions));
+        // getMintLen throws for the unknown extension, so the length is summed here.
+        const data = Buffer.alloc(
+          ACCOUNT_SIZE +
+            1 +
+            extensions.reduce(
+              (total, extension) =>
+                total + 4 + MINT_EXTENSION_LENGTHS.get(extension)!,
+              0
+            )
+        );
         MintLayout.encode(
           {
             mintAuthorityOption: 0,
@@ -843,6 +865,30 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(required).to.eq(BASE + rentFor(TOKEN_2022_FEE_ACCOUNT));
       });
 
+      it("skips a mint extension it does not know and still sizes the ones it does", async () => {
+        const mint = address();
+        chainAccounts.set(mint, {
+          data: transferFeeMintData([
+            UNKNOWN_MINT_EXTENSION,
+            ExtensionType.TransferFeeConfig,
+          ]),
+          owner: TOKEN_2022_PROGRAM,
+        });
+        buildOverrides = {
+          setupInstructions: [
+            createAta({
+              account: address(),
+              mint,
+              tokenProgram: TOKEN_2022_PROGRAM,
+            }),
+          ],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE + rentFor(TOKEN_2022_FEE_ACCOUNT));
+      });
+
       it("sizes a Token-2022 account of an absent mint at the base size", async () => {
         buildOverrides = {
           setupInstructions: [
@@ -921,6 +967,28 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         const { result } = await swapInstructions();
 
         expect(result.transactions).to.have.length(1);
+      });
+
+      it("fails the request when the rent lookup's RPC call fails, returning no build", async () => {
+        const quoteResponse = await quote();
+        buildOverrides = {
+          setupInstructions: [createAta({ account: address(), mint: USDC_MINT })],
+        };
+        failMultipleAccounts = true;
+
+        let result: unknown;
+        let failure: unknown;
+        try {
+          result = await call(getInstructions, {
+            quoteResponse,
+            userPublicKey: WALLET,
+          });
+        } catch (error) {
+          failure = error;
+        }
+
+        expect(failure).to.be.instanceOf(Error);
+        expect(result).to.eq(undefined);
       });
 
       it("refuses one lamport short with INSUFFICIENT_FUNDS", async () => {

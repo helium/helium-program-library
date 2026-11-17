@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import {
+  ComputeBudgetInstruction,
   ComputeBudgetProgram,
   Keypair,
+  PublicKey,
+  SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
 import {
@@ -9,10 +12,15 @@ import {
   BuildSwapRequest,
   buildSwapUrl,
   COMPUTE_UNIT_LIMIT,
+  estimateRequest,
+  FEE_LAMPORTS,
   FUND_FEES_MAX_ACCOUNTS,
   FUND_FEES_MAX_BYTES,
+  fundFeesRequest,
   planComputeBudget,
   readBuildResponse,
+  refuseExtraAccountCreations,
+  SLIPPAGE_BPS,
 } from "../src/build";
 
 const key = () => Keypair.generate().publicKey.toBase58();
@@ -125,7 +133,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       );
     });
 
-    it("budgets the bare swap so the fee-funding transaction fits 1232 bytes", () => {
+    it("pins the byte and account budgets of the fee-funding swap", () => {
       assert.equal(FUND_FEES_MAX_BYTES, 950);
       assert.equal(FUND_FEES_MAX_ACCOUNTS, 20);
     });
@@ -336,10 +344,160 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     });
   });
 
+  describe("estimateRequest and fundFeesRequest", () => {
+    const WSOL = "So11111111111111111111111111111111111111112";
+    const PLATFORM = key();
+    const USER = key();
+    const wiring = {
+      apiUrl: "https://jupiter.test",
+      mint: INPUT_MINT,
+      platformFeeBps: 50,
+      feeAccount: FEE_ACCOUNT,
+    };
+
+    it("prices SOL into the token for the platform wallet, unbounded", () => {
+      const request = estimateRequest({
+        ...wiring,
+        solAmount: "20015000",
+        platformWallet: PLATFORM,
+      });
+      assert.deepEqual(request, {
+        apiUrl: "https://jupiter.test",
+        amount: "20015000",
+        inputMint: WSOL,
+        outputMint: INPUT_MINT,
+        taker: PLATFORM,
+        slippageBps: SLIPPAGE_BPS,
+        platformFeeBps: 50,
+        feeAccount: FEE_ACCOUNT,
+        fitFundFeesTransaction: false,
+      });
+    });
+
+    it("builds the token into SOL for the user, bounded to fit the transaction", () => {
+      const request = fundFeesRequest({
+        ...wiring,
+        inputAmount: "123456",
+        userWallet: USER,
+      });
+      assert.deepEqual(request, {
+        apiUrl: "https://jupiter.test",
+        amount: "123456",
+        inputMint: INPUT_MINT,
+        outputMint: WSOL,
+        taker: USER,
+        slippageBps: SLIPPAGE_BPS,
+        platformFeeBps: 50,
+        feeAccount: FEE_ACCOUNT,
+        fitFundFeesTransaction: true,
+      });
+      const url = buildSwapUrl(request);
+      assert.equal(
+        url.searchParams.get("maxBytes"),
+        String(FUND_FEES_MAX_BYTES)
+      );
+      assert.equal(url.searchParams.get("taker"), USER);
+    });
+
+    it("passes no fee account through when none is set", () => {
+      const request = fundFeesRequest({
+        apiUrl: "https://jupiter.test",
+        mint: INPUT_MINT,
+        inputAmount: "1",
+        userWallet: USER,
+        platformFeeBps: 0,
+      });
+      assert.equal(request.feeAccount, undefined);
+      assert.equal(buildSwapUrl(request).searchParams.has("feeAccount"), false);
+    });
+  });
+
+  describe("refuseExtraAccountCreations", () => {
+    const ATA_PROGRAM = new PublicKey(
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+    );
+    const TOKEN_PROGRAM = new PublicKey(
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    );
+    const WSOL = new PublicKey("So11111111111111111111111111111111111111112");
+    const USER = Keypair.generate().publicKey;
+    const ataOf = (owner: PublicKey, mint: PublicKey) =>
+      PublicKey.findProgramAddressSync(
+        [owner.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()],
+        ATA_PROGRAM
+      )[0];
+
+    /** An associated token program instruction creating `account`, with `data` as its data. */
+    const create = (
+      account: PublicKey,
+      mint: PublicKey,
+      data: number[] = [1],
+      owner: PublicKey = USER
+    ) =>
+      new TransactionInstruction({
+        programId: ATA_PROGRAM,
+        keys: [
+          USER,
+          account,
+          owner,
+          mint,
+          SystemProgram.programId,
+          TOKEN_PROGRAM,
+        ].map((pubkey) => ({ pubkey, isSigner: false, isWritable: true })),
+        data: Buffer.from(data),
+      });
+    const wsolCreate = (data?: number[]) =>
+      create(ataOf(USER, WSOL), WSOL, data);
+    const other = Keypair.generate().publicKey;
+    const run = (ixs: TransactionInstruction[]) =>
+      refuseExtraAccountCreations(ixs, USER.toBase58());
+
+    it("accepts a setup without a create", () => {
+      run([]);
+    });
+
+    it("accepts the taker's wrapped SOL account, created idempotently or not", () => {
+      run([wsolCreate([1])]);
+      run([wsolCreate([0])]);
+      run([wsolCreate([])]);
+    });
+
+    it("refuses an intermediate token account beside the wrapped SOL one", () => {
+      assert.throws(
+        () => run([wsolCreate(), create(ataOf(USER, other), other)]),
+        /creates a token account besides the wrapped SOL account/
+      );
+    });
+
+    it("refuses a create of another account for the wrapped SOL mint", () => {
+      assert.throws(
+        () => run([create(ataOf(other, WSOL), WSOL, [1], other)]),
+        /creates a token account besides/
+      );
+    });
+
+    it("refuses a create with too few accounts", () => {
+      const ix = wsolCreate();
+      ix.keys = ix.keys.slice(0, 1);
+      assert.throws(() => run([ix]), /creates a token account besides/);
+    });
+
+    it("ignores RecoverNested and instructions of other programs", () => {
+      run([
+        create(ataOf(USER, other), other, [2]),
+        new TransactionInstruction({
+          programId: SystemProgram.programId,
+          keys: [],
+          data: Buffer.from([0]),
+        }),
+      ]);
+    });
+  });
+
   describe("planComputeBudget", () => {
-    it("adds the default unit limit when /build returns only a price", () => {
+    it("adds the default unit limit and drops the unit price /build returns", () => {
       const { instructions, fee } = planComputeBudget([PRICE_IX]);
-      assert.equal(instructions.length, 2);
+      assert.equal(instructions.length, 1);
       assert.deepEqual(
         [...instructions[0].data],
         [
@@ -348,51 +506,36 @@ describe("tokens-to-rent-service Jupiter /build", () => {
           }).data,
         ]
       );
-      assert.equal(instructions[1], PRICE_IX);
-      // 10000 base + 1_400_000 units * 2000 micro-lamports
-      assert.equal(fee, 10000 + 2800);
+      assert.equal(fee, FEE_LAMPORTS);
     });
 
-    it("keeps a limit that /build returns and charges for it", () => {
+    it("charges the flat fee however high the price /build returns", () => {
+      const { instructions, fee } = planComputeBudget([
+        ComputeBudgetProgram.setComputeUnitPrice({
+          microLamports: 50_000_000,
+        }),
+      ]);
+      assert.equal(fee, 10000);
+      assert.equal(
+        instructions.some(
+          (ix) =>
+            ComputeBudgetInstruction.decodeInstructionType(ix) ===
+            "SetComputeUnitPrice"
+        ),
+        false
+      );
+    });
+
+    it("keeps a limit that /build returns and drops the price beside it", () => {
       const { instructions, fee } = planComputeBudget([LIMIT_IX, PRICE_IX]);
-      assert.deepEqual(instructions, [LIMIT_IX, PRICE_IX]);
-      assert.equal(fee, 10000 + 600);
-    });
-
-    it("charges only the base fee when /build returns no price", () => {
-      const { instructions, fee } = planComputeBudget([]);
-      assert.equal(instructions.length, 1);
+      assert.deepEqual(instructions, [LIMIT_IX]);
       assert.equal(fee, 10000);
     });
 
-    it("rounds the priority fee up to a lamport", () => {
-      const { fee } = planComputeBudget([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1 }),
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
-      ]);
-      assert.equal(fee, 10001);
-    });
-
-    it("refuses a fee above 0.01 SOL and accepts one of exactly 0.01 SOL", () => {
-      const limit = ComputeBudgetProgram.setComputeUnitLimit({
-        units: 1_000_000,
-      });
-      // 10000 base + 1_000_000 units * 9_990_000 micro-lamports = 10_000_000 lamports
-      const { fee } = planComputeBudget([
-        limit,
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 9_990_000 }),
-      ]);
-      assert.equal(fee, 10_000_000);
-      assert.throws(
-        () =>
-          planComputeBudget([
-            limit,
-            ComputeBudgetProgram.setComputeUnitPrice({
-              microLamports: 9_990_001,
-            }),
-          ]),
-        /Priority fees are too high/
-      );
+    it("adds only the limit when /build returns nothing", () => {
+      const { instructions, fee } = planComputeBudget([]);
+      assert.equal(instructions.length, 1);
+      assert.equal(fee, 10000);
     });
   });
 });

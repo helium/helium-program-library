@@ -13,7 +13,7 @@ This is used for the wallet-app feature where we let users top up to 0.02 SOL us
 | `JUPITER_FEE_ACCOUNT` | none | Token account that collects the platform fee. |
 | `SOLANA_URL` | `http://127.0.0.1:8899` | Solana RPC endpoint. |
 
-`/build` takes the input amount only (ExactIn), has no quote-only form, and returns the compute unit price without a limit. `/estimate` builds a swap of 0.020015 SOL into the token for the platform wallet and reports its output; `/fees` builds the token to SOL swap for the user, bounded with `maxAccounts` and `maxBytes` so the transaction fits Solana's 1232-byte limit.
+`/build` takes the input amount only (ExactIn), has no quote-only form, and returns the compute unit price without a limit. `/estimate` builds a swap of 0.020015 SOL into the token for the platform wallet and reports its output; `/fees` builds the token to SOL swap for the user, bounded with `maxAccounts` and `maxBytes` so the transaction aims to stay within Solana's 1232-byte limit (an estimate from measured routes). The transaction carries no compute unit price, so the user repays the base fee and the rent loan only, and a build whose setup creates any token account besides the user's wrapped SOL account is refused.
 
 ## Deployments
 

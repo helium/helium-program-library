@@ -115,9 +115,11 @@ const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
   );
 
 /**
- * Jupiter RFQ v2, a liquidity source Metis can route through. Its fills need a
- * market maker's co-signature this procedure does not collect, so every
- * `/build` request excludes it and a built route through it is refused.
+ * Jupiter RFQ v2. Its fills need a market maker's co-signature this procedure
+ * does not collect. `/build` refuses RFQ v2 unless an undocumented
+ * `enableRfqV2` parameter is sent, which this procedure never sends, so the
+ * exclusion on every request and the refusal of a built route through it are
+ * defence in depth in case that default changes.
  */
 const RFQ_V2_LABEL = "JupiterRfqV2";
 
@@ -193,7 +195,12 @@ const token2022AccountSpace = (
     const { tlvData } = unpackMint(mint, mintInfo, TOKEN_2022_PROGRAM_ID);
     const accountExtensions = getExtensionTypes(tlvData)
       .map(getAccountTypeOfMintType)
-      .filter((extension) => extension !== ExtensionType.Uninitialized);
+      // An extension spl-token does not know maps to undefined, which would
+      // make getAccountLen throw and drop the extensions it does know.
+      .filter(
+        (extension): extension is ExtensionType =>
+          extension !== undefined && extension !== ExtensionType.Uninitialized,
+      );
     return getAccountLen([...accountExtensions, ExtensionType.ImmutableOwner]);
   } catch {
     return TOKEN_2022_BASE_ACCOUNT_SPACE;

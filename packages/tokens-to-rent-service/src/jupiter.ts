@@ -8,11 +8,15 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { buildJupiterSwap, planComputeBudget } from "./build";
+import {
+  buildJupiterSwap,
+  estimateRequest,
+  fundFeesRequest,
+  planComputeBudget,
+  refuseExtraAccountCreations,
+} from "./build";
 import { JUPITER_FEE_ACCOUNT, JUPITER_FEE_BPS, JUPITER_URL } from "./env";
 import { provider } from "./solana";
-
-const SLIPPAGE_BPS = 100; // 1%
 
 export const getAdressLookupTableAccounts = async (
   keys: string[]
@@ -58,17 +62,16 @@ export const estimate = async ({
   const decimals = (await getMint(connection, NATIVE_MINT)).decimals;
   // /build has no quote-only form, so the price comes from a build for the platform wallet,
   // whose instructions are discarded.
-  const quote = await buildJupiterSwap({
-    apiUrl: JUPITER_URL,
-    amount: toBN(0.020015, decimals).toString(),
-    inputMint: NATIVE_MINT.toBase58(),
-    outputMint: mint.toBase58(),
-    taker: provider.wallet.publicKey.toBase58(),
-    slippageBps: SLIPPAGE_BPS,
-    platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
-    feeAccount: JUPITER_FEE_ACCOUNT,
-    fitFundFeesTransaction: false,
-  });
+  const quote = await buildJupiterSwap(
+    estimateRequest({
+      apiUrl: JUPITER_URL,
+      mint: mint.toBase58(),
+      solAmount: toBN(0.020015, decimals).toString(),
+      platformWallet: provider.wallet.publicKey.toBase58(),
+      platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
+      feeAccount: JUPITER_FEE_ACCOUNT,
+    })
+  );
 
   return quote.outAmount;
 };
@@ -103,17 +106,18 @@ export const fundFees = async ({
     swapInstruction,
     cleanupInstruction,
     lookupTables,
-  } = await buildJupiterSwap({
-    apiUrl: JUPITER_URL,
-    amount: inputAmount,
-    inputMint: mint.toBase58(),
-    outputMint: NATIVE_MINT.toBase58(),
-    taker: userWallet.toBase58(),
-    slippageBps: SLIPPAGE_BPS,
-    platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
-    feeAccount: JUPITER_FEE_ACCOUNT,
-    fitFundFeesTransaction: true,
-  });
+  } = await buildJupiterSwap(
+    fundFeesRequest({
+      apiUrl: JUPITER_URL,
+      mint: mint.toBase58(),
+      inputAmount,
+      userWallet: userWallet.toBase58(),
+      platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
+      feeAccount: JUPITER_FEE_ACCOUNT,
+    })
+  );
+  // The loan below covers the rent of one account, the wrapped SOL one.
+  refuseExtraAccountCreations(setupInstructions, userWallet.toBase58());
 
   // create rent flash loan instructions
   const ataRent =
