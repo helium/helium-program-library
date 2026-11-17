@@ -15,9 +15,16 @@ const quoteCache = createTtlCache<QuoteResponse>({ ttlMs: QUOTE_CACHE_TTL_MS });
  */
 export const getQuote = publicProcedure.swap.getQuote.handler(
   async ({ input, errors }) => {
-    const { inputMint, outputMint, amount, swapMode, slippageBps } = input;
+    const {
+      inputMint,
+      outputMint,
+      amount,
+      swapMode,
+      slippageBps,
+      excludeDexes,
+    } = input;
 
-    const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}`;
+    const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}:${excludeDexes ?? ""}`;
 
     return quoteCache(cacheKey, async () => {
       // Get quote from Jupiter
@@ -32,6 +39,9 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       // be completed. The paid api-key host respects `excludeRouters=jupiterz` but
       // ignores `excludeRfq` (only the keyless lite-api host respects the latter).
       quoteUrl.searchParams.set("excludeRouters", "jupiterz");
+      if (excludeDexes) {
+        quoteUrl.searchParams.set("excludeDexes", excludeDexes);
+      }
 
       const quoteResponse = await fetch(quoteUrl.toString(), {
         headers: {

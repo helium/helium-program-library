@@ -12,6 +12,10 @@ export const GetQuoteInputSchema = z
     amount: z.string().min(1),
     swapMode: z.enum(["ExactIn", "ExactOut"]).default("ExactIn"),
     slippageBps: z.coerce.number().min(0).max(10000).default(50),
+    excludeDexes: z
+      .string()
+      .optional()
+      .describe("Comma-separated Jupiter DEX labels to leave out of the route"),
   })
   // A quote from a mint to itself is circular arbitrage, which Jupiter refuses
   // with CIRCULAR_ARBITRAGE_IS_DISABLED. Reject it here so the caller gets a

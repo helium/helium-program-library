@@ -188,6 +188,50 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     jupiterCalls = [];
   });
 
+  describe("quote excludeDexes", () => {
+    const quoteCalls = () =>
+      jupiterCalls.filter((c) => c.url.pathname === "/swap/v1/quote");
+
+    it("forwards excludeDexes to Jupiter", async () => {
+      await quote({ excludeDexes: "Kipseli,Foo" });
+
+      expect(quoteCalls()).to.have.length(1);
+      expect(quoteCalls()[0].url.searchParams.get("excludeDexes")).to.eq(
+        "Kipseli,Foo"
+      );
+      expect(quoteCalls()[0].url.searchParams.get("excludeRouters")).to.eq(
+        "jupiterz"
+      );
+    });
+
+    it("leaves excludeDexes out when the caller sets none", async () => {
+      await quote();
+
+      expect(quoteCalls()).to.have.length(1);
+      expect(quoteCalls()[0].url.searchParams.has("excludeDexes")).to.eq(false);
+    });
+
+    it("keys a quote without excludeDexes apart from one with it", async () => {
+      const amount = freshAmount();
+      await quote({}, amount);
+      await quote({ excludeDexes: "Kipseli" }, amount);
+
+      expect(quoteCalls()).to.have.length(2);
+      expect(quoteCalls()[0].url.searchParams.has("excludeDexes")).to.eq(false);
+      expect(quoteCalls()[1].url.searchParams.get("excludeDexes")).to.eq(
+        "Kipseli"
+      );
+    });
+
+    it("serves an identical repeat from the cache", async () => {
+      const amount = freshAmount();
+      await quote({ excludeDexes: "Kipseli" }, amount);
+      await quote({ excludeDexes: "Kipseli" }, amount);
+
+      expect(quoteCalls()).to.have.length(1);
+    });
+  });
+
   describe("swap instructions useSharedAccounts", () => {
     it("forwards useSharedAccounts: true to Jupiter", async () => {
       const calls = await swapInstructions({ useSharedAccounts: true });
