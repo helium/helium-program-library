@@ -1,7 +1,6 @@
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import {
-  AddressLookupTableAccount,
   Connection,
   PublicKey,
   TransactionInstruction,
@@ -25,36 +24,45 @@ import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
 import BN from "bn.js";
+import { z } from "zod";
+
+/** A base-10 token amount in base units, as Jupiter writes amounts. */
+const AmountSchema = z.string().regex(/^\d+$/);
 
 /** One instruction as Jupiter's swap API returns it. */
-interface JupiterInstruction {
-  programId: string;
-  accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
-  data: string;
-}
+const JupiterInstructionSchema = z.object({
+  programId: z.string(),
+  accounts: z.array(
+    z.object({
+      pubkey: z.string(),
+      isSigner: z.boolean(),
+      isWritable: z.boolean(),
+    }),
+  ),
+  data: z.string(),
+});
+
+type JupiterInstruction = z.infer<typeof JupiterInstructionSchema>;
 
 /** The fields of a Swap V2 `/build` response this procedure reads. */
-interface JupiterBuildResponse {
-  error?: string;
-  inputMint: string;
-  outputMint: string;
-  inAmount: string;
-  outAmount: string;
-  setupInstructions?: JupiterInstruction[];
-  swapInstruction: JupiterInstruction;
-  cleanupInstruction?: JupiterInstruction | null;
-  otherInstructions?: JupiterInstruction[];
-  addressesByLookupTableAddress?: Record<string, string[]> | null;
-}
+const JupiterBuildResponseSchema = z.object({
+  inputMint: z.string(),
+  outputMint: z.string(),
+  inAmount: AmountSchema,
+  outAmount: AmountSchema,
+  otherAmountThreshold: AmountSchema,
+  routePlan: z.array(z.object({ swapInfo: z.object({ label: z.string() }) })),
+  setupInstructions: z.array(JupiterInstructionSchema).optional(),
+  swapInstruction: JupiterInstructionSchema,
+  cleanupInstruction: JupiterInstructionSchema.nullish(),
+  otherInstructions: z.array(JupiterInstructionSchema).optional(),
+  addressesByLookupTableAddress: z
+    .record(z.string(), z.array(z.string()))
+    .nullish(),
+});
 
 /** The only swap mode `/build` builds. */
 const BUILD_SWAP_MODE = "ExactIn";
-
-/**
- * Deactivation slot of a lookup table that has not been deactivated (u64 max).
- * `/build` returns only tables it routes through, which are active.
- */
-const ACTIVE_LOOKUP_TABLE_SLOT = BigInt("18446744073709551615");
 
 const toInstruction = (instruction: JupiterInstruction) =>
   new TransactionInstruction({
@@ -67,24 +75,13 @@ const toInstruction = (instruction: JupiterInstruction) =>
     data: Buffer.from(instruction.data, "base64"),
   });
 
-/**
- * The lookup tables `/build` resolved, as accounts the transaction compiles
- * against, so building the swap reads no lookup table from the RPC.
- */
-const toLookupTables = (
-  resolved: Record<string, string[]> | null | undefined,
-): AddressLookupTableAccount[] =>
-  Object.entries(resolved ?? {}).map(
-    ([key, addresses]) =>
-      new AddressLookupTableAccount({
-        key: new PublicKey(key),
-        state: {
-          deactivationSlot: ACTIVE_LOOKUP_TABLE_SLOT,
-          lastExtendedSlot: 0,
-          lastExtendedSlotStartIndex: 0,
-          addresses: addresses.map((address) => new PublicKey(address)),
-        },
-      }),
+/** The DEX labels in a comma-separated `excludeDexes`, without blanks. */
+const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
+  new Set(
+    (excludeDexes ?? "")
+      .split(",")
+      .map((label) => label.trim())
+      .filter((label) => label.length > 0),
   );
 
 /**
@@ -92,7 +89,9 @@ const toLookupTables = (
  *
  * `/build` quotes the route again, so the transaction swaps the quote's input
  * mint, amount and slippage, and its output amount is the one `/build`
- * returned, not the earlier quote's.
+ * returned, not the earlier quote's. The built swap's minimum output must not
+ * fall below the quote's, so the chain enforces at least the floor the caller
+ * was shown.
  */
 export const getInstructions = publicProcedure.swap.getInstructions.handler(
   async ({ input, errors }) => {
@@ -105,6 +104,12 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     if (quoteResponse.swapMode !== BUILD_SWAP_MODE) {
       throw errors.BAD_REQUEST({
         message: `Only ${BUILD_SWAP_MODE} quotes can be built into a swap, got ${quoteResponse.swapMode}`,
+      });
+    }
+
+    if (!AmountSchema.safeParse(quoteResponse.otherAmountThreshold).success) {
+      throw errors.BAD_REQUEST({
+        message: "quoteResponse.otherAmountThreshold must be a base-10 amount",
       });
     }
 
@@ -148,13 +153,28 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       throw errors.JUPITER_ERROR({ message: classification.message });
     }
 
-    const build: JupiterBuildResponse = await buildResponse.json();
+    const raw: unknown = await buildResponse.json();
 
-    if (build.error) {
+    if (
+      typeof raw === "object" &&
+      raw !== null &&
+      "error" in raw &&
+      typeof raw.error === "string" &&
+      raw.error.length > 0
+    ) {
       throw errors.JUPITER_ERROR({
-        message: `Jupiter API returned error: ${build.error}`,
+        message: `Jupiter API returned error: ${raw.error}`,
       });
     }
+
+    const parsed = JupiterBuildResponseSchema.safeParse(raw);
+    if (!parsed.success) {
+      console.error("Invalid Jupiter /build response:", parsed.error);
+      throw errors.JUPITER_ERROR({
+        message: "Invalid response from Jupiter API",
+      });
+    }
+    const build = parsed.data;
 
     // The metadata below describes this response, so it must be a swap of the
     // mints and amount the caller asked to build.
@@ -168,20 +188,49 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       });
     }
 
+    // otherAmountThreshold is the minimum output the swap instruction enforces
+    // on chain. A re-quote below the caller's quote would let the signer
+    // receive less than the minimum it was shown.
+    if (
+      BigInt(build.otherAmountThreshold) <
+      BigInt(quoteResponse.otherAmountThreshold)
+    ) {
+      throw errors.JUPITER_ERROR({
+        message: `Jupiter built a swap with a minimum output of ${build.otherAmountThreshold}, below the quote's ${quoteResponse.otherAmountThreshold}`,
+      });
+    }
+
+    // A guard against Jupiter routing through a DEX the caller excluded.
+    const excluded = excludedLabels(excludeDexes);
+    const excludedHop = build.routePlan.find((hop) =>
+      excluded.has(hop.swapInfo.label),
+    );
+    if (excludedHop) {
+      throw errors.JUPITER_ERROR({
+        message: `Jupiter built a route through excluded DEX ${excludedHop.swapInfo.label}`,
+      });
+    }
+
+    // otherInstructions are not characterised for /build, so the signer is
+    // not handed instructions nobody has checked.
+    const otherCount = build.otherInstructions?.length ?? 0;
+    if (otherCount > 0) {
+      throw errors.JUPITER_ERROR({
+        message: `Jupiter built a swap with ${otherCount} otherInstructions, which this procedure does not sign`,
+      });
+    }
+
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
 
     // computeBudgetInstructions are left out: buildVersionedTransaction sets
     // the compute unit limit and price itself. tipInstruction is only present
     // when tipAmount is requested, which this procedure never sends.
-    // otherInstructions go after cleanup, the order Jupiter's own /build
-    // example assembles them in.
     const jupIxs = [
       ...(build.setupInstructions ?? []).map(toInstruction),
       toInstruction(build.swapInstruction),
       ...(build.cleanupInstruction
         ? [toInstruction(build.cleanupInstruction)]
         : []),
-      ...(build.otherInstructions ?? []).map(toInstruction),
     ];
 
     const tx = await buildVersionedTransaction({
@@ -189,7 +238,11 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       draft: {
         instructions: jupIxs,
         feePayer: new PublicKey(userPublicKey),
-        addressLookupTables: toLookupTables(build.addressesByLookupTableAddress),
+        // The tables are read from chain by key, so the transaction compiles
+        // against their on-chain contents.
+        addressLookupTableAddresses: Object.keys(
+          build.addressesByLookupTableAddress ?? {},
+        ).map((key) => new PublicKey(key)),
       },
     });
 

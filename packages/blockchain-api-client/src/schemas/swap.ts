@@ -15,7 +15,9 @@ export const GetQuoteInputSchema = z
     excludeDexes: z
       .string()
       .optional()
-      .describe("Comma-separated Jupiter DEX labels to leave out of the route"),
+      .describe(
+        "Comma-separated Jupiter DEX labels to leave out of the quoted route. It does not carry into getInstructions, which routes again: send the same excludeDexes to getInstructions to keep these DEXes out of the built swap.",
+      ),
   })
   // A quote from a mint to itself is circular arbitrage, which Jupiter refuses
   // with CIRCULAR_ARBITRAGE_IS_DISABLED. Reject it here so the caller gets a
@@ -44,7 +46,7 @@ export const QuoteResponseSchema = z
 
 export const GetInstructionsInputSchema = z.object({
   quoteResponse: QuoteResponseSchema.describe(
-    "A getQuote response. The swap is built for its inputMint, outputMint, inAmount and slippageBps; Jupiter quotes the route again, so the output amount can differ from this quote's outAmount. Only ExactIn quotes are accepted.",
+    "A getQuote response. The swap is built for its inputMint, outputMint, inAmount and slippageBps; Jupiter quotes the route again, so the output amount can differ from this quote's outAmount; a built swap whose minimum output is below this quote's otherAmountThreshold is refused with JUPITER_ERROR. Only ExactIn quotes are accepted.",
   ),
   userPublicKey: z.string().min(1),
   destinationTokenAccount: z
@@ -54,7 +56,9 @@ export const GetInstructionsInputSchema = z.object({
   excludeDexes: z
     .string()
     .optional()
-    .describe("Comma-separated Jupiter DEX labels to leave out of the route"),
+    .describe(
+      "Comma-separated Jupiter DEX labels to leave out of the built route. getQuote's excludeDexes does not carry over, because building routes again: send it here too. A built route through a listed label (exact, case-sensitive match) is refused with JUPITER_ERROR.",
+    ),
   dynamicComputeUnitLimit: z
     .boolean()
     .default(true)

@@ -1,7 +1,7 @@
 import { createServer, Server } from "http";
 import { AddressInfo } from "net";
 import { call, ORPCError } from "@orpc/server";
-import { VersionedTransaction } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { expect } from "chai";
 import { after, afterEach, before, describe, it } from "mocha";
 
@@ -18,10 +18,26 @@ const WALLET = "GZairnxHiWXk73YhsEtkGU2XnfGw3QcUsjJr8VW2R172";
 const HNT_MINT = "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
+const COMPUTE_BUDGET_PROGRAM = "ComputeBudget111111111111111111111111111111";
+const LOOKUP_TABLE_PROGRAM = "AddressLookupTab1e1111111111111111111111111";
 const MEMO_PROGRAM = "MemoSq4gqABAXKb96qnH8TuhgWdtsRHB4ShcXcV3Ftu";
 const LOOKUP_TABLE = "CuEETU2svDekhZ2mAdASYARmmyQkeQBN23MP9QzWZUvV";
 /** An account only reachable through LOOKUP_TABLE in the built transaction. */
 const ROUTE_ACCOUNT = "8BKagzPLX7WSJMhExppgvp9yQSfa2m1BTxrEAMpBDrk7";
+
+/**
+ * LOOKUP_TABLE's account data as the chain stores it: a 56-byte header for an
+ * active table without an authority, then ROUTE_ACCOUNT as its only address.
+ */
+const lookupTableData = (): string => {
+  const header = Buffer.alloc(56);
+  header.writeUInt32LE(1, 0);
+  header.writeBigUInt64LE(BigInt("18446744073709551615"), 4);
+  return Buffer.concat([
+    header,
+    new PublicKey(ROUTE_ACCOUNT).toBuffer(),
+  ]).toString("base64");
+};
 
 /** One request the handlers sent to the stubbed Jupiter API. */
 interface JupiterCall {
@@ -45,7 +61,7 @@ const withContext = (value: unknown) => ({
 });
 
 /** The RPC answers building and pricing the swap transaction needs. */
-function rpcResult(method: string): unknown {
+function rpcResult(method: string, params: unknown): unknown {
   switch (method) {
     case "getLatestBlockhash":
       return withContext({
@@ -54,6 +70,21 @@ function rpcResult(method: string): unknown {
       });
     case "getAccountInfo":
       return withContext(null);
+    case "getMultipleAccounts":
+      return withContext(
+        (params as [string[]])[0].map((key) =>
+          key === LOOKUP_TABLE
+            ? {
+                data: [lookupTableData(), "base64"],
+                executable: false,
+                lamports: 1_000_000,
+                owner: LOOKUP_TABLE_PROGRAM,
+                rentEpoch: 0,
+                space: 88,
+              }
+            : null
+        )
+      );
     case "getBalance":
       return withContext(5_000_000_000);
     case "getFeeForMessage":
@@ -73,9 +104,17 @@ function startStubRpc(): Promise<string> {
       let body = "";
       req.on("data", (chunk) => (body += chunk));
       req.on("end", () => {
-        const answer = ({ id, method }: { id: unknown; method: string }) => {
+        const answer = ({
+          id,
+          method,
+          params,
+        }: {
+          id: unknown;
+          method: string;
+          params: unknown;
+        }) => {
           rpcMethods.push(method);
-          const result = rpcResult(method);
+          const result = rpcResult(method, params);
           return result === undefined
             ? {
                 jsonrpc: "2.0",
@@ -201,6 +240,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     input: {
       quoteResponse: Awaited<ReturnType<typeof quote>>;
       userPublicKey: string;
+      excludeDexes?: string;
     }
   ) => {
     try {
@@ -373,16 +413,124 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       expect(jupiterCalls).to.have.length(0);
     });
 
-    it("refuses a /build answer for a different amount than the quote", async () => {
+    for (const [field, value] of [
+      ["inAmount", "1"],
+      ["inputMint", MEMO_PROGRAM],
+      ["outputMint", MEMO_PROGRAM],
+    ]) {
+      it(`refuses a /build answer whose ${field} differs from the quote`, async () => {
+        const quoteResponse = await quote();
+        buildOverrides = { [field]: value };
+
+        const code = await rejectionCode({
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
+
+        expect(code).to.eq("JUPITER_ERROR");
+      });
+    }
+
+    describe("minimum output", () => {
+      // The stubbed /build answer enforces a minimum output of 773.
+      it("refuses a /build minimum one below the quote's", async () => {
+        const quoteResponse = {
+          ...(await quote()),
+          otherAmountThreshold: "774",
+        };
+
+        const code = await rejectionCode({
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
+
+        expect(code).to.eq("JUPITER_ERROR");
+      });
+
+      for (const threshold of ["773", "772"]) {
+        it(`accepts a /build minimum of 773 against a quote minimum of ${threshold}`, async () => {
+          const quoteResponse = {
+            ...(await quote()),
+            otherAmountThreshold: threshold,
+          };
+
+          const result = await call(getInstructions, {
+            quoteResponse,
+            userPublicKey: WALLET,
+          });
+
+          expect(result.transactions).to.have.length(1);
+        });
+      }
+
+      it("refuses a quote whose minimum is not an amount without calling Jupiter", async () => {
+        const quoteResponse = {
+          ...(await quote()),
+          otherAmountThreshold: "7e2",
+        };
+        jupiterCalls = [];
+
+        const code = await rejectionCode({
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
+
+        expect(code).to.eq("BAD_REQUEST");
+        expect(jupiterCalls).to.have.length(0);
+      });
+    });
+
+    describe("excluded DEXes in the built route", () => {
+      const routeThrough = (label: string) => [
+        { swapInfo: { label: "Whirlpool" } },
+        { swapInfo: { label } },
+      ];
+
+      it("refuses a route through a DEX listed in excludeDexes", async () => {
+        const quoteResponse = await quote();
+        buildOverrides = { routePlan: routeThrough("Kipseli") };
+
+        const code = await rejectionCode({
+          quoteResponse,
+          userPublicKey: WALLET,
+          excludeDexes: "Foo, Kipseli",
+        });
+
+        expect(code).to.eq("JUPITER_ERROR");
+      });
+
+      it("matches labels exactly and case-sensitively", async () => {
+        buildOverrides = { routePlan: routeThrough("Kipseli") };
+
+        const { result } = await swapInstructions({
+          excludeDexes: "kipseli,Kipsel",
+        });
+
+        expect(result.transactions).to.have.length(1);
+      });
+    });
+
+    it("refuses a malformed /build answer with JUPITER_ERROR", async () => {
       const quoteResponse = await quote();
-      buildOverrides = { inAmount: "1" };
+      buildOverrides = { swapInstruction: undefined };
 
       const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
 
       expect(code).to.eq("JUPITER_ERROR");
     });
 
-    it("compiles against the lookup tables /build resolved, reading none from the RPC", async () => {
+    it("refuses a /build answer with otherInstructions", async () => {
+      const quoteResponse = await quote();
+      buildOverrides = {
+        otherInstructions: [{ programId: MEMO_PROGRAM, accounts: [], data: "" }],
+      };
+
+      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+
+      expect(code).to.eq("JUPITER_ERROR");
+    });
+
+    it("compiles against the lookup tables /build names, read from chain", async () => {
       buildOverrides = {
         swapInstruction: {
           programId: MEMO_PROGRAM,
@@ -406,29 +554,70 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       expect(
         tx.message.staticAccountKeys.map((k) => k.toBase58())
       ).to.not.include(ROUTE_ACCOUNT);
-      expect(rpcMethods).to.not.include("getMultipleAccounts");
-      expect(rpcMethods).to.not.include("getAccountInfo");
+      expect(rpcMethods).to.include("getMultipleAccounts");
     });
 
-    it("puts otherInstructions in the transaction and leaves Jupiter's compute budget out", async () => {
+    it("compiles against the on-chain table, not the addresses /build lists", async () => {
       buildOverrides = {
-        computeBudgetInstructions: [
-          { programId: SYSTEM_PROGRAM, accounts: [], data: "AQ==" },
-        ],
-        otherInstructions: [
-          { programId: MEMO_PROGRAM, accounts: [], data: "" },
-        ],
+        swapInstruction: {
+          programId: MEMO_PROGRAM,
+          accounts: [
+            { pubkey: WALLET, isSigner: true, isWritable: true },
+            { pubkey: ROUTE_ACCOUNT, isSigner: false, isWritable: true },
+          ],
+          data: "",
+        },
+        // The chain holds only ROUTE_ACCOUNT, at index 0.
+        addressesByLookupTableAddress: {
+          [LOOKUP_TABLE]: [SYSTEM_PROGRAM, ROUTE_ACCOUNT],
+        },
       };
       const { result } = await swapInstructions();
 
       const tx = VersionedTransaction.deserialize(
         Buffer.from(result.transactions[0].serializedTransaction, "base64")
       );
-      const programs = tx.message.compiledInstructions.map((ix) =>
-        tx.message.staticAccountKeys[ix.programIdIndex].toBase58()
+      expect(tx.message.addressTableLookups[0].writableIndexes).to.deep.eq([0]);
+    });
+
+    it("orders setup, swap and cleanup and leaves Jupiter's compute budget out", async () => {
+      const memo = (text: string) => ({
+        programId: MEMO_PROGRAM,
+        accounts: [],
+        data: Buffer.from(text).toString("base64"),
+      });
+      buildOverrides = {
+        // RequestHeapFrame, an instruction the server never adds itself.
+        computeBudgetInstructions: [
+          { programId: COMPUTE_BUDGET_PROGRAM, accounts: [], data: "AQAAAQA=" },
+        ],
+        setupInstructions: [memo("setup-1"), memo("setup-2")],
+        swapInstruction: memo("swap"),
+        cleanupInstruction: memo("cleanup"),
+      };
+      const { result } = await swapInstructions();
+
+      const tx = VersionedTransaction.deserialize(
+        Buffer.from(result.transactions[0].serializedTransaction, "base64")
       );
-      expect(programs.filter((p) => p === MEMO_PROGRAM)).to.have.length(1);
-      expect(programs.filter((p) => p === SYSTEM_PROGRAM)).to.have.length(1);
+      const compiled = tx.message.compiledInstructions.map((ix) => ({
+        program: tx.message.staticAccountKeys[ix.programIdIndex].toBase58(),
+        data: Buffer.from(ix.data),
+      }));
+      expect(
+        compiled
+          .filter((ix) => ix.program === MEMO_PROGRAM)
+          .map((ix) => ix.data.toString())
+      ).to.deep.eq(["setup-1", "setup-2", "swap", "cleanup"]);
+      const budget = compiled.filter(
+        (ix) => ix.program === COMPUTE_BUDGET_PROGRAM
+      );
+      expect(budget).to.not.have.length(0);
+      expect(budget.map((ix) => ix.data[0])).to.not.include(1);
+      // The server's compute budget comes before every Jupiter instruction.
+      expect(compiled.findIndex((ix) => ix.program === MEMO_PROGRAM)).to.eq(
+        budget.length
+      );
     });
 
     it("describes the output /build returned, not the earlier quote's", async () => {
