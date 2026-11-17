@@ -1,7 +1,7 @@
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 
 /** Jupiter's Swap V2 build endpoint, relative to the API base URL. */
-export const JUPITER_BUILD_PATH = "/swap/v2/build";
+const JUPITER_BUILD_PATH = "/swap/v2/build";
 
 /**
  * The byte budget `/build` gets for the bare swap it returns (`maxBytes`).
@@ -10,11 +10,14 @@ export const JUPITER_BUILD_PATH = "/swap/v2/build";
  * over the signed remote task, which carries the swap's instruction data again with `lend_v0`,
  * the `swap_v0` wrapper and `check_repay_v0`, and a `run_task_v0` that lists every account the
  * task touches, plus the DCA's own accounts, which no lookup table holds. That adds about 660
- * bytes to the bare swap, so a bare swap of 540 bytes leaves the submitted transaction about
- * 30 bytes under Solana's 1232-byte limit. A larger budget lets `/build` choose multi-hop routes
+ * bytes to the bare swap, so a bare swap of 520 bytes leaves the submitted transaction about
+ * 50 bytes under Solana's 1232-byte limit. A larger budget lets `/build` choose multi-hop routes
  * whose task transaction exceeds the limit and cannot be submitted.
  */
-export const DCA_SWAP_MAX_BYTES = 540;
+export const DCA_SWAP_MAX_BYTES = 520;
+
+/** How much of a failed `/build` answer's body goes into the error. */
+const ERROR_BODY_MAX_CHARS = 300;
 
 export interface BuildSwapRequest {
   apiUrl: string;
@@ -210,8 +213,9 @@ export async function buildJupiterSwap(
     headers: request.apiKey ? { "x-api-key": request.apiKey } : {},
   });
   if (!response.ok) {
+    const body = (await response.text()).slice(0, ERROR_BODY_MAX_CHARS);
     throw new Error(
-      `Jupiter /build error: ${response.status} ${response.statusText}`
+      `Jupiter /build error: ${response.status} ${response.statusText}: ${body}`
     );
   }
   return readBuildResponse(await response.json(), {

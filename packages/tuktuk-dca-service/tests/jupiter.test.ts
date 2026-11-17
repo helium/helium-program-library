@@ -78,10 +78,6 @@ describe("tuktuk-dca-service Jupiter /build", () => {
         maxBytes: String(DCA_SWAP_MAX_BYTES),
       });
     });
-
-    it("budgets the bare swap at 540 bytes", () => {
-      assert.equal(DCA_SWAP_MAX_BYTES, 540);
-    });
   });
 
   describe("readBuildResponse", () => {
@@ -247,8 +243,21 @@ describe("tuktuk-dca-service Jupiter /build", () => {
         })) as typeof fetch;
       await assert.rejects(
         buildJupiterSwap(REQUEST, fetchImpl),
-        /Jupiter \/build error: 400 Bad Request/
+        /Jupiter \/build error: 400 Bad Request: No routes found$/
       );
+    });
+
+    it("keeps the first 300 characters of a failed request's body", async () => {
+      const body = "x".repeat(300) + "TRUNCATED";
+      const fetchImpl = (async () =>
+        new Response(body, { status: 500, statusText: "Server Error" })) as typeof fetch;
+      await assert.rejects(buildJupiterSwap(REQUEST, fetchImpl), (error: Error) => {
+        assert.equal(
+          error.message,
+          `Jupiter /build error: 500 Server Error: ${"x".repeat(300)}`
+        );
+        return true;
+      });
     });
   });
 });
