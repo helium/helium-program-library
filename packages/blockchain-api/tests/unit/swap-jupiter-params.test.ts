@@ -60,6 +60,8 @@ let buildOverrides: Record<string, unknown> = {};
 let buildAnswers: Record<string, unknown>[] = [];
 /** A status and body that replace the stubbed `/build` answer, when a case sets one. */
 let buildReply: { status: number; body: unknown } | undefined;
+/** A status and body that replace the stubbed quote answer, when a case sets one. */
+let quoteReply: { status: number; body: unknown } | undefined;
 /** Every RPC method the handlers called, in order. */
 let rpcMethods: string[] = [];
 /** Accounts the stubbed chain holds besides LOOKUP_TABLE, by address. */
@@ -203,7 +205,15 @@ const stubFetch: typeof fetch = async (input, init) => {
     body,
   });
 
-  if (url.pathname === "/swap/v1/quote") {
+  // getQuote calls /build for the system program as a placeholder taker. Its
+  // answer ignores the getInstructions overrides, so they shape builds only.
+  if (
+    url.pathname === "/swap/v2/build" &&
+    url.searchParams.get("taker") === SYSTEM_PROGRAM
+  ) {
+    if (quoteReply) {
+      return jsonResponse(quoteReply.body, quoteReply.status);
+    }
     return jsonResponse({
       inputMint: url.searchParams.get("inputMint"),
       inAmount: url.searchParams.get("amount"),
@@ -214,6 +224,14 @@ const stubFetch: typeof fetch = async (input, init) => {
       slippageBps: Number(url.searchParams.get("slippageBps")),
       priceImpactPct: "0",
       routePlan: [],
+      computeBudgetInstructions: [],
+      setupInstructions: [],
+      swapInstruction: { programId: SYSTEM_PROGRAM, accounts: [], data: "" },
+      cleanupInstruction: null,
+      otherInstructions: [],
+      tipInstruction: null,
+      addressesByLookupTableAddress: {},
+      blockhashWithMetadata: { blockhash: "x", lastValidBlockHeight: 1 },
     });
   }
   if (url.pathname === "/swap/v2/build") {
@@ -332,33 +350,82 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     buildOverrides = {};
     buildAnswers = [];
     buildReply = undefined;
+    quoteReply = undefined;
     rpcMethods = [];
     chainAccounts = new Map();
     walletLamports = 5_000_000_000;
     failMultipleAccounts = false;
   });
 
-  describe("quote excludeDexes", () => {
+  describe("quote through /build", () => {
     const quoteCalls = () =>
-      jupiterCalls.filter((c) => c.url.pathname === "/swap/v1/quote");
+      jupiterCalls.filter(
+        (c) =>
+          c.url.pathname === "/swap/v2/build" &&
+          c.url.searchParams.get("taker") === SYSTEM_PROGRAM
+      );
 
-    it("forwards excludeDexes to Jupiter", async () => {
-      await quote({ excludeDexes: "Kipseli,Foo" });
+    /** The error a getQuote call rejects with. */
+    const quoteRejection = async (extra: Record<string, unknown> = {}) => {
+      try {
+        await quote(extra);
+      } catch (error) {
+        expect(error).to.be.instanceOf(ORPCError);
+        return error as ORPCError<string, unknown>;
+      }
+      expect.fail("getQuote resolved");
+    };
+
+    it("GETs /swap/v2/build for a placeholder taker, excluding RFQ v2", async () => {
+      const amount = freshAmount();
+      await quote({}, amount);
+
+      expect(jupiterCalls).to.have.length(1);
+      expect(quoteCalls()).to.have.length(1);
+      expect(quoteCalls()[0].method).to.eq("GET");
+      expect(quoteCalls()[0].apiKey).to.eq("test");
+      expect(Object.fromEntries(quoteCalls()[0].url.searchParams)).to.deep.eq({
+        inputMint: HNT_MINT,
+        outputMint: USDC_MINT,
+        amount,
+        taker: SYSTEM_PROGRAM,
+        slippageBps: "50",
+        excludeDexes: "JupiterRfqV2",
+      });
+    });
+
+    it("returns the quote fields only", async () => {
+      const amount = freshAmount();
+      const result = await quote({}, amount);
+
+      expect(result).to.deep.eq({
+        inputMint: HNT_MINT,
+        inAmount: amount,
+        outputMint: USDC_MINT,
+        outAmount: "1",
+        otherAmountThreshold: "1",
+        swapMode: "ExactIn",
+        slippageBps: 50,
+        priceImpactPct: "0",
+        routePlan: [],
+      });
+    });
+
+    it("forwards excludeDexes to Jupiter with RFQ v2 added", async () => {
+      await quote({ excludeDexes: "Kipseli, Foo" });
 
       expect(quoteCalls()).to.have.length(1);
       expect(quoteCalls()[0].url.searchParams.get("excludeDexes")).to.eq(
-        "Kipseli,Foo"
-      );
-      expect(quoteCalls()[0].url.searchParams.get("excludeRouters")).to.eq(
-        "jupiterz"
+        "Kipseli,Foo,JupiterRfqV2"
       );
     });
 
-    it("leaves excludeDexes out when the caller sets none", async () => {
-      await quote();
+    it("sends RFQ v2 once when the caller excludes it too", async () => {
+      await quote({ excludeDexes: "JupiterRfqV2" });
 
-      expect(quoteCalls()).to.have.length(1);
-      expect(quoteCalls()[0].url.searchParams.has("excludeDexes")).to.eq(false);
+      expect(quoteCalls()[0].url.searchParams.get("excludeDexes")).to.eq(
+        "JupiterRfqV2"
+      );
     });
 
     it("keys a quote without excludeDexes apart from one with it", async () => {
@@ -367,9 +434,11 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       await quote({ excludeDexes: "Kipseli" }, amount);
 
       expect(quoteCalls()).to.have.length(2);
-      expect(quoteCalls()[0].url.searchParams.has("excludeDexes")).to.eq(false);
+      expect(quoteCalls()[0].url.searchParams.get("excludeDexes")).to.eq(
+        "JupiterRfqV2"
+      );
       expect(quoteCalls()[1].url.searchParams.get("excludeDexes")).to.eq(
-        "Kipseli"
+        "Kipseli,JupiterRfqV2"
       );
     });
 
@@ -379,7 +448,9 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       await quote({}, amount);
 
       expect(quoteCalls()).to.have.length(1);
-      expect(quoteCalls()[0].url.searchParams.has("excludeDexes")).to.eq(false);
+      expect(quoteCalls()[0].url.searchParams.get("excludeDexes")).to.eq(
+        "JupiterRfqV2"
+      );
     });
 
     it("serves an identical repeat from the cache", async () => {
@@ -388,6 +459,31 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       await quote({ excludeDexes: "Kipseli" }, amount);
 
       expect(quoteCalls()).to.have.length(1);
+    });
+
+    it("refuses an ExactOut quote without calling Jupiter", async () => {
+      const error = await quoteRejection({ swapMode: "ExactOut" });
+
+      expect(error.code).to.eq("BAD_REQUEST");
+      expect(error.message).to.eq(
+        "Only ExactIn quotes are supported, got ExactOut"
+      );
+      expect(jupiterCalls).to.have.length(0);
+    });
+
+    it("answers a pair Jupiter cannot route with a bad request", async () => {
+      quoteReply = { status: 400, body: { error: "No routes found" } };
+
+      const error = await quoteRejection();
+
+      expect(error.code).to.eq("BAD_REQUEST");
+      expect(error.message).to.eq("No route found for this swap");
+    });
+
+    it("reports a malformed answer as a Jupiter error", async () => {
+      quoteReply = { status: 200, body: { inputMint: HNT_MINT } };
+
+      expect((await quoteRejection()).code).to.eq("JUPITER_ERROR");
     });
   });
 

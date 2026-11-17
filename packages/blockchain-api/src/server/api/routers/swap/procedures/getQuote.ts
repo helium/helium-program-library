@@ -3,6 +3,7 @@ import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import { createTtlCache } from "@/lib/utils/ttl-cache";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
+import { ALWAYS_EXCLUDED_LABELS, excludedLabels } from "./getInstructions";
 
 // Quotes are polled repeatedly and often re-requested with identical params.
 // A short TTL plus in-flight coalescing collapses those bursts into a single
@@ -10,8 +11,19 @@ import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
 const QUOTE_CACHE_TTL_MS = 2000;
 const quoteCache = createTtlCache<QuoteResponse>({ ttlMs: QUOTE_CACHE_TTL_MS });
 
+/** The only swap mode `/build` quotes and builds. */
+const BUILD_SWAP_MODE = "ExactIn";
+
 /**
- * Get a quote for swapping tokens from Jupiter.
+ * The taker `/build` quotes for. `/build` requires a taker, and a quote does
+ * not depend on whose wallet swaps, so the system program stands in for one.
+ */
+const QUOTE_TAKER = "11111111111111111111111111111111";
+
+/**
+ * Get a quote for swapping tokens from Jupiter's Swap V2 `/build`. The quote
+ * is the route metadata of a swap `/build` would build; its instructions are
+ * dropped, because getInstructions builds again for the real taker.
  */
 export const getQuote = publicProcedure.swap.getQuote.handler(
   async ({ input, errors }) => {
@@ -24,24 +36,28 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       excludeDexes,
     } = input;
 
-    const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}:${excludeDexes ?? ""}`;
+    // `/build` swaps an exact input only, and getInstructions refuses
+    // anything else, so an ExactOut quote could never be built.
+    if (swapMode !== BUILD_SWAP_MODE) {
+      throw errors.BAD_REQUEST({
+        message: `Only ${BUILD_SWAP_MODE} quotes are supported, got ${swapMode}`,
+      });
+    }
+
+    const excluded = [
+      ...new Set([...excludedLabels(excludeDexes), ...ALWAYS_EXCLUDED_LABELS]),
+    ].join(",");
+
+    const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}:${excluded}`;
 
     return quoteCache(cacheKey, async () => {
-      // Get quote from Jupiter
-      const quoteUrl = new URL(`${env.JUPITER_API_URL}/swap/v1/quote`);
+      const quoteUrl = new URL(`${env.JUPITER_API_URL}/swap/v2/build`);
       quoteUrl.searchParams.set("inputMint", inputMint);
       quoteUrl.searchParams.set("outputMint", outputMint);
       quoteUrl.searchParams.set("amount", amount);
-      quoteUrl.searchParams.set("swapMode", swapMode);
+      quoteUrl.searchParams.set("taker", QUOTE_TAKER);
       quoteUrl.searchParams.set("slippageBps", slippageBps.toString());
-      // Exclude RFQ (JupiterZ) routes: those return maker-co-signed transactions
-      // the requesting wallet cannot sign on its own, so a self-signed swap can't
-      // be completed. The paid api-key host respects `excludeRouters=jupiterz` but
-      // ignores `excludeRfq` (only the keyless lite-api host respects the latter).
-      quoteUrl.searchParams.set("excludeRouters", "jupiterz");
-      if (excludeDexes) {
-        quoteUrl.searchParams.set("excludeDexes", excludeDexes);
-      }
+      quoteUrl.searchParams.set("excludeDexes", excluded);
 
       const quoteResponse = await fetch(quoteUrl.toString(), {
         headers: {
@@ -67,11 +83,11 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
         throw errors.JUPITER_ERROR({ message: classification.message });
       }
 
-      const raw = await quoteResponse.json();
+      const raw: unknown = await quoteResponse.json();
 
       // Validate the response from Jupiter
       const {
-        data: quote,
+        data: build,
         success,
         error,
       } = QuoteResponseSchema.safeParse(raw);
@@ -81,7 +97,20 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
           message: "Invalid response from Jupiter API",
         });
       }
-      return quote;
+
+      // Only the quote fields go back: the instructions, blockhash and lookup
+      // tables were built for the placeholder taker, not the caller.
+      return {
+        inputMint: build.inputMint,
+        inAmount: build.inAmount,
+        outputMint: build.outputMint,
+        outAmount: build.outAmount,
+        otherAmountThreshold: build.otherAmountThreshold,
+        swapMode: build.swapMode,
+        slippageBps: build.slippageBps,
+        priceImpactPct: build.priceImpactPct,
+        routePlan: build.routePlan,
+      };
     });
   }
 );

@@ -106,7 +106,7 @@ const toInstruction = (instruction: JupiterInstruction) =>
   });
 
 /** The DEX labels in a comma-separated `excludeDexes`, without blanks. */
-const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
+export const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
   new Set(
     (excludeDexes ?? "")
       .split(",")
@@ -121,10 +121,10 @@ const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
  * exclusion on every request and the refusal of a built route through it are
  * defence in depth in case that default changes.
  */
-const RFQ_V2_LABEL = "JupiterRfqV2";
+export const RFQ_V2_LABEL = "JupiterRfqV2";
 
 /** The labels every `/build` request excludes, on top of the caller's. */
-const ALWAYS_EXCLUDED_LABELS = [RFQ_V2_LABEL];
+export const ALWAYS_EXCLUDED_LABELS = [RFQ_V2_LABEL];
 
 /**
  * The associated token program's Create (no data, or 0) and
