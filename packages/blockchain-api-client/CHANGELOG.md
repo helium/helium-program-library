@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.18.1
+
+### Patch Changes
+
+- [#1390](https://github.com/helium/helium-program-library/pull/1390) [`2fa5b26`](https://github.com/helium/helium-program-library/commit/2fa5b260bcffb17f10e26df67ddfc809519253b9) Thanks [@bryzettler](https://github.com/bryzettler)! - `closePosition` returns BAD_REQUEST for a Constant lockup position. The position must flip to Cliff and decay before it can close.
+
 ## 0.18.0
 
 ### Minor Changes
