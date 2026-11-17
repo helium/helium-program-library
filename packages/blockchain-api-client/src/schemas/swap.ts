@@ -21,7 +21,7 @@ export const GetQuoteInputSchema = z
       .string()
       .optional()
       .describe(
-        "Comma-separated Jupiter DEX labels to leave out of the quoted route. JupiterRfqV2 is always left out. It does not carry into getInstructions, which routes again: send the same excludeDexes to getInstructions to keep these DEXes out of the built swap.",
+        "Comma-separated Jupiter DEX labels to leave out of the quoted route. JupiterRfqV2 is always left out. The quote returns these labels as excludeDexes, and getInstructions applies them again when it builds the swap.",
       ),
   })
   // A quote from a mint to itself is circular arbitrage, which Jupiter refuses
@@ -46,6 +46,7 @@ export const QuoteResponseSchema = z
     routePlan: z.array(z.unknown()),
     contextSlot: z.number().optional(),
     timeTaken: z.number().optional(),
+    excludeDexes: z.array(z.string()).optional(),
   })
   .passthrough();
 
@@ -62,7 +63,7 @@ export const GetInstructionsInputSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Comma-separated Jupiter DEX labels to leave out of the built route. getQuote's excludeDexes does not carry over, because building routes again: send it here too. A built route through a listed label (exact, case-sensitive match) is refused with JUPITER_ERROR.",
+      "Comma-separated Jupiter DEX labels to leave out of the built route. Merged with the excludeDexes the quote carries. A built route through a listed label (exact, case-sensitive match) is refused with JUPITER_ERROR.",
     ),
   dynamicComputeUnitLimit: z
     .boolean()

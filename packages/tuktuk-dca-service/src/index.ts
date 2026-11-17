@@ -13,7 +13,11 @@ import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
 import { dcaTaskBindingError } from "./binding";
 import { wrapRoute } from "./wrap";
-import { buildJupiterSwap } from "./jupiter";
+import {
+  buildJupiterSwap,
+  dcaSwapRequest,
+  refuseSetupCreationsOnChain,
+} from "./jupiter";
 import {
   DCA_SIGNER,
   JUPITER_API_KEY,
@@ -113,16 +117,16 @@ server.post<{
       .instruction();
 
     // Build the swap through Jupiter, with the swap payer as the taker
-    const swap = await buildJupiterSwap({
-      apiUrl: JUPITER_API_URL,
-      apiKey: JUPITER_API_KEY,
-      inputMint: dcaAccount.inputMint.toBase58(),
-      outputMint: dcaAccount.outputMint.toBase58(),
-      amount: swapAmount.toString(),
-      taker: swapPayer.toBase58(),
-      destinationTokenAccount: dcaAccount.destinationTokenAccount.toBase58(),
-      slippageBps: Number(SLIPPAGE_BPS),
-    });
+    const swap = await buildJupiterSwap(
+      dcaSwapRequest({
+        apiUrl: JUPITER_API_URL,
+        apiKey: JUPITER_API_KEY,
+        dcaAccount,
+        swapAmount: swapAmount.toString(),
+        swapPayer,
+        slippageBps: Number(SLIPPAGE_BPS),
+      })
+    );
 
     console.log(
       `Jupiter build: ${swap.outAmount} output tokens, at least ${
@@ -132,6 +136,9 @@ server.post<{
     console.log("Lookup table addresses", swap.lookupTables);
 
     const jupiterInstructions = swap.instructions;
+
+    // Setup instructions run with the swap payer PDA as payer, so refuse any that create an account.
+    await refuseSetupCreationsOnChain(provider.connection, swap.setupInstructions);
 
     console.log("Jupiter instructions", jupiterInstructions);
 

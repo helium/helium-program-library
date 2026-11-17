@@ -1,5 +1,5 @@
-import { HNT_MINT, IOT_MINT, MOBILE_MINT, toBN } from "@helium/spl-utils";
-import { ACCOUNT_SIZE, NATIVE_MINT, getMint } from "@solana/spl-token";
+import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
   AddressLookupTableAccount,
   ComputeBudgetProgram,
@@ -10,13 +10,17 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import {
+  ESTIMATE_LAMPORTS,
   MAX_COMPUTE_UNIT_LIMIT,
+  MIN_FUND_FEES_OUT_LAMPORTS,
   buildFundFeesSwap,
   buildJupiterSwap,
   computeUnitLimit,
   estimateRequest,
   planComputeBudget,
-  refusePlatformSigner,
+  refusePlatformKey,
+  refusePlatformUser,
+  repayLamports,
 } from "./build";
 import { JUPITER_API_KEY, JUPITER_API_URL } from "./env";
 import { provider } from "./solana";
@@ -61,8 +65,6 @@ export const estimate = async ({
     );
   }
 
-  const connection = provider.connection;
-  const decimals = (await getMint(connection, NATIVE_MINT)).decimals;
   // /build has no quote-only form, so the price comes from a build for the platform wallet,
   // whose instructions are discarded.
   const quote = await buildJupiterSwap(
@@ -70,7 +72,7 @@ export const estimate = async ({
       apiUrl: JUPITER_API_URL,
       apiKey: JUPITER_API_KEY,
       mint: mint.toBase58(),
-      solAmount: toBN(0.020015, decimals).toString(),
+      solAmount: ESTIMATE_LAMPORTS.toString(),
       platformWallet: provider.wallet.publicKey.toBase58(),
     })
   );
@@ -97,12 +99,9 @@ export const fundFees = async ({
     );
   }
 
-  if (userWallet.equals(provider.wallet.publicKey)) {
-    throw new Error("The platform wallet cannot fund its own fees");
-  }
-
   const connection = provider.connection;
   const platformWallet = provider.wallet;
+  refusePlatformUser(userWallet, platformWallet.publicKey);
   const inputAmount = await estimate({ mint });
 
   // Tx contains instructions to create/close WSOL token account
@@ -118,8 +117,9 @@ export const fundFees = async ({
     mint: mint.toBase58(),
     inputAmount,
     userWallet: userWallet.toBase58(),
+    minOutLamports: MIN_FUND_FEES_OUT_LAMPORTS,
   });
-  refusePlatformSigner(
+  refusePlatformKey(
     [
       ...setupInstructions,
       swapInstruction,
@@ -185,12 +185,12 @@ export const fundFees = async ({
       )}: ${(simulation.value.logs ?? []).slice(-5).join(" | ")}`
     );
   }
-  const { instructions: budgetInstructions, fee } = planComputeBudget(
+  const { instructions: budgetInstructions } = planComputeBudget(
     computeUnitLimit(simulation.value.unitsConsumed ?? 0)
   );
 
   const blockhash = (await connection.getLatestBlockhash()).blockhash;
   return platformWallet.signTransaction(
-    compile(budgetInstructions, ataRent + fee, blockhash)
+    compile(budgetInstructions, repayLamports(ataRent), blockhash)
   );
 };

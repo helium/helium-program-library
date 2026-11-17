@@ -5,6 +5,7 @@ import { Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import {
   ACCOUNT_SIZE,
   ExtensionType,
+  getAccountLen,
   MintLayout,
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
@@ -65,7 +66,10 @@ let quoteReply: { status: number; body: unknown } | undefined;
 /** Every RPC method the handlers called, in order. */
 let rpcMethods: string[] = [];
 /** Accounts the stubbed chain holds besides LOOKUP_TABLE, by address. */
-let chainAccounts: Map<string, { data: Buffer; owner: string }> = new Map();
+let chainAccounts: Map<
+  string,
+  { data: Buffer; owner: string; lamports?: number }
+> = new Map();
 /** The taker's SOL balance on the stubbed chain. */
 let walletLamports = 5_000_000_000;
 /** Whether the stubbed chain answers getMultipleAccounts with an RPC error. */
@@ -112,7 +116,7 @@ function rpcResult(method: string, params: unknown): unknown {
             ? {
                 data: [account.data.toString("base64"), "base64"],
                 executable: false,
-                lamports: 1_000_000,
+                lamports: account.lamports ?? 1_000_000,
                 owner: account.owner,
                 rentEpoch: 0,
                 space: account.data.length,
@@ -412,6 +416,12 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       });
     });
 
+    it("returns the caller's excludeDexes on the quote", async () => {
+      const result = await quote({ excludeDexes: "Kipseli, Foo" });
+
+      expect(result.excludeDexes).to.deep.eq(["Kipseli", "Foo"]);
+    });
+
     it("forwards excludeDexes to Jupiter with RFQ v2 added", async () => {
       await quote({ excludeDexes: "Kipseli, Foo" });
 
@@ -486,6 +496,75 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
       expect((await quoteRejection()).code).to.eq("JUPITER_ERROR");
     });
+
+    /** A well-formed quote answer for `amount`, with `overrides` laid over it. */
+    const quoteBody = (amount: string, overrides: Record<string, unknown>) => ({
+      inputMint: HNT_MINT,
+      inAmount: amount,
+      outputMint: USDC_MINT,
+      outAmount: "1",
+      otherAmountThreshold: "1",
+      swapMode: "ExactIn",
+      slippageBps: 50,
+      priceImpactPct: "0",
+      routePlan: [],
+      ...overrides,
+    });
+
+    it("refuses a 200 answer that carries an error with JUPITER_ERROR", async () => {
+      quoteReply = { status: 200, body: { error: "No routes found" } };
+
+      const error = await quoteRejection();
+
+      expect(error.code).to.eq("JUPITER_ERROR");
+      expect(error.message).to.eq("Jupiter API returned error: No routes found");
+    });
+
+    it("refuses an answer whose outAmount is not base-10 digits with JUPITER_ERROR", async () => {
+      const amount = freshAmount();
+      quoteReply = { status: 200, body: quoteBody(amount, { outAmount: "1e3" }) };
+
+      const error = await quoteRejection({}, amount);
+
+      expect(error.code).to.eq("JUPITER_ERROR");
+      expect(error.message).to.eq("Invalid response from Jupiter API");
+    });
+
+    it("refuses a route through an excluded DEX with JUPITER_ERROR", async () => {
+      const amount = freshAmount();
+      quoteReply = {
+        status: 200,
+        body: quoteBody(amount, {
+          routePlan: [
+            { swapInfo: { label: "Whirlpool" } },
+            { swapInfo: { label: "Kipseli" } },
+          ],
+        }),
+      };
+
+      const error = await quoteRejection({ excludeDexes: "Kipseli" }, amount);
+
+      expect(error.code).to.eq("JUPITER_ERROR");
+      expect(error.message).to.eq(
+        "Jupiter built a route through excluded DEX Kipseli"
+      );
+    });
+
+    for (const [name, routePlan] of [
+      ["is not an array", { swapInfo: { label: "Whirlpool" } }],
+      ["has a hop without swapInfo", [{}]],
+      ["has a hop without a string label", [{ swapInfo: { label: 1 } }]],
+    ] as const) {
+      it(`refuses an answer whose routePlan ${name} with JUPITER_ERROR`, async () => {
+        const amount = freshAmount();
+        quoteReply = { status: 200, body: quoteBody(amount, { routePlan }) };
+
+        const error = await quoteRejection({}, amount);
+
+        expect(error.code).to.eq("JUPITER_ERROR");
+        expect(error.message).to.eq("Invalid response from Jupiter API");
+      });
+    }
 
     it("refuses a quote for a different output mint than requested", async () => {
       const amount = freshAmount();
@@ -796,6 +875,20 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         });
       }
 
+      it("refuses as an expired quote when the output clears the quote's minimum by less than 1 bp", async () => {
+        const quoteResponse = await quoteWithMinimum("999950");
+        // floor((1000000 - 999950) * 10000 / 1000000) = 0
+        buildAnswers = [
+          { outAmount: "1000000", otherAmountThreshold: "990000" },
+        ];
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("BAD_REQUEST");
+        expect(error.message).to.match(QUOTE_EXPIRED);
+        expect(buildCalls()).to.have.length(1);
+      });
+
       it("refuses a quote whose minimum is not an amount without calling Jupiter", async () => {
         const quoteResponse = {
           ...(await quote()),
@@ -840,6 +933,23 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
         expect(error.code).to.eq("JUPITER_ERROR");
         expect(error.message).to.contain("JupiterRfqV2");
+      });
+
+      it("sends and refuses the quote's excludeDexes when the request names none", async () => {
+        const quoteResponse = await quote({ excludeDexes: "X" });
+        jupiterCalls = [];
+        buildOverrides = { routePlan: routeThrough("X") };
+
+        const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+
+        const calls = jupiterCalls.filter(
+          (c) => c.url.pathname === "/swap/v2/build"
+        );
+        expect(calls).to.have.length(1);
+        expect(calls[0].url.searchParams.get("excludeDexes")).to.eq(
+          "X,JupiterRfqV2"
+        );
+        expect(code).to.eq("JUPITER_ERROR");
       });
 
       it("matches labels exactly and case-sensitively", async () => {
@@ -899,6 +1009,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const MINT_EXTENSION_LENGTHS = new Map([
         [ExtensionType.TransferFeeConfig, 108],
         [ExtensionType.MintCloseAuthority, 32],
+        [ExtensionType.ConfidentialTransferMint, 65],
+        [ExtensionType.NonTransferable, 0],
+        [ExtensionType.TransferHook, 64],
+        [ExtensionType.PausableConfig, 33],
         [UNKNOWN_MINT_EXTENSION, 4],
       ]);
 
@@ -1018,6 +1132,64 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(required).to.eq(BASE + rentFor(TOKEN_2022_BASE_ACCOUNT));
       });
 
+      for (const [extension, space] of [
+        [ExtensionType.ConfidentialTransferMint, TOKEN_2022_BASE_ACCOUNT],
+        [ExtensionType.TransferFeeConfig, TOKEN_2022_FEE_ACCOUNT],
+      ] as const) {
+        it(`sizes the account of a mint with ${ExtensionType[extension]} only at ${space} bytes`, async () => {
+          const mint = address();
+          chainAccounts.set(mint, {
+            data: transferFeeMintData([extension]),
+            owner: TOKEN_2022_PROGRAM,
+          });
+          buildOverrides = {
+            setupInstructions: [
+              createAta({
+                account: address(),
+                mint,
+                tokenProgram: TOKEN_2022_PROGRAM,
+              }),
+            ],
+          };
+
+          const required = await requiredLamports(await quote());
+
+          expect(required).to.eq(BASE + rentFor(space));
+        });
+      }
+
+      for (const [extension, accountExtension] of [
+        [ExtensionType.NonTransferable, ExtensionType.NonTransferableAccount],
+        [ExtensionType.TransferHook, ExtensionType.TransferHookAccount],
+        [ExtensionType.PausableConfig, ExtensionType.PausableAccount],
+      ] as const) {
+        it(`sizes the account of a mint with ${ExtensionType[extension]} with ${ExtensionType[accountExtension]} and ImmutableOwner`, async () => {
+          const mint = address();
+          chainAccounts.set(mint, {
+            data: transferFeeMintData([extension]),
+            owner: TOKEN_2022_PROGRAM,
+          });
+          buildOverrides = {
+            setupInstructions: [
+              createAta({
+                account: address(),
+                mint,
+                tokenProgram: TOKEN_2022_PROGRAM,
+              }),
+            ],
+          };
+
+          const required = await requiredLamports(await quote());
+
+          expect(required).to.eq(
+            BASE +
+              rentFor(
+                getAccountLen([accountExtension, ExtensionType.ImmutableOwner])
+              )
+          );
+        });
+      }
+
       it("adds no account extension for a mint-only extension", async () => {
         const mint = address();
         chainAccounts.set(mint, {
@@ -1094,6 +1266,80 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         const required = await requiredLamports(await quote());
 
         expect(required).to.eq(BASE + rentFor(SPL_ACCOUNT));
+      });
+
+      it("counts the rent of a Create with an explicit data byte 0", async () => {
+        buildOverrides = {
+          setupInstructions: [
+            createAta({ account: address(), mint: USDC_MINT, data: "AA==" }),
+          ],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE + rentFor(SPL_ACCOUNT));
+      });
+
+      it("charges a prefunded empty System-owned address the rest of its rent", async () => {
+        const account = address();
+        // The stubbed chain gives every account it holds 1,000,000 lamports.
+        chainAccounts.set(account, {
+          data: Buffer.alloc(0),
+          owner: SYSTEM_PROGRAM,
+        });
+        buildOverrides = {
+          setupInstructions: [createAta({ account, mint: USDC_MINT })],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE + rentFor(SPL_ACCOUNT) - 1_000_000);
+      });
+
+      it("counts an empty account owned by another program as existing", async () => {
+        const account = address();
+        chainAccounts.set(account, {
+          data: Buffer.alloc(0),
+          owner: TOKEN_PROGRAM,
+        });
+        buildOverrides = {
+          setupInstructions: [createAta({ account, mint: USDC_MINT })],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE);
+      });
+
+      it("counts a System-owned account with data as existing", async () => {
+        const account = address();
+        chainAccounts.set(account, {
+          data: Buffer.alloc(8),
+          owner: SYSTEM_PROGRAM,
+        });
+        buildOverrides = {
+          setupInstructions: [createAta({ account, mint: USDC_MINT })],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE);
+      });
+
+      it("charges nothing for an empty System-owned address prefunded above its rent", async () => {
+        const account = address();
+        chainAccounts.set(account, {
+          data: Buffer.alloc(0),
+          owner: SYSTEM_PROGRAM,
+          lamports: rentFor(SPL_ACCOUNT) + 1,
+        });
+        buildOverrides = {
+          setupInstructions: [createAta({ account, mint: USDC_MINT })],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE);
       });
 
       it("leaves out accounts another payer creates", async () => {

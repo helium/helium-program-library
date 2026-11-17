@@ -27,3 +27,48 @@ export const excludedWithDefaults = (
   excludeDexes: string | undefined,
 ): Set<string> =>
   new Set([...excludedLabels(excludeDexes), ...ALWAYS_EXCLUDED_LABELS]);
+
+/** A base-10 token amount in base units, as Jupiter writes amounts. */
+const AMOUNT = /^\d+$/;
+
+/** The amounts a `/build` answer must write as base-10 digits. */
+const AMOUNT_FIELDS = ["inAmount", "outAmount", "otherAmountThreshold"];
+
+/**
+ * Why a 200 `/build` answer is refused, or undefined when it passes: an
+ * `error` it carries, an amount that is not base-10 digits, a `routePlan` that
+ * is not an array of hops with a string `swapInfo.label`, or a route through
+ * one of the `excluded` labels.
+ */
+export const checkBuildAnswer = (
+  body: unknown,
+  excluded: Set<string>,
+): string | undefined => {
+  if (typeof body !== "object" || body === null) {
+    return "Invalid response from Jupiter API";
+  }
+  const answer = body as Record<string, unknown>;
+  if (typeof answer.error === "string" && answer.error.length > 0) {
+    return `Jupiter API returned error: ${answer.error}`;
+  }
+  for (const field of AMOUNT_FIELDS) {
+    const value = answer[field];
+    if (typeof value !== "string" || !AMOUNT.test(value)) {
+      return "Invalid response from Jupiter API";
+    }
+  }
+  if (!Array.isArray(answer.routePlan)) {
+    return "Invalid response from Jupiter API";
+  }
+  for (const hop of answer.routePlan) {
+    const label = (hop as { swapInfo?: { label?: unknown } } | null)?.swapInfo
+      ?.label;
+    if (typeof label !== "string") {
+      return "Invalid response from Jupiter API";
+    }
+    if (excluded.has(label)) {
+      return `Jupiter built a route through excluded DEX ${label}`;
+    }
+  }
+  return undefined;
+};

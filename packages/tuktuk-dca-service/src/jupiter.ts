@@ -1,4 +1,11 @@
-import { PublicKey, TransactionInstruction } from "@solana/web3.js";
+import { ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  AccountInfo,
+  Connection,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 
 /** Jupiter's Swap V2 build endpoint, relative to the API base URL. */
 const JUPITER_BUILD_PATH = "/swap/v2/build";
@@ -33,6 +40,36 @@ export interface BuildSwapRequest {
   slippageBps: number;
 }
 
+/** The `/build` request for one order of a DCA account, with the swap payer PDA as the taker. */
+export const dcaSwapRequest = ({
+  apiUrl,
+  apiKey,
+  dcaAccount,
+  swapAmount,
+  swapPayer,
+  slippageBps,
+}: {
+  apiUrl: string;
+  apiKey?: string;
+  dcaAccount: {
+    inputMint: PublicKey;
+    outputMint: PublicKey;
+    destinationTokenAccount: PublicKey;
+  };
+  swapAmount: string;
+  swapPayer: PublicKey;
+  slippageBps: number;
+}): BuildSwapRequest & { apiKey?: string } => ({
+  apiUrl,
+  apiKey,
+  inputMint: dcaAccount.inputMint.toBase58(),
+  outputMint: dcaAccount.outputMint.toBase58(),
+  amount: swapAmount,
+  taker: swapPayer.toBase58(),
+  destinationTokenAccount: dcaAccount.destinationTokenAccount.toBase58(),
+  slippageBps,
+});
+
 /** The `/build` request for a DCA order, as a URL. */
 export function buildSwapUrl(request: BuildSwapRequest): URL {
   const url = new URL(`${request.apiUrl}${JUPITER_BUILD_PATH}`);
@@ -53,6 +90,8 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
 export interface BuiltSwap {
   /** Setup, swap and cleanup instructions, in the order they run. */
   instructions: TransactionInstruction[];
+  /** The setup instructions alone, which also lead `instructions`. */
+  setupInstructions: TransactionInstruction[];
   /** The lookup tables the route's accounts live in, by key. */
   lookupTables: string[];
   outAmount: string;
@@ -195,9 +234,11 @@ export function readBuildResponse(
     throw invalid("addressesByLookupTableAddress");
   }
 
+  const setupInstructions = readInstructions(raw, "setupInstructions");
   return {
+    setupInstructions,
     instructions: [
-      ...readInstructions(raw, "setupInstructions"),
+      ...setupInstructions,
       readInstruction(raw.swapInstruction, "swapInstruction"),
       ...(raw.cleanupInstruction === undefined ||
       raw.cleanupInstruction === null
@@ -233,3 +274,56 @@ export async function buildJupiterSwap(
     amount: request.amount,
   });
 }
+
+/** ATA program instruction data for Create (empty or 0) and CreateIdempotent (1). */
+const isAtaCreate = (ix: TransactionInstruction): boolean =>
+  ix.programId.equals(ASSOCIATED_TOKEN_PROGRAM_ID) &&
+  (ix.data.length === 0 || ix.data[0] === 0 || ix.data[0] === 1);
+
+/** The accounts the setup's ATA Create and CreateIdempotent instructions create, in order. */
+export const setupCreateTargets = (
+  setupInstructions: TransactionInstruction[]
+): PublicKey[] =>
+  setupInstructions.filter(isAtaCreate).map((ix) => {
+    const target = ix.keys[1]?.pubkey;
+    if (!target) {
+      throw new Error("Jupiter setup holds an ATA create without the account to create");
+    }
+    return target;
+  });
+
+/**
+ * Refuses a setup that would create an account paid by the swap payer PDA: any System Program
+ * instruction, and an ATA Create or CreateIdempotent whose account does not exist yet.
+ * `infos` holds the fetched accounts of `setupCreateTargets(setupInstructions)`, in that order.
+ */
+export const refuseSetupCreations = (
+  setupInstructions: TransactionInstruction[],
+  infos: (AccountInfo<Buffer> | null)[]
+): void => {
+  if (setupInstructions.some((ix) => ix.programId.equals(SystemProgram.programId))) {
+    throw new Error("Jupiter setup holds a System Program instruction");
+  }
+  setupCreateTargets(setupInstructions).forEach((target, i) => {
+    const info = infos[i];
+    if (!info || (info.owner.equals(SystemProgram.programId) && info.data.length === 0)) {
+      throw new Error(
+        `Jupiter setup creates the account ${target.toBase58()}, which the swap payer would fund`
+      );
+    }
+  });
+};
+
+/**
+ * Fetches the accounts the setup would create and refuses the setup as `refuseSetupCreations`
+ * does. Makes no fetch when the setup creates no ATA.
+ */
+export const refuseSetupCreationsOnChain = async (
+  connection: Pick<Connection, "getMultipleAccountsInfo">,
+  setupInstructions: TransactionInstruction[]
+): Promise<void> => {
+  const targets = setupCreateTargets(setupInstructions);
+  const infos =
+    targets.length === 0 ? [] : await connection.getMultipleAccountsInfo(targets);
+  refuseSetupCreations(setupInstructions, infos);
+};

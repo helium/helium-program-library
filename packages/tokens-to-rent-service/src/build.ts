@@ -241,18 +241,21 @@ const readInstructions = (
   return value.map((ix, i) => readInstruction(ix, `${field}[${i}]`));
 };
 
-/** The labels of the route's hops; a hop without a string label reads as "". */
+/** The labels of the route's hops; a hop without a string label is refused. */
 const routeLabels = (routePlan: unknown): string[] => {
   if (!Array.isArray(routePlan)) {
     throw invalid("routePlan");
   }
-  return routePlan.map((hop) =>
-    isRecord(hop) &&
-    isRecord(hop.swapInfo) &&
-    typeof hop.swapInfo.label === "string"
-      ? hop.swapInfo.label
-      : ""
-  );
+  return routePlan.map((hop) => {
+    if (
+      !isRecord(hop) ||
+      !isRecord(hop.swapInfo) ||
+      typeof hop.swapInfo.label !== "string"
+    ) {
+      throw invalid("routePlan");
+    }
+    return hop.swapInfo.label;
+  });
 };
 
 /**
@@ -341,20 +344,36 @@ export async function buildJupiterSwap(
   });
 }
 
-/** Refuses instructions that need the platform wallet's signature. */
-export const refusePlatformSigner = (
+/**
+ * Refuses instructions that name the platform key, as program or as an account of any flags.
+ * The platform wallet is the fee payer, so the compiled message makes it a signer of every
+ * instruction that names it.
+ */
+export const refusePlatformKey = (
   instructions: TransactionInstruction[],
   platformKey: PublicKey | string
 ): void => {
   const platform = new PublicKey(platformKey);
   if (
-    instructions.some((ix) =>
-      ix.keys.some((meta) => meta.isSigner && meta.pubkey.equals(platform))
+    instructions.some(
+      (ix) =>
+        ix.programId.equals(platform) ||
+        ix.keys.some((meta) => meta.pubkey.equals(platform))
     )
   ) {
     throw new Error(
       "Jupiter built an instruction that needs the platform wallet's signature"
     );
+  }
+};
+
+/** Refuses a fee-funding request where the user is the platform wallet. */
+export const refusePlatformUser = (
+  user: PublicKey | string,
+  platformKey: PublicKey | string
+): void => {
+  if (new PublicKey(user).equals(new PublicKey(platformKey))) {
+    throw new Error("The platform wallet cannot fund its own fees");
   }
 };
 
@@ -415,37 +434,50 @@ export function computeUnitLimit(unitsConsumed: number): number {
 }
 
 /**
- * The compute budget instructions the transaction carries, and the lamports the user repays for
- * its fees.
+ * The compute budget instructions the transaction carries.
  *
  * The limit comes from the caller. `/build`'s unit price is dropped, so the transaction pays
- * the base fee only and the user repays `FEE_LAMPORTS`.
+ * the base fee only, which `repayLamports` covers.
  */
 export function planComputeBudget(units: number): {
   instructions: TransactionInstruction[];
-  fee: number;
 } {
   return {
     instructions: [ComputeBudgetProgram.setComputeUnitLimit({ units })],
-    fee: FEE_LAMPORTS,
   };
 }
 
+/** The lamports the user repays: the rent loan and the transaction's fees. */
+export const repayLamports = (ataRent: number): number =>
+  ataRent + FEE_LAMPORTS;
+
+/** The SOL that `/estimate` prices, in lamports: 0.020015 SOL. */
+export const ESTIMATE_LAMPORTS = 20_015_000;
+
+/** The least SOL the fee-funding swap may pay out, in lamports: 95% of `ESTIMATE_LAMPORTS`. */
+export const MIN_FUND_FEES_OUT_LAMPORTS = (ESTIMATE_LAMPORTS * 95) / 100;
+
 /** What the fee-funding transaction is assembled from. */
-export type FundFeesSwap = Omit<BuiltSwap, "outAmount">;
+export type FundFeesSwap = BuiltSwap;
 
 /**
  * Builds the swap the user signs for the fee-funding transaction: the bounded `/build` request
  * for the user, refused when its setup creates a token account besides the user's wrapped SOL
- * account (the rent loan covers that one). The compute budget is planned after a simulation of
+ * account (the rent loan covers that one), or when it quotes less SOL than `minOutLamports`.
+ * The compute budget is planned after a simulation of
  * the assembled transaction, so it is not part of this result.
  */
 export async function buildFundFeesSwap(
-  params: Parameters<typeof fundFeesRequest>[0],
+  params: Parameters<typeof fundFeesRequest>[0] & {
+    /** The least SOL the swap may pay out, in lamports. */
+    minOutLamports: number;
+  },
   fetchImpl: typeof fetch = fetch
 ): Promise<FundFeesSwap> {
   const built = await buildJupiterSwap(fundFeesRequest(params), fetchImpl);
   refuseExtraAccountCreations(built.setupInstructions, params.userWallet);
-  const { outAmount: _outAmount, ...swap } = built;
-  return swap;
+  if (Number(built.outAmount) < params.minOutLamports) {
+    throw new Error("Jupiter quoted less SOL than the fee estimate");
+  }
+  return built;
 }

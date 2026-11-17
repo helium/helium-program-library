@@ -3,7 +3,12 @@ import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import { createTtlCache } from "@/lib/utils/ttl-cache";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
-import { BUILD_SWAP_MODE, excludedWithDefaults } from "./build-request";
+import {
+  BUILD_SWAP_MODE,
+  checkBuildAnswer,
+  excludedLabels,
+  excludedWithDefaults,
+} from "./build-request";
 
 // Quotes are polled repeatedly and often re-requested with identical params.
 // A short TTL plus in-flight coalescing collapses those bursts into a single
@@ -41,7 +46,9 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       });
     }
 
-    const excluded = [...excludedWithDefaults(excludeDexes)].join(",");
+    const callerExcluded = [...excludedLabels(excludeDexes)];
+    const excludedSet = excludedWithDefaults(excludeDexes);
+    const excluded = [...excludedSet].join(",");
 
     const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}:${excluded}`;
 
@@ -80,6 +87,11 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
 
       const raw: unknown = await quoteResponse.json();
 
+      const refusal = checkBuildAnswer(raw, excludedSet);
+      if (refusal) {
+        throw errors.JUPITER_ERROR({ message: refusal });
+      }
+
       // Validate the response from Jupiter
       const {
         data: build,
@@ -114,6 +126,8 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
         slippageBps: build.slippageBps,
         priceImpactPct: build.priceImpactPct,
         routePlan: build.routePlan,
+        // getInstructions applies these again, because it routes again.
+        ...(callerExcluded.length > 0 && { excludeDexes: callerExcluded }),
       };
     });
   }

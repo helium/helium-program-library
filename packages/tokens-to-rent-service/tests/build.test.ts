@@ -12,16 +12,19 @@ import {
   BuildSwapRequest,
   buildSwapUrl,
   computeUnitLimit,
+  ESTIMATE_LAMPORTS,
   estimateRequest,
-  FEE_LAMPORTS,
   FUND_FEES_MAX_ACCOUNTS,
   FUND_FEES_MAX_BYTES,
   fundFeesRequest,
   MAX_COMPUTE_UNIT_LIMIT,
+  MIN_FUND_FEES_OUT_LAMPORTS,
   planComputeBudget,
   readBuildResponse,
   refuseExtraAccountCreations,
-  refusePlatformSigner,
+  refusePlatformKey,
+  refusePlatformUser,
+  repayLamports,
   RFQ_V2_LABEL,
   SLIPPAGE_BPS,
 } from "../src/build";
@@ -208,6 +211,17 @@ describe("tokens-to-rent-service Jupiter /build", () => {
             EXPECTED
           ),
         /route through JupiterRfqV2/
+      );
+    });
+
+    it("refuses a hop without a string label", () => {
+      assert.throws(
+        () =>
+          readBuildResponse(
+            buildBody({ routePlan: [{ swapInfo: { label: 1 } }] }),
+            EXPECTED
+          ),
+        /Invalid Jupiter \/build response: routePlan/
       );
     });
 
@@ -492,7 +506,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     });
   });
 
-  describe("refusePlatformSigner", () => {
+  describe("refusePlatformKey", () => {
     const PLATFORM = Keypair.generate().publicKey;
     const ix = (pubkey: PublicKey, isSigner: boolean) =>
       new TransactionInstruction({
@@ -507,18 +521,62 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         const instructions = [other(), other(), other()];
         instructions[position] = ix(PLATFORM, true);
         assert.throws(
-          () => refusePlatformSigner(instructions, PLATFORM.toBase58()),
+          () => refusePlatformKey(instructions, PLATFORM.toBase58()),
           /platform wallet's signature/
         );
       }
     });
 
-    it("accepts the platform key as a non-signer", () => {
-      refusePlatformSigner([other(), ix(PLATFORM, false)], PLATFORM);
+    it("refuses the platform key as a non-signer", () => {
+      assert.throws(
+        () => refusePlatformKey([other(), ix(PLATFORM, false)], PLATFORM),
+        /platform wallet's signature/
+      );
+    });
+
+    it("refuses the platform key as the program", () => {
+      const program = new TransactionInstruction({
+        programId: PLATFORM,
+        keys: [],
+        data: Buffer.alloc(0),
+      });
+      assert.throws(
+        () => refusePlatformKey([other(), program], PLATFORM),
+        /platform wallet's signature/
+      );
     });
 
     it("accepts other signers", () => {
-      refusePlatformSigner([other(), other()], PLATFORM);
+      refusePlatformKey([other(), other()], PLATFORM);
+    });
+  });
+
+  describe("refusePlatformUser", () => {
+    const PLATFORM = Keypair.generate().publicKey;
+    const USER = Keypair.generate().publicKey;
+
+    it("refuses the platform wallet as the user", () => {
+      assert.throws(
+        () => refusePlatformUser(PLATFORM, PLATFORM.toBase58()),
+        /The platform wallet cannot fund its own fees/
+      );
+    });
+
+    it("accepts another user", () => {
+      refusePlatformUser(USER, PLATFORM);
+    });
+  });
+
+  describe("MIN_FUND_FEES_OUT_LAMPORTS", () => {
+    it("is 95% of the 0.020015 SOL that /estimate prices", () => {
+      assert.equal(ESTIMATE_LAMPORTS, 20_015_000);
+      assert.equal(MIN_FUND_FEES_OUT_LAMPORTS, 19_014_250);
+    });
+  });
+
+  describe("repayLamports", () => {
+    it("repays the rent loan and 10000 lamports of fees", () => {
+      assert.equal(repayLamports(2_039_280), 2_049_280);
     });
   });
 
@@ -558,6 +616,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       inputAmount: "1000000",
       userWallet: USER.toBase58(),
       apiKey: "secret",
+      minOutLamports: 19_014_250,
     };
     const answer = (overrides: Record<string, unknown> = {}) =>
       buildBody({
@@ -619,6 +678,21 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         /creates a token account besides the wrapped SOL account/
       );
     });
+
+    it("accepts an answer that pays out the minimum SOL", async () => {
+      const built = await buildFundFeesSwap(
+        PARAMS,
+        serving(answer({ outAmount: "19014250" }))
+      );
+      assert.equal(built.outAmount, "19014250");
+    });
+
+    it("refuses an answer that pays out less than the minimum SOL", async () => {
+      await assert.rejects(
+        buildFundFeesSwap(PARAMS, serving(answer({ outAmount: "19014249" }))),
+        /Jupiter quoted less SOL than the fee estimate/
+      );
+    });
   });
 
   describe("computeUnitLimit", () => {
@@ -639,12 +713,11 @@ describe("tokens-to-rent-service Jupiter /build", () => {
   });
 
   describe("planComputeBudget", () => {
-    it("sets the given limit and no unit price, and charges the flat fee", () => {
-      const { instructions, fee } = planComputeBudget(57_444);
+    it("sets the given limit and no unit price", () => {
+      const { instructions } = planComputeBudget(57_444);
       assert.deepEqual(instructions, [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 57_444 }),
       ]);
-      assert.equal(fee, FEE_LAMPORTS);
     });
   });
 });

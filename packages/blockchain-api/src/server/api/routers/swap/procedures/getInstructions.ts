@@ -4,6 +4,7 @@ import {
   AccountInfo,
   Connection,
   PublicKey,
+  SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
 import {
@@ -26,14 +27,18 @@ import {
   NATIVE_MINT,
   TOKEN_2022_PROGRAM_ID,
   getAccountLen,
-  getAccountTypeOfMintType,
   getExtensionTypes,
   unpackMint,
 } from "@solana/spl-token";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
-import { BUILD_SWAP_MODE, excludedWithDefaults } from "./build-request";
+import {
+  ALWAYS_EXCLUDED_LABELS,
+  BUILD_SWAP_MODE,
+  checkBuildAnswer,
+  excludedLabels,
+} from "./build-request";
 import BN from "bn.js";
 import { z } from "zod";
 
@@ -87,7 +92,9 @@ const QUOTE_EXPIRED_MESSAGE =
 
 /**
  * The slippage, in basis points rounded down, that keeps a re-quote of
- * `outAmount` at or above `minimum`. 0 when no slippage does.
+ * `outAmount` at or above `minimum`. 0 when no slippage of 1 bp or more
+ * does, which refuses the swap: a re-quote that clears `minimum` by less than
+ * 1 bp is refused as an expired quote.
  */
 const slippageBpsKeeping = (outAmount: bigint, minimum: bigint): bigint =>
   outAmount < minimum ? BigInt(0) : ((outAmount - minimum) * BPS) / outAmount;
@@ -157,6 +164,25 @@ const TOKEN_2022_BASE_ACCOUNT_SPACE = getAccountLen([
 ]);
 
 /**
+ * The account extensions the token program allocates in a new account for
+ * each mint extension that requires one. Mint extensions not listed here add
+ * nothing: ConfidentialTransferMint, for one, leaves its account extension to
+ * a later reallocation.
+ */
+const ACCOUNT_EXTENSIONS_OF_MINT_EXTENSION = new Map<
+  ExtensionType,
+  ExtensionType[]
+>([
+  [ExtensionType.TransferFeeConfig, [ExtensionType.TransferFeeAmount]],
+  [
+    ExtensionType.NonTransferable,
+    [ExtensionType.NonTransferableAccount, ExtensionType.ImmutableOwner],
+  ],
+  [ExtensionType.TransferHook, [ExtensionType.TransferHookAccount]],
+  [ExtensionType.PausableConfig, [ExtensionType.PausableAccount]],
+]);
+
+/**
  * The size of a Token-2022 associated token account for `mint`: the
  * account-side extensions the mint's extensions require, plus the
  * ImmutableOwner the associated token program adds. A mint that is absent
@@ -170,15 +196,13 @@ const token2022AccountSpace = (
   if (!mintInfo) return TOKEN_2022_BASE_ACCOUNT_SPACE;
   try {
     const { tlvData } = unpackMint(mint, mintInfo, TOKEN_2022_PROGRAM_ID);
-    const accountExtensions = getExtensionTypes(tlvData)
-      .map(getAccountTypeOfMintType)
-      // An extension spl-token does not know maps to undefined, which would
-      // make getAccountLen throw and drop the extensions it does know.
-      .filter(
-        (extension): extension is ExtensionType =>
-          extension !== undefined && extension !== ExtensionType.Uninitialized,
-      );
-    return getAccountLen([...accountExtensions, ExtensionType.ImmutableOwner]);
+    const accountExtensions = new Set([
+      ExtensionType.ImmutableOwner,
+      ...getExtensionTypes(tlvData).flatMap(
+        (extension) => ACCOUNT_EXTENSIONS_OF_MINT_EXTENSION.get(extension) ?? [],
+      ),
+    ]);
+    return getAccountLen([...accountExtensions]);
   } catch {
     return TOKEN_2022_BASE_ACCOUNT_SPACE;
   }
@@ -186,9 +210,10 @@ const token2022AccountSpace = (
 
 /**
  * Lamports of rent the taker pays for the token accounts `instructions`
- * create, counting only accounts that do not exist yet. Accounts and their
- * Token-2022 mints are read in one batch, and rent is priced once per
- * distinct size.
+ * create, counting only accounts that do not exist yet. An address that holds
+ * lamports but no data under the System Program does not exist yet, and its
+ * lamports count toward its rent. Accounts and their Token-2022 mints are read
+ * in one batch, and rent is priced once per distinct size.
  */
 const takerRentLamports = async (
   connection: Connection,
@@ -211,13 +236,21 @@ const takerRentLamports = async (
   const mintInfos = new Map(
     token2022Mints.map((mint, i) => [mint, infos[creations.length + i]]),
   );
-  const spaces = creations
-    .filter((_, i) => !infos[i])
-    .map((c) =>
-      c.tokenProgram.equals(TOKEN_2022_PROGRAM_ID)
-        ? token2022AccountSpace(c.mint, mintInfos.get(c.mint.toBase58()) ?? null)
-        : ATA_SPACE,
-    );
+  const absent = creations.flatMap((creation, i) => {
+    const info = infos[i];
+    if (
+      info &&
+      !(info.owner.equals(SystemProgram.programId) && info.data.length === 0)
+    ) {
+      return [];
+    }
+    return [{ creation, prefunded: info?.lamports ?? 0 }];
+  });
+  const spaces = absent.map(({ creation: c }) =>
+    c.tokenProgram.equals(TOKEN_2022_PROGRAM_ID)
+      ? token2022AccountSpace(c.mint, mintInfos.get(c.mint.toBase58()) ?? null)
+      : ATA_SPACE,
+  );
   const rents = new Map(
     await Promise.all(
       [...new Set(spaces)].map(
@@ -226,7 +259,11 @@ const takerRentLamports = async (
       ),
     ),
   );
-  return spaces.reduce((total, space) => total + rents.get(space)!, 0);
+  return absent.reduce(
+    (total, { prefunded }, i) =>
+      total + Math.max(0, rents.get(spaces[i])! - prefunded),
+    0,
+  );
 };
 
 /**
@@ -259,9 +296,13 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       });
     }
 
-    // The caller's exclusions and those every swap carries, sent to /build
-    // and checked against the route it builds.
-    const excluded = excludedWithDefaults(excludeDexes);
+    // The caller's exclusions, those the quote applied and those every swap
+    // carries, sent to /build and checked against the route it builds.
+    const excluded = new Set([
+      ...excludedLabels(excludeDexes),
+      ...(quoteResponse.excludeDexes ?? []),
+      ...ALWAYS_EXCLUDED_LABELS,
+    ]);
 
     /** One `/build` request at `slippageBps`, validated against the quote. */
     const requestBuild = async (slippageBps: number) => {
@@ -305,16 +346,9 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
 
       const raw: unknown = await buildResponse.json();
 
-      if (
-        typeof raw === "object" &&
-        raw !== null &&
-        "error" in raw &&
-        typeof raw.error === "string" &&
-        raw.error.length > 0
-      ) {
-        throw errors.JUPITER_ERROR({
-          message: `Jupiter API returned error: ${raw.error}`,
-        });
+      const refusal = checkBuildAnswer(raw, excluded);
+      if (refusal) {
+        throw errors.JUPITER_ERROR({ message: refusal });
       }
 
       const parsed = JupiterBuildResponseSchema.safeParse(raw);
@@ -379,16 +413,6 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           otherAmountThreshold: build.otherAmountThreshold,
           outAmount: build.outAmount,
         },
-      });
-    }
-
-    // A guard against Jupiter routing through a DEX the request excluded.
-    const excludedHop = build.routePlan.find((hop) =>
-      excluded.has(hop.swapInfo.label),
-    );
-    if (excludedHop) {
-      throw errors.JUPITER_ERROR({
-        message: `Jupiter built a route through excluded DEX ${excludedHop.swapInfo.label}`,
       });
     }
 

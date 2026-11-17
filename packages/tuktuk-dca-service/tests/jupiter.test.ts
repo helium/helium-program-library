@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
-import { Keypair } from "@solana/web3.js";
+import { ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  AccountInfo,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  TransactionInstruction,
+} from "@solana/web3.js";
 import {
   buildJupiterSwap,
   buildSwapUrl,
   BuildSwapRequest,
-  DCA_SWAP_MAX_BYTES,
+  dcaSwapRequest,
   readBuildResponse,
+  refuseSetupCreations,
+  refuseSetupCreationsOnChain,
   RFQ_V2_LABEL,
+  setupCreateTargets,
 } from "../src/jupiter";
 
 const key = () => Keypair.generate().publicKey.toBase58();
@@ -76,7 +86,7 @@ describe("tuktuk-dca-service Jupiter /build", () => {
         taker: TAKER,
         slippageBps: "50",
         destinationTokenAccount: DESTINATION,
-        maxBytes: String(DCA_SWAP_MAX_BYTES),
+        maxBytes: "520",
         excludeDexes: RFQ_V2_LABEL,
       });
     });
@@ -184,6 +194,7 @@ describe("tuktuk-dca-service Jupiter /build", () => {
       ["swapInstruction", undefined],
       ["swapInstruction", { programId: SWAP_PROGRAM, data: "AA==" }],
       ["outAmount", "1.5"],
+      ["otherAmountThreshold", "1.5"],
       ["inAmount", 1000000],
       ["routePlan", undefined],
       ["setupInstructions", {}],
@@ -228,6 +239,25 @@ describe("tuktuk-dca-service Jupiter /build", () => {
       );
     });
 
+    it("refuses a route hop without a string label", () => {
+      assert.throws(
+        () =>
+          readBuildResponse(
+            buildBody({ routePlan: [{ swapInfo: { label: 1 } }] }),
+            EXPECTED
+          ),
+        /Invalid Jupiter \/build response: label/
+      );
+    });
+
+    it("keeps the setup instructions apart", () => {
+      const built = readBuildResponse(buildBody(), EXPECTED);
+      assert.deepEqual(
+        built.setupInstructions.map((ix) => ix.programId.toBase58()),
+        [SETUP_PROGRAM]
+      );
+    });
+
     it("refuses a route through Jupiter RFQ v2", () => {
       assert.throws(
         () =>
@@ -242,6 +272,164 @@ describe("tuktuk-dca-service Jupiter /build", () => {
           ),
         /route through JupiterRfqV2/
       );
+    });
+  });
+
+  describe("dcaSwapRequest", () => {
+    it("maps a DCA order to a /build request with the swap payer as taker", () => {
+      const swapPayer = new PublicKey(TAKER);
+      assert.deepEqual(
+        dcaSwapRequest({
+          apiUrl: "https://jupiter.test",
+          apiKey: "test-key",
+          dcaAccount: {
+            inputMint: new PublicKey(INPUT_MINT),
+            outputMint: new PublicKey(OUTPUT_MINT),
+            destinationTokenAccount: new PublicKey(DESTINATION),
+          },
+          swapAmount: "1000000",
+          swapPayer,
+          slippageBps: 50,
+        }),
+        {
+          apiUrl: "https://jupiter.test",
+          apiKey: "test-key",
+          inputMint: INPUT_MINT,
+          outputMint: OUTPUT_MINT,
+          amount: "1000000",
+          taker: TAKER,
+          destinationTokenAccount: DESTINATION,
+          slippageBps: 50,
+        }
+      );
+    });
+  });
+
+  describe("refuseSetupCreations", () => {
+    const ATA = Keypair.generate().publicKey;
+    const ataCreate = (data: number[]) =>
+      new TransactionInstruction({
+        programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+        keys: [
+          { pubkey: new PublicKey(TAKER), isSigner: true, isWritable: true },
+          { pubkey: ATA, isSigner: false, isWritable: true },
+        ],
+        data: Buffer.from(data),
+      });
+    const existing: AccountInfo<Buffer> = {
+      executable: false,
+      owner: Keypair.generate().publicKey,
+      lamports: 2039280,
+      data: Buffer.alloc(165),
+    };
+
+    it("refuses a System Program instruction", () => {
+      const setup = [
+        SystemProgram.transfer({
+          fromPubkey: new PublicKey(TAKER),
+          toPubkey: ATA,
+          lamports: 1,
+        }),
+      ];
+      assert.throws(
+        () => refuseSetupCreations(setup, []),
+        /System Program instruction/
+      );
+    });
+
+    it("refuses a Create of a missing ATA", () => {
+      const setup = [ataCreate([0])];
+      assert.deepEqual(setupCreateTargets(setup), [ATA]);
+      assert.throws(
+        () => refuseSetupCreations(setup, [null]),
+        new RegExp(`creates the account ${ATA.toBase58()}`)
+      );
+    });
+
+    it("accepts a CreateIdempotent of an existing ATA", () => {
+      const setup = [ataCreate([1])];
+      assert.deepEqual(setupCreateTargets(setup), [ATA]);
+      assert.doesNotThrow(() => refuseSetupCreations(setup, [existing]));
+    });
+
+    it("refuses a Create of a prefunded System-owned empty address", () => {
+      const prefunded: AccountInfo<Buffer> = {
+        executable: false,
+        owner: SystemProgram.programId,
+        lamports: 5000000,
+        data: Buffer.alloc(0),
+      };
+      assert.throws(
+        () => refuseSetupCreations([ataCreate([1])], [prefunded]),
+        new RegExp(`creates the account ${ATA.toBase58()}`)
+      );
+    });
+
+    it("refuses an empty-data (legacy) Create of a missing ATA", () => {
+      const setup = [ataCreate([])];
+      assert.deepEqual(setupCreateTargets(setup), [ATA]);
+      assert.throws(
+        () => refuseSetupCreations(setup, [null]),
+        new RegExp(`creates the account ${ATA.toBase58()}`)
+      );
+    });
+
+    it("refuses an ATA create without the account to create", () => {
+      const setup = [
+        new TransactionInstruction({
+          programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+          keys: [{ pubkey: new PublicKey(TAKER), isSigner: true, isWritable: true }],
+          data: Buffer.from([1]),
+        }),
+      ];
+      assert.throws(() => setupCreateTargets(setup), /ATA create without the account/);
+    });
+  });
+
+  describe("refuseSetupCreationsOnChain", () => {
+    const ATA = Keypair.generate().publicKey;
+    const stubConnection = (infos: (AccountInfo<Buffer> | null)[]) => {
+      const calls: PublicKey[][] = [];
+      return {
+        calls,
+        connection: {
+          getMultipleAccountsInfo: async (keys: PublicKey[]) => {
+            calls.push(keys);
+            return infos;
+          },
+        },
+      };
+    };
+
+    it("refuses a setup that creates a missing account", async () => {
+      const { calls, connection } = stubConnection([null]);
+      const setup = [
+        new TransactionInstruction({
+          programId: ASSOCIATED_TOKEN_PROGRAM_ID,
+          keys: [
+            { pubkey: new PublicKey(TAKER), isSigner: true, isWritable: true },
+            { pubkey: ATA, isSigner: false, isWritable: true },
+          ],
+          data: Buffer.from([1]),
+        }),
+      ];
+      await assert.rejects(
+        refuseSetupCreationsOnChain(connection, setup),
+        new RegExp(`creates the account ${ATA.toBase58()}`)
+      );
+      assert.deepEqual(calls, [[ATA]]);
+    });
+
+    it("makes no fetch when the setup creates no account", async () => {
+      const { calls, connection } = stubConnection([]);
+      await refuseSetupCreationsOnChain(connection, [
+        new TransactionInstruction({
+          programId: new PublicKey(SETUP_PROGRAM),
+          keys: [],
+          data: Buffer.from([1]),
+        }),
+      ]);
+      assert.equal(calls.length, 0);
     });
   });
 
