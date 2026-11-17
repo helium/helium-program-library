@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.19.0
+
+### Minor Changes
+
+- [#1391](https://github.com/helium/helium-program-library/pull/1391) [`7c0e8ff`](https://github.com/helium/helium-program-library/commit/7c0e8ffa6d4e93d1957fd9daf801e16f1558b138) Thanks [@madninja](https://github.com/madninja)! - `getInstructions` takes an optional `useSharedAccounts`, and `getQuote` takes an optional `excludeDexes` (comma-separated Jupiter DEX labels). Each is forwarded to Jupiter only when set, so a caller that omits them sends the requests it sent before. `useSharedAccounts` is forwarded to Jupiter's swap-instructions request as the same-named field. `excludeDexes` is forwarded to Jupiter's quote request as the same-named query parameter, which leaves the named DEXes out of the quoted route, and is part of the quote cache key.
+
 ## 0.18.1
 
 ### Patch Changes
