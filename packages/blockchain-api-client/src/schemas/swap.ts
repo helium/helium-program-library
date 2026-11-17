@@ -14,14 +14,14 @@ export const GetQuoteInputSchema = z
       .enum(["ExactIn", "ExactOut"])
       .default("ExactIn")
       .describe(
-        "An ExactOut quote cannot be built: getInstructions refuses it, because Jupiter's Swap V2 /build swaps an exact input only.",
+        "Only ExactIn is supported: getQuote and getInstructions refuse ExactOut with BAD_REQUEST, because Jupiter's Swap V2 /build swaps an exact input only.",
       ),
     slippageBps: z.coerce.number().min(0).max(10000).default(50),
     excludeDexes: z
       .string()
       .optional()
       .describe(
-        "Comma-separated Jupiter DEX labels to leave out of the quoted route. It does not carry into getInstructions, which routes again: send the same excludeDexes to getInstructions to keep these DEXes out of the built swap.",
+        "Comma-separated Jupiter DEX labels to leave out of the quoted route. JupiterRfqV2 is always left out. It does not carry into getInstructions, which routes again: send the same excludeDexes to getInstructions to keep these DEXes out of the built swap.",
       ),
   })
   // A quote from a mint to itself is circular arbitrage, which Jupiter refuses

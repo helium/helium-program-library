@@ -7,7 +7,8 @@ HTTP endpoint the tuktuk cranker calls when it's time to execute a scheduled DCA
 ## Environment
 
 - `SOLANA_URL` — RPC (default `https://api.mainnet-beta.solana.com`)
-- `JUPITER_API_URL` — default `https://lite-api.jup.ag`
+- `JUPITER_API_URL` — default `https://api.jup.ag`
+- `JUPITER_API_KEY` — Jupiter API key, sent as `x-api-key`; without it, calls run keyless at a low rate limit
 - `PORT` — default `8123`
 - `DCA_SIGNER_SECRET` — base58-encoded signer keypair
 
