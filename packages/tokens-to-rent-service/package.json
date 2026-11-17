@@ -28,6 +28,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "build": "tsc -p tsconfig.build.json",
+    "test": "ts-mocha -p ../../tsconfig.test.json -t 10000 'tests/**/*.test.ts'",
     "start": "node lib/src/index.js",
     "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts"
   },
@@ -37,7 +38,6 @@
     "@helium/account-fetch-cache": "workspace:^",
     "@helium/address": "^4.12.0",
     "@helium/spl-utils": "workspace:^",
-    "@jup-ag/api": "^6.0.6",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
     "axios": "^1.9.0",

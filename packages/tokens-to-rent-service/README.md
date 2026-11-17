@@ -1,8 +1,19 @@
 # tokens-to-rent-service
 
-Flash-loans a small amount of SOL for rent, swaps HNT/MOBILE/IOT → SOL via Jupiter, and repays the loan from the swap proceeds in a single atomic transaction. The user ends up with just enough SOL to pay fees even if they only hold Helium tokens.
+Flash-loans a small amount of SOL for rent, swaps HNT/MOBILE/IOT → SOL via Jupiter's Swap V2 `GET /swap/v2/build`, and repays the loan from the swap proceeds in a single atomic transaction. The user ends up with just enough SOL to pay fees even if they only hold Helium tokens.
 
 This is used for the wallet-app feature where we let users top up to 0.02 SOL using IOT/MOBILE/HNT when they're low. If you kill wallet app, you can likely kill this service/feature.
+
+## Environment
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `JUPITER_URL` | `https://lite-api.jup.ag` | Jupiter API base URL; the service appends `/swap/v2/build`. |
+| `JUPITER_FEE_BPS` | `0` | Platform fee in basis points. A positive value needs `JUPITER_FEE_ACCOUNT`. |
+| `JUPITER_FEE_ACCOUNT` | none | Token account that collects the platform fee. |
+| `SOLANA_URL` | `http://127.0.0.1:8899` | Solana RPC endpoint. |
+
+`/build` takes the input amount only (ExactIn), has no quote-only form, and returns the compute unit price without a limit. `/estimate` builds a swap of 0.020015 SOL into the token for the platform wallet and reports its output; `/fees` builds the token to SOL swap for the user, bounded with `maxAccounts` and `maxBytes` so the transaction fits Solana's 1232-byte limit.
 
 ## Deployments
 
