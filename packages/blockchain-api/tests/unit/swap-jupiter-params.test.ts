@@ -1,7 +1,14 @@
 import { createServer, Server } from "http";
 import { AddressInfo } from "net";
 import { call, ORPCError } from "@orpc/server";
-import { PublicKey, VersionedTransaction } from "@solana/web3.js";
+import { Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
+import {
+  ACCOUNT_SIZE,
+  ExtensionType,
+  MintLayout,
+  TOKEN_2022_PROGRAM_ID,
+  getMintLen,
+} from "@solana/spl-token";
 import { expect } from "chai";
 import { after, afterEach, before, beforeEach, describe, it } from "mocha";
 
@@ -56,8 +63,18 @@ let buildAnswers: Record<string, unknown>[] = [];
 let buildReply: { status: number; body: unknown } | undefined;
 /** Every RPC method the handlers called, in order. */
 let rpcMethods: string[] = [];
+/** Accounts the stubbed chain holds besides LOOKUP_TABLE, by address. */
+let chainAccounts: Map<string, { data: Buffer; owner: string }> = new Map();
+/** The taker's SOL balance on the stubbed chain. */
+let walletLamports = 5_000_000_000;
 const realFetch = globalThis.fetch;
 let rpc: Server;
+
+/** The fee the stubbed chain charges for any transaction. */
+const TX_FEE = 10000;
+
+/** The stubbed chain's rent-exempt minimum for `space` bytes, as mainnet prices it. */
+const rentFor = (space: number) => (128 + space) * 6960;
 
 const withContext = (value: unknown) => ({
   context: { apiVersion: "2.0.0", slot: 1 },
@@ -76,25 +93,36 @@ function rpcResult(method: string, params: unknown): unknown {
       return withContext(null);
     case "getMultipleAccounts":
       return withContext(
-        (params as [string[]])[0].map((key) =>
-          key === LOOKUP_TABLE
+        (params as [string[]])[0].map((key) => {
+          if (key === LOOKUP_TABLE) {
+            return {
+              data: [lookupTableData(), "base64"],
+              executable: false,
+              lamports: 1_000_000,
+              owner: LOOKUP_TABLE_PROGRAM,
+              rentEpoch: 0,
+              space: 88,
+            };
+          }
+          const account = chainAccounts.get(key);
+          return account
             ? {
-                data: [lookupTableData(), "base64"],
+                data: [account.data.toString("base64"), "base64"],
                 executable: false,
                 lamports: 1_000_000,
-                owner: LOOKUP_TABLE_PROGRAM,
+                owner: account.owner,
                 rentEpoch: 0,
-                space: 88,
+                space: account.data.length,
               }
-            : null
-        )
+            : null;
+        })
       );
     case "getBalance":
-      return withContext(5_000_000_000);
+      return withContext(walletLamports);
     case "getFeeForMessage":
-      return withContext(10000);
+      return withContext(TX_FEE);
     case "getMinimumBalanceForRentExemption":
-      return 810624;
+      return rentFor((params as [number])[0]);
     case "getRecentPrioritizationFees":
       return [];
     default:
@@ -247,6 +275,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     quoteResponse: Awaited<ReturnType<typeof quote>>;
     userPublicKey: string;
     excludeDexes?: string;
+    destinationTokenAccount?: string;
   };
 
   /** The error a getInstructions call rejects with. */
@@ -296,6 +325,8 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     buildAnswers = [];
     buildReply = undefined;
     rpcMethods = [];
+    chainAccounts = new Map();
+    walletLamports = 5_000_000_000;
   });
 
   describe("quote excludeDexes", () => {
@@ -367,6 +398,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         amount: quoteResponse.inAmount,
         taker: WALLET,
         slippageBps: "50",
+        excludeDexes: "JupiterRfqV2",
       });
     });
 
@@ -379,18 +411,33 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       expect(jupiterCalls[0].url.searchParams.get("slippageBps")).to.eq("125");
     });
 
-    it("forwards excludeDexes to /build", async () => {
+    it("forwards excludeDexes to /build with RFQ v2 added", async () => {
       const { calls } = await swapInstructions({ excludeDexes: "Raydium CP" });
 
       expect(calls).to.have.length(1);
-      expect(calls[0].url.searchParams.get("excludeDexes")).to.eq("Raydium CP");
+      expect(calls[0].url.searchParams.get("excludeDexes")).to.eq(
+        "Raydium CP,JupiterRfqV2"
+      );
     });
 
-    it("leaves an empty excludeDexes out", async () => {
+    it("excludes only RFQ v2 when excludeDexes is empty", async () => {
       const { calls } = await swapInstructions({ excludeDexes: "" });
 
       expect(calls).to.have.length(1);
-      expect(calls[0].url.searchParams.has("excludeDexes")).to.eq(false);
+      expect(calls[0].url.searchParams.get("excludeDexes")).to.eq(
+        "JupiterRfqV2"
+      );
+    });
+
+    it("sends RFQ v2 once when the caller excludes it too", async () => {
+      const { calls } = await swapInstructions({
+        excludeDexes: "JupiterRfqV2, Raydium CP",
+      });
+
+      expect(calls).to.have.length(1);
+      expect(calls[0].url.searchParams.get("excludeDexes")).to.eq(
+        "JupiterRfqV2,Raydium CP"
+      );
     });
 
     for (const useSharedAccounts of [true, false]) {
@@ -598,6 +645,16 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(code).to.eq("JUPITER_ERROR");
       });
 
+      it("refuses a route through RFQ v2 when the caller excludes nothing", async () => {
+        const quoteResponse = await quote();
+        buildOverrides = { routePlan: routeThrough("JupiterRfqV2") };
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("JUPITER_ERROR");
+        expect(error.message).to.contain("JupiterRfqV2");
+      });
+
       it("matches labels exactly and case-sensitively", async () => {
         buildOverrides = { routePlan: routeThrough("Kipseli") };
 
@@ -606,6 +663,280 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         });
 
         expect(result.transactions).to.have.length(1);
+      });
+    });
+
+    describe("rent for the accounts /build creates", () => {
+      const ATA_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+      const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+      const TOKEN_2022_PROGRAM = TOKEN_2022_PROGRAM_ID.toBase58();
+      const WSOL_MINT = "So11111111111111111111111111111111111111112";
+      const SPL_ACCOUNT = 165;
+      /** A Token-2022 associated account for a mint without extensions. */
+      const TOKEN_2022_BASE_ACCOUNT = 165 + 1 + 4;
+      /** For a TransferFeeConfig mint: TransferFeeAmount (8) and ImmutableOwner. */
+      const TOKEN_2022_FEE_ACCOUNT = 165 + 1 + (4 + 8) + 4;
+
+      const address = () => Keypair.generate().publicKey.toBase58();
+
+      /** A CreateIdempotent of `account` for `mint` under `tokenProgram`, paid by `payer`. */
+      const createAta = ({
+        account,
+        mint,
+        tokenProgram = TOKEN_PROGRAM,
+        payer = WALLET,
+        data = "AQ==",
+      }: {
+        account: string;
+        mint: string;
+        tokenProgram?: string;
+        payer?: string;
+        data?: string;
+      }) => ({
+        programId: ATA_PROGRAM,
+        accounts: [
+          { pubkey: payer, isSigner: true, isWritable: true },
+          { pubkey: account, isSigner: false, isWritable: true },
+          { pubkey: WALLET, isSigner: false, isWritable: false },
+          { pubkey: mint, isSigner: false, isWritable: false },
+          { pubkey: SYSTEM_PROGRAM, isSigner: false, isWritable: false },
+          { pubkey: tokenProgram, isSigner: false, isWritable: false },
+        ],
+        data,
+      });
+
+      /** Byte lengths of the mint extensions these cases lay out. */
+      const MINT_EXTENSION_LENGTHS = new Map([
+        [ExtensionType.TransferFeeConfig, 108],
+        [ExtensionType.MintCloseAuthority, 32],
+      ]);
+
+      /** A Token-2022 mint carrying `extensions` (TransferFeeConfig by default). */
+      const transferFeeMintData = (
+        extensions: ExtensionType[] = [ExtensionType.TransferFeeConfig]
+      ) => {
+        const data = Buffer.alloc(getMintLen(extensions));
+        MintLayout.encode(
+          {
+            mintAuthorityOption: 0,
+            mintAuthority: PublicKey.default,
+            supply: BigInt(0),
+            decimals: 6,
+            isInitialized: true,
+            freezeAuthorityOption: 0,
+            freezeAuthority: PublicKey.default,
+          },
+          data
+        );
+        data[ACCOUNT_SIZE] = 1; // AccountType.Mint
+        let offset = ACCOUNT_SIZE + 1;
+        for (const extension of extensions) {
+          const length = MINT_EXTENSION_LENGTHS.get(extension)!;
+          data.writeUInt16LE(extension, offset);
+          data.writeUInt16LE(length, offset + 2);
+          offset += 4 + length;
+        }
+        return data;
+      };
+
+      const existing = (key: string) =>
+        chainAccounts.set(key, {
+          data: Buffer.alloc(SPL_ACCOUNT),
+          owner: TOKEN_PROGRAM,
+        });
+
+      /** The lamports a build of `quoteResponse` requires, read from its refusal at a zero balance. */
+      const requiredLamports = async (
+        quoteResponse: Awaited<ReturnType<typeof quote>>,
+        extra: Record<string, unknown> = {}
+      ) => {
+        walletLamports = 0;
+        const error = await rejection({
+          quoteResponse,
+          userPublicKey: WALLET,
+          ...extra,
+        });
+        expect(error.code).to.eq("INSUFFICIENT_FUNDS");
+        return (error.data as { required: number }).required;
+      };
+
+      /** Fee and the wallet's own rent-exempt floor, which every swap requires. */
+      const BASE = TX_FEE + rentFor(0);
+
+      it("counts rent only for the absent accounts of a multi-hop answer, by size", async () => {
+        const output = address();
+        const intermediate = address();
+        const wsol = address();
+        const feeAccount = address();
+        const feeMint = address();
+        existing(intermediate);
+        existing(wsol);
+        chainAccounts.set(feeMint, {
+          data: transferFeeMintData(),
+          owner: TOKEN_2022_PROGRAM,
+        });
+        buildOverrides = {
+          setupInstructions: [
+            createAta({ account: wsol, mint: WSOL_MINT }),
+            createAta({ account: intermediate, mint: HNT_MINT }),
+            createAta({ account: output, mint: USDC_MINT }),
+            createAta({
+              account: feeAccount,
+              mint: feeMint,
+              tokenProgram: TOKEN_2022_PROGRAM,
+            }),
+            // The same account again counts once.
+            createAta({ account: output, mint: USDC_MINT }),
+          ],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(
+          BASE + rentFor(SPL_ACCOUNT) + rentFor(TOKEN_2022_FEE_ACCOUNT)
+        );
+      });
+
+      it("sizes a Token-2022 account of a mint without extensions at the base size", async () => {
+        const mint = address();
+        chainAccounts.set(mint, {
+          data: Buffer.alloc(82),
+          owner: TOKEN_2022_PROGRAM,
+        });
+        buildOverrides = {
+          setupInstructions: [
+            createAta({
+              account: address(),
+              mint,
+              tokenProgram: TOKEN_2022_PROGRAM,
+            }),
+          ],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE + rentFor(TOKEN_2022_BASE_ACCOUNT));
+      });
+
+      it("adds no account extension for a mint-only extension", async () => {
+        const mint = address();
+        chainAccounts.set(mint, {
+          // MintCloseAuthority has no account-side counterpart.
+          data: transferFeeMintData([
+            ExtensionType.TransferFeeConfig,
+            ExtensionType.MintCloseAuthority,
+          ]),
+          owner: TOKEN_2022_PROGRAM,
+        });
+        buildOverrides = {
+          setupInstructions: [
+            createAta({
+              account: address(),
+              mint,
+              tokenProgram: TOKEN_2022_PROGRAM,
+            }),
+          ],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE + rentFor(TOKEN_2022_FEE_ACCOUNT));
+      });
+
+      it("sizes a Token-2022 account of an absent mint at the base size", async () => {
+        buildOverrides = {
+          setupInstructions: [
+            createAta({
+              account: address(),
+              mint: address(),
+              tokenProgram: TOKEN_2022_PROGRAM,
+            }),
+          ],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE + rentFor(TOKEN_2022_BASE_ACCOUNT));
+      });
+
+      it("counts the rent of a create without data and ignores RecoverNested", async () => {
+        buildOverrides = {
+          setupInstructions: [
+            createAta({ account: address(), mint: USDC_MINT, data: "" }),
+            createAta({ account: address(), mint: USDC_MINT, data: "Ag==" }),
+          ],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE + rentFor(SPL_ACCOUNT));
+      });
+
+      it("leaves out accounts another payer creates", async () => {
+        buildOverrides = {
+          setupInstructions: [
+            createAta({ account: address(), mint: USDC_MINT, payer: address() }),
+          ],
+        };
+
+        const required = await requiredLamports(await quote());
+
+        expect(required).to.eq(BASE);
+      });
+
+      it("counts the wrapped SOL account's rent on top of a SOL input", async () => {
+        const quoteResponse = await quote({ inputMint: WSOL_MINT });
+        buildOverrides = {
+          setupInstructions: [
+            createAta({ account: address(), mint: WSOL_MINT }),
+            createAta({ account: address(), mint: USDC_MINT }),
+          ],
+        };
+
+        const required = await requiredLamports(quoteResponse);
+
+        expect(required).to.eq(
+          BASE + 2 * rentFor(SPL_ACCOUNT) + Number(quoteResponse.inAmount)
+        );
+      });
+
+      it("counts the taker's absent output account when destinationTokenAccount is set", async () => {
+        buildOverrides = {
+          setupInstructions: [createAta({ account: address(), mint: USDC_MINT })],
+        };
+
+        const required = await requiredLamports(await quote(), {
+          destinationTokenAccount: ROUTE_ACCOUNT,
+        });
+
+        expect(required).to.eq(BASE + rentFor(SPL_ACCOUNT));
+      });
+
+      it("builds when the balance covers fee, floor and rent exactly", async () => {
+        buildOverrides = {
+          setupInstructions: [createAta({ account: address(), mint: USDC_MINT })],
+        };
+        walletLamports = BASE + rentFor(SPL_ACCOUNT);
+
+        const { result } = await swapInstructions();
+
+        expect(result.transactions).to.have.length(1);
+      });
+
+      it("refuses one lamport short with INSUFFICIENT_FUNDS", async () => {
+        const quoteResponse = await quote();
+        buildOverrides = {
+          setupInstructions: [createAta({ account: address(), mint: USDC_MINT })],
+        };
+        walletLamports = BASE + rentFor(SPL_ACCOUNT) - 1;
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("INSUFFICIENT_FUNDS");
+        expect(error.data).to.deep.eq({
+          required: BASE + rentFor(SPL_ACCOUNT),
+          available: walletLamports,
+        });
       });
     });
 

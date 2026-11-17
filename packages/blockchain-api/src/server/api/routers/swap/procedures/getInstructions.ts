@@ -1,6 +1,7 @@
 import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import {
+  AccountInfo,
   Connection,
   PublicKey,
   TransactionInstruction,
@@ -19,7 +20,16 @@ import {
   ATA_SPACE,
   getRentLamports,
 } from "@/lib/utils/balance-validation";
-import { NATIVE_MINT } from "@solana/spl-token";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  ExtensionType,
+  NATIVE_MINT,
+  TOKEN_2022_PROGRAM_ID,
+  getAccountLen,
+  getAccountTypeOfMintType,
+  getExtensionTypes,
+  unpackMint,
+} from "@solana/spl-token";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
@@ -105,6 +115,137 @@ const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
   );
 
 /**
+ * Jupiter RFQ v2, a liquidity source Metis can route through. Its fills need a
+ * market maker's co-signature this procedure does not collect, so every
+ * `/build` request excludes it and a built route through it is refused.
+ */
+const RFQ_V2_LABEL = "JupiterRfqV2";
+
+/** The labels every `/build` request excludes, on top of the caller's. */
+const ALWAYS_EXCLUDED_LABELS = [RFQ_V2_LABEL];
+
+/**
+ * The associated token program's Create (no data, or 0) and
+ * CreateIdempotent (1) instructions; RecoverNested (2) creates nothing.
+ */
+const ATA_CREATE_DISCRIMINATORS = new Set([0, 1]);
+
+/** A token account a setup instruction creates with the taker as payer. */
+interface TakerAccountCreation {
+  address: PublicKey;
+  mint: PublicKey;
+  tokenProgram: PublicKey;
+}
+
+/**
+ * The associated token accounts `instructions` create and the taker pays
+ * for, one entry per address. The associated token program lays the
+ * accounts out as payer, account, owner, mint, system program, token
+ * program.
+ */
+const takerAccountCreations = (
+  instructions: JupiterInstruction[],
+  taker: string,
+): TakerAccountCreation[] => {
+  const creations = new Map<string, TakerAccountCreation>();
+  for (const instruction of instructions) {
+    if (instruction.programId !== ASSOCIATED_TOKEN_PROGRAM_ID.toBase58()) {
+      continue;
+    }
+    const data = Buffer.from(instruction.data, "base64");
+    if (data.length > 0 && !ATA_CREATE_DISCRIMINATORS.has(data[0])) {
+      continue;
+    }
+    const [payer, account, , mint, , tokenProgram] = instruction.accounts;
+    if (!payer || !account || !mint || !tokenProgram) {
+      continue;
+    }
+    if (payer.pubkey !== taker) {
+      continue;
+    }
+    creations.set(account.pubkey, {
+      address: new PublicKey(account.pubkey),
+      mint: new PublicKey(mint.pubkey),
+      tokenProgram: new PublicKey(tokenProgram.pubkey),
+    });
+  }
+  return [...creations.values()];
+};
+
+/** A Token-2022 associated token account without any mint extension. */
+const TOKEN_2022_BASE_ACCOUNT_SPACE = getAccountLen([
+  ExtensionType.ImmutableOwner,
+]);
+
+/**
+ * The size of a Token-2022 associated token account for `mint`: the
+ * account-side extensions the mint's extensions require, plus the
+ * ImmutableOwner the associated token program adds. A mint that is absent
+ * or unreadable sizes as the base account; creating its account fails on
+ * chain anyway.
+ */
+const token2022AccountSpace = (
+  mint: PublicKey,
+  mintInfo: AccountInfo<Buffer> | null,
+): number => {
+  if (!mintInfo) return TOKEN_2022_BASE_ACCOUNT_SPACE;
+  try {
+    const { tlvData } = unpackMint(mint, mintInfo, TOKEN_2022_PROGRAM_ID);
+    const accountExtensions = getExtensionTypes(tlvData)
+      .map(getAccountTypeOfMintType)
+      .filter((extension) => extension !== ExtensionType.Uninitialized);
+    return getAccountLen([...accountExtensions, ExtensionType.ImmutableOwner]);
+  } catch {
+    return TOKEN_2022_BASE_ACCOUNT_SPACE;
+  }
+};
+
+/**
+ * Lamports of rent the taker pays for the token accounts `instructions`
+ * create, counting only accounts that do not exist yet. Accounts and their
+ * Token-2022 mints are read in one batch, and rent is priced once per
+ * distinct size.
+ */
+const takerRentLamports = async (
+  connection: Connection,
+  instructions: JupiterInstruction[],
+  taker: string,
+): Promise<number> => {
+  const creations = takerAccountCreations(instructions, taker);
+  if (creations.length === 0) return 0;
+  const token2022Mints = [
+    ...new Set(
+      creations
+        .filter((c) => c.tokenProgram.equals(TOKEN_2022_PROGRAM_ID))
+        .map((c) => c.mint.toBase58()),
+    ),
+  ];
+  const infos = await connection.getMultipleAccountsInfo([
+    ...creations.map((c) => c.address),
+    ...token2022Mints.map((mint) => new PublicKey(mint)),
+  ]);
+  const mintInfos = new Map(
+    token2022Mints.map((mint, i) => [mint, infos[creations.length + i]]),
+  );
+  const spaces = creations
+    .filter((_, i) => !infos[i])
+    .map((c) =>
+      c.tokenProgram.equals(TOKEN_2022_PROGRAM_ID)
+        ? token2022AccountSpace(c.mint, mintInfos.get(c.mint.toBase58()) ?? null)
+        : ATA_SPACE,
+    );
+  const rents = new Map(
+    await Promise.all(
+      [...new Set(spaces)].map(
+        async (space) =>
+          [space, await getRentLamports(connection, space)] as const,
+      ),
+    ),
+  );
+  return spaces.reduce((total, space) => total + rents.get(space)!, 0);
+};
+
+/**
  * Build a swap transaction through Jupiter's Swap V2 `/build`.
  *
  * `/build` quotes the route again, so the transaction swaps the quote's input
@@ -134,6 +275,13 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       });
     }
 
+    // The caller's exclusions and those every swap carries, sent to /build
+    // and checked against the route it builds.
+    const excluded = new Set([
+      ...excludedLabels(excludeDexes),
+      ...ALWAYS_EXCLUDED_LABELS,
+    ]);
+
     /** One `/build` request at `slippageBps`, validated against the quote. */
     const requestBuild = async (slippageBps: number) => {
       const buildUrl = new URL(`${env.JUPITER_API_URL}/swap/v2/build`);
@@ -142,9 +290,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       buildUrl.searchParams.set("amount", quoteResponse.inAmount);
       buildUrl.searchParams.set("taker", userPublicKey);
       buildUrl.searchParams.set("slippageBps", String(slippageBps));
-      if (excludeDexes) {
-        buildUrl.searchParams.set("excludeDexes", excludeDexes);
-      }
+      buildUrl.searchParams.set("excludeDexes", [...excluded].join(","));
       if (destinationTokenAccount) {
         buildUrl.searchParams.set(
           "destinationTokenAccount",
@@ -255,8 +401,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       });
     }
 
-    // A guard against Jupiter routing through a DEX the caller excluded.
-    const excluded = excludedLabels(excludeDexes);
+    // A guard against Jupiter routing through a DEX the request excluded.
     const excludedHop = build.routePlan.find((hop) =>
       excluded.has(hop.swapInfo.label),
     );
@@ -306,9 +451,15 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       connection.getBalance(new PublicKey(userPublicKey)),
       getTransactionFee(connection, tx),
     ]);
-    const rentCost = destinationTokenAccount
-      ? 0
-      : await getRentLamports(connection, ATA_SPACE);
+    // Rent for the token accounts the setup instructions create for the
+    // taker and that do not exist yet: the output account (created even when
+    // destinationTokenAccount names another), intermediate accounts of a
+    // multi-hop route, and the wrapped SOL account a SOL input swaps from.
+    const rentCost = await takerRentLamports(
+      connection,
+      build.setupInstructions ?? [],
+      userPublicKey,
+    );
     const solInputAmount =
       quoteResponse.inputMint === NATIVE_MINT.toBase58()
         ? Number(quoteResponse.inAmount)
