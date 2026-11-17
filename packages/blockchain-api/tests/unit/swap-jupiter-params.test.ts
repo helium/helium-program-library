@@ -330,12 +330,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     process.env.JUPITER_API_KEY = "test";
     process.env.NO_PG = "true";
     process.env.SOLANA_RPC_URL = await startStubRpc();
-    ({ getQuote } = await import(
-      "../../src/server/api/routers/swap/procedures/getQuote"
-    ));
-    ({ getInstructions } = await import(
-      "../../src/server/api/routers/swap/procedures/getInstructions"
-    ));
+    ({ getQuote } =
+      await import("../../src/server/api/routers/swap/procedures/getQuote"));
+    ({ getInstructions } =
+      await import("../../src/server/api/routers/swap/procedures/getInstructions"));
     globalThis.fetch = stubFetch;
   });
 
@@ -366,9 +364,12 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       );
 
     /** The error a getQuote call rejects with. */
-    const quoteRejection = async (extra: Record<string, unknown> = {}) => {
+    const quoteRejection = async (
+      extra: Record<string, unknown> = {},
+      amount = freshAmount()
+    ) => {
       try {
-        await quote(extra);
+        await quote(extra, amount);
       } catch (error) {
         expect(error).to.be.instanceOf(ORPCError);
         return error as ORPCError<string, unknown>;
@@ -485,6 +486,81 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
       expect((await quoteRejection()).code).to.eq("JUPITER_ERROR");
     });
+
+    it("refuses a quote for a different output mint than requested", async () => {
+      const amount = freshAmount();
+      quoteReply = {
+        status: 200,
+        body: {
+          inputMint: HNT_MINT,
+          inAmount: amount,
+          outputMint: SYSTEM_PROGRAM,
+          outAmount: "1",
+          otherAmountThreshold: "1",
+          swapMode: "ExactIn",
+          slippageBps: 50,
+          priceImpactPct: "0",
+          routePlan: [],
+        },
+      };
+
+      const error = await quoteRejection({}, amount);
+
+      expect(error.code).to.eq("JUPITER_ERROR");
+      expect(error.message).to.eq(
+        "Jupiter quoted a swap that differs from the request"
+      );
+    });
+
+    it("refuses a quote for a different input mint than requested", async () => {
+      const amount = freshAmount();
+      quoteReply = {
+        status: 200,
+        body: {
+          inputMint: SYSTEM_PROGRAM,
+          inAmount: amount,
+          outputMint: USDC_MINT,
+          outAmount: "1",
+          otherAmountThreshold: "1",
+          swapMode: "ExactIn",
+          slippageBps: 50,
+          priceImpactPct: "0",
+          routePlan: [],
+        },
+      };
+
+      const error = await quoteRejection({}, amount);
+
+      expect(error.code).to.eq("JUPITER_ERROR");
+      expect(error.message).to.eq(
+        "Jupiter quoted a swap that differs from the request"
+      );
+    });
+
+    it("refuses a quote for a different input amount than requested", async () => {
+      const amount = freshAmount();
+      quoteReply = {
+        status: 200,
+        body: {
+          inputMint: HNT_MINT,
+          inAmount: `${amount}0`,
+          outputMint: USDC_MINT,
+          outAmount: "1",
+          otherAmountThreshold: "1",
+          swapMode: "ExactIn",
+          slippageBps: 50,
+          priceImpactPct: "0",
+          routePlan: [],
+        },
+      };
+
+      const error = await quoteRejection({}, amount);
+
+      expect(error.code).to.eq("JUPITER_ERROR");
+      expect(error.message).to.eq(
+        "Jupiter quoted a swap that differs from the request"
+      );
+    });
   });
 
   describe("swap instructions through /build", () => {
@@ -573,7 +649,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const quoteResponse = { ...(await quote()), swapMode: "ExactOut" };
       jupiterCalls = [];
 
-      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+      const code = await rejectionCode({
+        quoteResponse,
+        userPublicKey: WALLET,
+      });
 
       expect(code).to.eq("BAD_REQUEST");
       expect(jupiterCalls).to.have.length(0);
@@ -669,7 +748,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(error.message).to.match(QUOTE_EXPIRED);
         expect(buildCalls()).to.have.length(2);
         expect(warnings).to.have.length(1);
-        expect(warnings[0][1]).to.deep.include({ retried: true, passed: false });
+        expect(warnings[0][1]).to.deep.include({
+          retried: true,
+          passed: false,
+        });
       });
 
       it("refuses as an expired quote without a retry when the output is below the quote's minimum", async () => {
@@ -1017,7 +1099,11 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       it("leaves out accounts another payer creates", async () => {
         buildOverrides = {
           setupInstructions: [
-            createAta({ account: address(), mint: USDC_MINT, payer: address() }),
+            createAta({
+              account: address(),
+              mint: USDC_MINT,
+              payer: address(),
+            }),
           ],
         };
 
@@ -1044,7 +1130,9 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
       it("counts the taker's absent output account when destinationTokenAccount is set", async () => {
         buildOverrides = {
-          setupInstructions: [createAta({ account: address(), mint: USDC_MINT })],
+          setupInstructions: [
+            createAta({ account: address(), mint: USDC_MINT }),
+          ],
         };
 
         const required = await requiredLamports(await quote(), {
@@ -1056,7 +1144,9 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
       it("builds when the balance covers fee, floor and rent exactly", async () => {
         buildOverrides = {
-          setupInstructions: [createAta({ account: address(), mint: USDC_MINT })],
+          setupInstructions: [
+            createAta({ account: address(), mint: USDC_MINT }),
+          ],
         };
         walletLamports = BASE + rentFor(SPL_ACCOUNT);
 
@@ -1068,7 +1158,9 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       it("fails the request when the rent lookup's RPC call fails, returning no build", async () => {
         const quoteResponse = await quote();
         buildOverrides = {
-          setupInstructions: [createAta({ account: address(), mint: USDC_MINT })],
+          setupInstructions: [
+            createAta({ account: address(), mint: USDC_MINT }),
+          ],
         };
         failMultipleAccounts = true;
 
@@ -1094,7 +1186,9 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       it("refuses one lamport short with INSUFFICIENT_FUNDS", async () => {
         const quoteResponse = await quote();
         buildOverrides = {
-          setupInstructions: [createAta({ account: address(), mint: USDC_MINT })],
+          setupInstructions: [
+            createAta({ account: address(), mint: USDC_MINT }),
+          ],
         };
         walletLamports = BASE + rentFor(SPL_ACCOUNT) - 1;
 
@@ -1112,7 +1206,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const quoteResponse = await quote();
       buildOverrides = { swapInstruction: undefined };
 
-      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+      const code = await rejectionCode({
+        quoteResponse,
+        userPublicKey: WALLET,
+      });
 
       expect(code).to.eq("JUPITER_ERROR");
     });
@@ -1121,7 +1218,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const quoteResponse = await quote();
       buildReply = { status: 429, body: { error: "Too many requests" } };
 
-      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+      const code = await rejectionCode({
+        quoteResponse,
+        userPublicKey: WALLET,
+      });
 
       expect(code).to.eq("RATE_LIMITED");
     });
@@ -1130,7 +1230,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const quoteResponse = await quote();
       buildReply = { status: 400, body: { errorCode: "TOKEN_NOT_TRADABLE" } };
 
-      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+      const code = await rejectionCode({
+        quoteResponse,
+        userPublicKey: WALLET,
+      });
 
       expect(code).to.eq("BAD_REQUEST");
     });
@@ -1139,7 +1242,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const quoteResponse = await quote();
       buildReply = { status: 500, body: { error: "Internal error" } };
 
-      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+      const code = await rejectionCode({
+        quoteResponse,
+        userPublicKey: WALLET,
+      });
 
       expect(code).to.eq("JUPITER_ERROR");
     });
@@ -1165,10 +1271,15 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     it("refuses a /build answer with otherInstructions", async () => {
       const quoteResponse = await quote();
       buildOverrides = {
-        otherInstructions: [{ programId: MEMO_PROGRAM, accounts: [], data: "" }],
+        otherInstructions: [
+          { programId: MEMO_PROGRAM, accounts: [], data: "" },
+        ],
       };
 
-      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+      const code = await rejectionCode({
+        quoteResponse,
+        userPublicKey: WALLET,
+      });
 
       expect(code).to.eq("JUPITER_ERROR");
     });

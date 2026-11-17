@@ -21,6 +21,7 @@ import {
   planComputeBudget,
   readBuildResponse,
   refuseExtraAccountCreations,
+  refusePlatformSigner,
   RFQ_V2_LABEL,
   SLIPPAGE_BPS,
 } from "../src/build";
@@ -119,11 +120,6 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       const url = buildSwapUrl(REQUEST);
       assert.equal(url.searchParams.has("platformFeeBps"), false);
       assert.equal(url.searchParams.has("feeAccount"), false);
-    });
-
-    it("pins the byte and account budgets of the fee-funding swap", () => {
-      assert.equal(FUND_FEES_MAX_BYTES, 950);
-      assert.equal(FUND_FEES_MAX_ACCOUNTS, 20);
     });
   });
 
@@ -496,6 +492,36 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     });
   });
 
+  describe("refusePlatformSigner", () => {
+    const PLATFORM = Keypair.generate().publicKey;
+    const ix = (pubkey: PublicKey, isSigner: boolean) =>
+      new TransactionInstruction({
+        programId: SystemProgram.programId,
+        keys: [{ pubkey, isSigner, isWritable: true }],
+        data: Buffer.alloc(0),
+      });
+    const other = () => ix(Keypair.generate().publicKey, true);
+
+    it("refuses an instruction that needs the platform key's signature, in any position", () => {
+      for (const position of [0, 1, 2]) {
+        const instructions = [other(), other(), other()];
+        instructions[position] = ix(PLATFORM, true);
+        assert.throws(
+          () => refusePlatformSigner(instructions, PLATFORM.toBase58()),
+          /platform wallet's signature/
+        );
+      }
+    });
+
+    it("accepts the platform key as a non-signer", () => {
+      refusePlatformSigner([other(), ix(PLATFORM, false)], PLATFORM);
+    });
+
+    it("accepts other signers", () => {
+      refusePlatformSigner([other(), other()], PLATFORM);
+    });
+  });
+
   describe("buildFundFeesSwap", () => {
     const WSOL = "So11111111111111111111111111111111111111112";
     const ATA_PROGRAM = new PublicKey(
@@ -619,7 +645,6 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         ComputeBudgetProgram.setComputeUnitLimit({ units: 57_444 }),
       ]);
       assert.equal(fee, FEE_LAMPORTS);
-      assert.equal(fee, 10000);
     });
   });
 });

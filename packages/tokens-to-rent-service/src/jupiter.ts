@@ -16,6 +16,7 @@ import {
   computeUnitLimit,
   estimateRequest,
   planComputeBudget,
+  refusePlatformSigner,
 } from "./build";
 import { JUPITER_API_KEY, JUPITER_API_URL } from "./env";
 import { provider } from "./solana";
@@ -96,6 +97,10 @@ export const fundFees = async ({
     );
   }
 
+  if (userWallet.equals(provider.wallet.publicKey)) {
+    throw new Error("The platform wallet cannot fund its own fees");
+  }
+
   const connection = provider.connection;
   const platformWallet = provider.wallet;
   const inputAmount = await estimate({ mint });
@@ -114,6 +119,14 @@ export const fundFees = async ({
     inputAmount,
     userWallet: userWallet.toBase58(),
   });
+  refusePlatformSigner(
+    [
+      ...setupInstructions,
+      swapInstruction,
+      ...(cleanupInstruction ? [cleanupInstruction] : []),
+    ],
+    platformWallet.publicKey
+  );
 
   // create rent flash loan instructions
   const ataRent =

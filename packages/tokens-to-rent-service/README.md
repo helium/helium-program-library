@@ -14,11 +14,11 @@ This is used for the wallet-app feature where we let users top up to 0.02 SOL us
 
 `/build` takes the input amount only (ExactIn), has no quote-only form, and returns the compute unit price without a limit. `/estimate` builds a swap of 0.020015 SOL into the token for the platform wallet and reports its output; `/fees` builds the token to SOL swap for the user, bounded with `maxAccounts` and `maxBytes` so the transaction aims to stay within Solana's 1232-byte limit (an estimate from measured routes). It simulates the transaction to set the compute unit limit at 20% over the units used, and refuses the request when the simulation fails. The transaction carries no compute unit price, so the user repays the base fee and the rent loan only. A build whose setup creates any token account besides the user's wrapped SOL account is refused. Every request excludes Jupiter RFQ v2, whose fills need a market maker's signature.
 
-Jupiter has no SOL to IOT route, so `/estimate` and `/fees` for IOT answer `No routes found`.
+Jupiter has no SOL to IOT route, so `/estimate` and `/fees` for IOT answer `No routes found`, and `/estimates` leaves IOT out.
 
 ## Deployments
 
-Image: `public.ecr.aws/v0j6k5v6/tokens-to-rent-service`. The `hnt-to-rent-service` deployment runs an older image whose code left this repo; this package does not build it.
+Image: `public.ecr.aws/v0j6k5v6/tokens-to-rent-service`. This package builds only the tokens-to-rent-service image.
 
 | Cluster / env | Manifest |
 | --- | --- |

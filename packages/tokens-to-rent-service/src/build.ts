@@ -341,6 +341,23 @@ export async function buildJupiterSwap(
   });
 }
 
+/** Refuses instructions that need the platform wallet's signature. */
+export const refusePlatformSigner = (
+  instructions: TransactionInstruction[],
+  platformKey: PublicKey | string
+): void => {
+  const platform = new PublicKey(platformKey);
+  if (
+    instructions.some((ix) =>
+      ix.keys.some((meta) => meta.isSigner && meta.pubkey.equals(platform))
+    )
+  ) {
+    throw new Error(
+      "Jupiter built an instruction that needs the platform wallet's signature"
+    );
+  }
+};
+
 /**
  * Refuses a fee-funding build whose setup creates a token account other than the taker's
  * wrapped SOL account.
@@ -415,12 +432,7 @@ export function planComputeBudget(units: number): {
 }
 
 /** What the fee-funding transaction is assembled from. */
-export interface FundFeesSwap {
-  setupInstructions: TransactionInstruction[];
-  swapInstruction: TransactionInstruction;
-  cleanupInstruction: TransactionInstruction | null;
-  lookupTables: string[];
-}
+export type FundFeesSwap = Omit<BuiltSwap, "outAmount">;
 
 /**
  * Builds the swap the user signs for the fee-funding transaction: the bounded `/build` request
@@ -434,10 +446,6 @@ export async function buildFundFeesSwap(
 ): Promise<FundFeesSwap> {
   const built = await buildJupiterSwap(fundFeesRequest(params), fetchImpl);
   refuseExtraAccountCreations(built.setupInstructions, params.userWallet);
-  return {
-    setupInstructions: built.setupInstructions,
-    swapInstruction: built.swapInstruction,
-    cleanupInstruction: built.cleanupInstruction,
-    lookupTables: built.lookupTables,
-  };
+  const { outAmount: _outAmount, ...swap } = built;
+  return swap;
 }

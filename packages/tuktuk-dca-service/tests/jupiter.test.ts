@@ -6,6 +6,7 @@ import {
   BuildSwapRequest,
   DCA_SWAP_MAX_BYTES,
   readBuildResponse,
+  RFQ_V2_LABEL,
 } from "../src/jupiter";
 
 const key = () => Keypair.generate().publicKey.toBase58();
@@ -76,7 +77,13 @@ describe("tuktuk-dca-service Jupiter /build", () => {
         slippageBps: "50",
         destinationTokenAccount: DESTINATION,
         maxBytes: String(DCA_SWAP_MAX_BYTES),
+        excludeDexes: RFQ_V2_LABEL,
       });
+    });
+
+    it("excludes Jupiter RFQ v2", () => {
+      const url = buildSwapUrl(REQUEST);
+      assert.equal(url.searchParams.get("excludeDexes"), "JupiterRfqV2");
     });
   });
 
@@ -218,6 +225,22 @@ describe("tuktuk-dca-service Jupiter /build", () => {
       assert.throws(
         () => readBuildResponse(buildBody({ routePlan: [null] }), EXPECTED),
         /Invalid Jupiter \/build response: routePlan/
+      );
+    });
+
+    it("refuses a route through Jupiter RFQ v2", () => {
+      assert.throws(
+        () =>
+          readBuildResponse(
+            buildBody({
+              routePlan: [
+                { swapInfo: { label: "Raydium CP" } },
+                { swapInfo: { label: RFQ_V2_LABEL } },
+              ],
+            }),
+            EXPECTED
+          ),
+        /route through JupiterRfqV2/
       );
     });
   });

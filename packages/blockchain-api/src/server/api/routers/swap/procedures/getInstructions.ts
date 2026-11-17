@@ -33,6 +33,7 @@ import {
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_NAMES } from "@/lib/constants/tokens";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
+import { BUILD_SWAP_MODE, excludedWithDefaults } from "./build-request";
 import BN from "bn.js";
 import { z } from "zod";
 
@@ -71,9 +72,6 @@ const JupiterBuildResponseSchema = z.object({
     .nullish(),
 });
 
-/** The only swap mode `/build` builds. */
-const BUILD_SWAP_MODE = "ExactIn";
-
 /**
  * How many times `/build` is asked again, with a narrower slippage, when its
  * re-quote enforces a lower minimum output than the caller's quote.
@@ -104,27 +102,6 @@ const toInstruction = (instruction: JupiterInstruction) =>
     })),
     data: Buffer.from(instruction.data, "base64"),
   });
-
-/** The DEX labels in a comma-separated `excludeDexes`, without blanks. */
-export const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
-  new Set(
-    (excludeDexes ?? "")
-      .split(",")
-      .map((label) => label.trim())
-      .filter((label) => label.length > 0),
-  );
-
-/**
- * Jupiter RFQ v2. Its fills need a market maker's co-signature this procedure
- * does not collect. `/build` refuses RFQ v2 unless an undocumented
- * `enableRfqV2` parameter is sent, which this procedure never sends, so the
- * exclusion on every request and the refusal of a built route through it are
- * defence in depth in case that default changes.
- */
-export const RFQ_V2_LABEL = "JupiterRfqV2";
-
-/** The labels every `/build` request excludes, on top of the caller's. */
-export const ALWAYS_EXCLUDED_LABELS = [RFQ_V2_LABEL];
 
 /**
  * The associated token program's Create (no data, or 0) and
@@ -284,10 +261,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
 
     // The caller's exclusions and those every swap carries, sent to /build
     // and checked against the route it builds.
-    const excluded = new Set([
-      ...excludedLabels(excludeDexes),
-      ...ALWAYS_EXCLUDED_LABELS,
-    ]);
+    const excluded = excludedWithDefaults(excludeDexes);
 
     /** One `/build` request at `slippageBps`, validated against the quote. */
     const requestBuild = async (slippageBps: number) => {

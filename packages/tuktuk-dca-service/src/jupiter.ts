@@ -17,6 +17,8 @@ const JUPITER_BUILD_PATH = "/swap/v2/build";
  */
 export const DCA_SWAP_MAX_BYTES = 520;
 
+export const RFQ_V2_LABEL = "JupiterRfqV2";
+
 /** How much of a failed `/build` answer's body goes into the error. */
 const ERROR_BODY_MAX_CHARS = 300;
 
@@ -44,6 +46,7 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
     request.destinationTokenAccount
   );
   url.searchParams.set("maxBytes", String(DCA_SWAP_MAX_BYTES));
+  url.searchParams.set("excludeDexes", RFQ_V2_LABEL);
   return url;
 }
 
@@ -181,6 +184,11 @@ export function readBuildResponse(
     }
     return readString(hop.swapInfo, "label");
   });
+  if (routeLabels.includes(RFQ_V2_LABEL)) {
+    throw new Error(
+      `Jupiter built a route through ${RFQ_V2_LABEL}, which needs a market maker's signature`
+    );
+  }
 
   const tables = raw.addressesByLookupTableAddress;
   if (tables !== undefined && tables !== null && !isRecord(tables)) {

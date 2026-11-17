@@ -3,16 +3,13 @@ import { publicProcedure } from "../../../procedures";
 import { env } from "@/lib/env";
 import { createTtlCache } from "@/lib/utils/ttl-cache";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
-import { ALWAYS_EXCLUDED_LABELS, excludedLabels } from "./getInstructions";
+import { BUILD_SWAP_MODE, excludedWithDefaults } from "./build-request";
 
 // Quotes are polled repeatedly and often re-requested with identical params.
 // A short TTL plus in-flight coalescing collapses those bursts into a single
 // Jupiter call, which is what was tripping Jupiter's 429 rate limiting.
 const QUOTE_CACHE_TTL_MS = 2000;
 const quoteCache = createTtlCache<QuoteResponse>({ ttlMs: QUOTE_CACHE_TTL_MS });
-
-/** The only swap mode `/build` quotes and builds. */
-const BUILD_SWAP_MODE = "ExactIn";
 
 /**
  * The taker `/build` quotes for. `/build` requires a taker, and a quote does
@@ -44,9 +41,7 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       });
     }
 
-    const excluded = [
-      ...new Set([...excludedLabels(excludeDexes), ...ALWAYS_EXCLUDED_LABELS]),
-    ].join(",");
+    const excluded = [...excludedWithDefaults(excludeDexes)].join(",");
 
     const cacheKey = `${inputMint}:${outputMint}:${amount}:${swapMode}:${slippageBps}:${excluded}`;
 
@@ -95,6 +90,15 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
         console.error("Invalid Jupiter response:", error);
         throw errors.JUPITER_ERROR({
           message: "Invalid response from Jupiter API",
+        });
+      }
+      if (
+        build.inputMint !== inputMint ||
+        build.outputMint !== outputMint ||
+        build.inAmount !== amount
+      ) {
+        throw errors.JUPITER_ERROR({
+          message: "Jupiter quoted a swap that differs from the request",
         });
       }
 
