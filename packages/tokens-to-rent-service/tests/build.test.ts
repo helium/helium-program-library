@@ -8,6 +8,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import {
+  buildFundFeesSwap,
   buildJupiterSwap,
   BuildSwapRequest,
   buildSwapUrl,
@@ -20,7 +21,6 @@ import {
   planComputeBudget,
   readBuildResponse,
   refuseExtraAccountCreations,
-  SLIPPAGE_BPS,
 } from "../src/build";
 
 const key = () => Keypair.generate().publicKey.toBase58();
@@ -367,7 +367,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         inputMint: WSOL,
         outputMint: INPUT_MINT,
         taker: PLATFORM,
-        slippageBps: SLIPPAGE_BPS,
+        slippageBps: 100,
         platformFeeBps: 50,
         feeAccount: FEE_ACCOUNT,
         fitFundFeesTransaction: false,
@@ -386,7 +386,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         inputMint: INPUT_MINT,
         outputMint: WSOL,
         taker: USER,
-        slippageBps: SLIPPAGE_BPS,
+        slippageBps: 100,
         platformFeeBps: 50,
         feeAccount: FEE_ACCOUNT,
         fitFundFeesTransaction: true,
@@ -491,6 +491,125 @@ describe("tokens-to-rent-service Jupiter /build", () => {
           data: Buffer.from([0]),
         }),
       ]);
+    });
+  });
+
+  describe("buildFundFeesSwap", () => {
+    const WSOL = "So11111111111111111111111111111111111111112";
+    const ATA_PROGRAM = new PublicKey(
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+    );
+    const TOKEN_PROGRAM = new PublicKey(
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    );
+    const USER = Keypair.generate().publicKey;
+    const ataOf = (mint: string) =>
+      PublicKey.findProgramAddressSync(
+        [
+          USER.toBuffer(),
+          TOKEN_PROGRAM.toBuffer(),
+          new PublicKey(mint).toBuffer(),
+        ],
+        ATA_PROGRAM
+      )[0];
+    const createData = (mint: string) => ({
+      programId: ATA_PROGRAM.toBase58(),
+      accounts: [
+        USER.toBase58(),
+        ataOf(mint).toBase58(),
+        USER.toBase58(),
+        mint,
+        key(),
+        TOKEN_PROGRAM.toBase58(),
+      ].map((pubkey) => ({ pubkey, isSigner: false, isWritable: true })),
+      data: "AQ==",
+    });
+    const PARAMS = {
+      apiUrl: "https://jupiter.test",
+      mint: INPUT_MINT,
+      inputAmount: "1000000",
+      userWallet: USER.toBase58(),
+      platformFeeBps: 50,
+      feeAccount: FEE_ACCOUNT,
+    };
+    const answer = (overrides: Record<string, unknown> = {}) =>
+      buildBody({
+        outputMint: WSOL,
+        setupInstructions: [createData(WSOL)],
+        ...overrides,
+      });
+    const serving = (body: unknown, calls: string[] = []) =>
+      (async (url: string) => {
+        calls.push(url);
+        return new Response(JSON.stringify(body), { status: 200 });
+      }) as typeof fetch;
+
+    it("sends the bounded request for the user and returns the planned transaction parts", async () => {
+      const calls: string[] = [];
+      const built = await buildFundFeesSwap(PARAMS, serving(answer(), calls));
+      assert.equal(calls.length, 1);
+      const url = new URL(calls[0]);
+      assert.equal(url.searchParams.get("taker"), USER.toBase58());
+      assert.equal(url.searchParams.get("inputMint"), INPUT_MINT);
+      assert.equal(url.searchParams.get("outputMint"), WSOL);
+      assert.equal(url.searchParams.get("amount"), "1000000");
+      assert.equal(
+        url.searchParams.get("maxBytes"),
+        String(FUND_FEES_MAX_BYTES)
+      );
+      assert.equal(
+        url.searchParams.get("maxAccounts"),
+        String(FUND_FEES_MAX_ACCOUNTS)
+      );
+      assert.equal(url.searchParams.get("feeAccount"), FEE_ACCOUNT);
+      assert.equal(built.setupInstructions.length, 1);
+      assert.equal(built.lookupTables.length, 2);
+      assert.notEqual(built.cleanupInstruction, null);
+    });
+
+    it("drops the unit price /build returns and charges the flat fee", async () => {
+      const built = await buildFundFeesSwap(PARAMS, serving(answer()));
+      assert.equal(built.fee, 10000);
+      assert.deepEqual(
+        built.budgetInstructions.map((ix) =>
+          ComputeBudgetInstruction.decodeInstructionType(ix)
+        ),
+        ["SetComputeUnitLimit"]
+      );
+    });
+
+    it("keeps the limit /build returns beside the dropped price", async () => {
+      const built = await buildFundFeesSwap(
+        PARAMS,
+        serving(
+          answer({
+            computeBudgetInstructions: [
+              budgetData(LIMIT_IX),
+              budgetData(PRICE_IX),
+            ],
+          })
+        )
+      );
+      assert.equal(built.budgetInstructions.length, 1);
+      assert.deepEqual(
+        [...built.budgetInstructions[0].data],
+        [...LIMIT_IX.data]
+      );
+    });
+
+    it("refuses an answer whose setup creates an intermediate token account", async () => {
+      const intermediate = key();
+      await assert.rejects(
+        buildFundFeesSwap(
+          PARAMS,
+          serving(
+            answer({
+              setupInstructions: [createData(WSOL), createData(intermediate)],
+            })
+          )
+        ),
+        /creates a token account besides the wrapped SOL account/
+      );
     });
   });
 

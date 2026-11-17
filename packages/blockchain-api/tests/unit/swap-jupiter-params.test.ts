@@ -988,6 +988,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         }
 
         expect(failure).to.be.instanceOf(Error);
+        // The stub's RPC error, raised by the rent lookup: the build has no
+        // lookup tables, so no other getMultipleAccounts call is made.
+        expect((failure as Error).message).to.contain("node is unhealthy");
+        expect(rpcMethods).to.include("getMultipleAccounts");
         expect(result).to.eq(undefined);
       });
 

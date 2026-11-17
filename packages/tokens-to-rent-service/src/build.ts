@@ -15,7 +15,7 @@ const TRANSACTION_SIZE_LIMIT = 1232;
 
 /**
  * What the fee-funding transaction adds around Jupiter's bare swap (setup, swap and cleanup
- * instructions compiled alone): a compute unit limit and price, the two SOL transfers, and the
+ * instructions compiled alone): a compute unit limit, the two SOL transfers, and the
  * second signature. Measured from live `/build` answers for HNT and MOBILE to SOL, the compiled
  * transaction is 182 bytes larger than the bare swap for the routes measured.
  */
@@ -29,7 +29,7 @@ const FUND_FEES_MARGIN_BYTES = 100;
 
 /**
  * The byte budget `/build` gets for the bare swap when it builds the fee-funding transaction
- * (`maxBytes`), so that the whole transaction stays under Solana's size limit. It leaves out
+ * (`maxBytes`), which aims to keep the whole transaction under Solana's size limit. It leaves out
  * routes that would not fit: unconstrained, HNT to SOL answered with a route whose transaction
  * is 1272 bytes. The budget is an estimate from those measurements, and Jupiter marks
  * `maxBytes` as experimental. A pair with no route inside it gets `No routes found`.
@@ -398,4 +398,40 @@ export function planComputeBudget(budget: TransactionInstruction[]): {
     );
   }
   return { instructions, fee: FEE_LAMPORTS };
+}
+
+/** What the fee-funding transaction is assembled from. */
+export interface FundFeesSwap {
+  /** The compute budget the transaction carries: a unit limit and no unit price. */
+  budgetInstructions: TransactionInstruction[];
+  /** The lamports the user repays for the transaction's fees. */
+  fee: number;
+  setupInstructions: TransactionInstruction[];
+  swapInstruction: TransactionInstruction;
+  cleanupInstruction: TransactionInstruction | null;
+  lookupTables: string[];
+}
+
+/**
+ * Builds the swap the user signs for the fee-funding transaction: the bounded `/build` request
+ * for the user, refused when its setup creates a token account besides the user's wrapped SOL
+ * account (the rent loan covers that one), with the compute budget planned.
+ */
+export async function buildFundFeesSwap(
+  params: Parameters<typeof fundFeesRequest>[0],
+  fetchImpl: typeof fetch = fetch
+): Promise<FundFeesSwap> {
+  const built = await buildJupiterSwap(fundFeesRequest(params), fetchImpl);
+  refuseExtraAccountCreations(built.setupInstructions, params.userWallet);
+  const { instructions, fee } = planComputeBudget(
+    built.computeBudgetInstructions
+  );
+  return {
+    budgetInstructions: instructions,
+    fee,
+    setupInstructions: built.setupInstructions,
+    swapInstruction: built.swapInstruction,
+    cleanupInstruction: built.cleanupInstruction,
+    lookupTables: built.lookupTables,
+  };
 }

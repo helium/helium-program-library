@@ -8,13 +8,7 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import {
-  buildJupiterSwap,
-  estimateRequest,
-  fundFeesRequest,
-  planComputeBudget,
-  refuseExtraAccountCreations,
-} from "./build";
+import { buildJupiterSwap, estimateRequest, buildFundFeesSwap } from "./build";
 import { JUPITER_FEE_ACCOUNT, JUPITER_FEE_BPS, JUPITER_URL } from "./env";
 import { provider } from "./solana";
 
@@ -100,24 +94,22 @@ export const fundFees = async ({
   const inputAmount = await estimate({ mint });
 
   // Tx contains instructions to create/close WSOL token account
+  // The loan below covers the rent of one account, the wrapped SOL one.
   const {
-    computeBudgetInstructions,
+    budgetInstructions,
+    fee,
     setupInstructions,
     swapInstruction,
     cleanupInstruction,
     lookupTables,
-  } = await buildJupiterSwap(
-    fundFeesRequest({
-      apiUrl: JUPITER_URL,
-      mint: mint.toBase58(),
-      inputAmount,
-      userWallet: userWallet.toBase58(),
-      platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
-      feeAccount: JUPITER_FEE_ACCOUNT,
-    })
-  );
-  // The loan below covers the rent of one account, the wrapped SOL one.
-  refuseExtraAccountCreations(setupInstructions, userWallet.toBase58());
+  } = await buildFundFeesSwap({
+    apiUrl: JUPITER_URL,
+    mint: mint.toBase58(),
+    inputAmount,
+    userWallet: userWallet.toBase58(),
+    platformFeeBps: Number(JUPITER_FEE_BPS) || 0,
+    feeAccount: JUPITER_FEE_ACCOUNT,
+  });
 
   // create rent flash loan instructions
   const ataRent =
@@ -128,10 +120,6 @@ export const fundFees = async ({
     toPubkey: userWallet,
     lamports: ataRent,
   });
-
-  const { instructions: budgetInstructions, fee } = planComputeBudget(
-    computeBudgetInstructions
-  );
 
   const repayIx = SystemProgram.transfer({
     fromPubkey: userWallet,
