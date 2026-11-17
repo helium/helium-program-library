@@ -2988,9 +2988,6 @@ importers:
       '@helium/spl-utils':
         specifier: workspace:^
         version: link:../spl-utils
-      '@jup-ag/api':
-        specifier: ^6.0.6
-        version: 6.0.6
       '@solana/spl-token':
         specifier: ^0.3.8
         version: 0.3.11(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)
@@ -4957,9 +4954,6 @@ packages:
 
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
-
-  '@jup-ag/api@6.0.6':
-    resolution: {integrity: sha512-wGp3FjT+WNdd5TzsWaKr2a2rQ2FgIyaV6sq8L76R8KVYxH7TfCY/BZwhcij6YhxHGjxrF8j7qI6ZPpmUTICpnA==}
 
   '@jup-ag/core@4.0.0-beta.3-fbed36':
     resolution: {integrity: sha512-ubk7LO0t3RfHAPJctq04u9SHMXPYPdxNB9ql3GzY7+H8ZC5l5KIqlhvXU8c49nclXNRO5kIkyMqrgCWKY5sOAQ==}
@@ -14764,8 +14758,6 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@js-sdsl/ordered-map@4.4.2': {}
-
-  '@jup-ag/api@6.0.6': {}
 
   '@jup-ag/core@4.0.0-beta.3-fbed36(@saberhq/solana-contrib@1.15.0(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bn.js@5.2.5))(@saberhq/token-utils@1.15.0(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bn.js@5.2.5)(bufferutil@4.0.7)(encoding@0.1.13)(jsbi@4.3.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@solana/buffer-layout@4.0.1)(@solana/web3.js@1.99.0(bufferutil@4.0.7)(encoding@0.1.13)(typescript@5.9.3)(utf-8-validate@5.0.10))(bufferutil@4.0.7)(encoding@0.1.13)(fastestsmallesttextencoderdecoder@1.0.22)(typescript@5.9.3)(utf-8-validate@5.0.10)':
     dependencies:
