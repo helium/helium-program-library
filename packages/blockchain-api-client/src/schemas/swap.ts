@@ -12,6 +12,10 @@ export const GetQuoteInputSchema = z
     amount: z.string().min(1),
     swapMode: z.enum(["ExactIn", "ExactOut"]).default("ExactIn"),
     slippageBps: z.coerce.number().min(0).max(10000).default(50),
+    excludeDexes: z
+      .string()
+      .optional()
+      .describe("Comma-separated Jupiter DEX labels to leave out of the route"),
   })
   // A quote from a mint to itself is circular arbitrage, which Jupiter refuses
   // with CIRCULAR_ARBITRAGE_IS_DISABLED. Reject it here so the caller gets a
@@ -43,6 +47,12 @@ export const GetInstructionsInputSchema = z.object({
   userPublicKey: z.string().min(1),
   destinationTokenAccount: z.string().optional(),
   dynamicComputeUnitLimit: z.boolean().default(true),
+  useSharedAccounts: z
+    .boolean()
+    .optional()
+    .describe(
+      "Build the route through Jupiter's shared program accounts instead of the user's own intermediate token accounts.",
+    ),
   prioritizationFeeLamports: z
     .object({
       priorityLevelWithMaxLamports: z.object({
