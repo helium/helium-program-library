@@ -32,6 +32,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       destinationTokenAccount,
       dynamicComputeUnitLimit,
       prioritizationFeeLamports,
+      useSharedAccounts,
     } = input;
 
     // Get swap instructions from Jupiter
@@ -48,6 +49,8 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           userPublicKey,
           destinationTokenAccount,
           dynamicComputeUnitLimit,
+          // Omitted unless the caller sets it, so Jupiter applies its default.
+          ...(useSharedAccounts !== undefined && { useSharedAccounts }),
           prioritizationFeeLamports: prioritizationFeeLamports || {
             priorityLevelWithMaxLamports: {
               maxLamports: 1000000,
