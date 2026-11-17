@@ -10,7 +10,12 @@ export const GetQuoteInputSchema = z
     inputMint: z.string().min(1),
     outputMint: z.string().min(1),
     amount: z.string().min(1),
-    swapMode: z.enum(["ExactIn", "ExactOut"]).default("ExactIn"),
+    swapMode: z
+      .enum(["ExactIn", "ExactOut"])
+      .default("ExactIn")
+      .describe(
+        "An ExactOut quote cannot be built: getInstructions refuses it, because Jupiter's Swap V2 /build swaps an exact input only.",
+      ),
     slippageBps: z.coerce.number().min(0).max(10000).default(50),
     excludeDexes: z
       .string()

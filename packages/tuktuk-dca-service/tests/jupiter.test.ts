@@ -206,6 +206,20 @@ describe("tuktuk-dca-service Jupiter /build", () => {
         /Invalid Jupiter \/build response: swapInstruction.accounts/
       );
     });
+
+    it("refuses a body that is not an object", () => {
+      assert.throws(
+        () => readBuildResponse(null, EXPECTED),
+        /Invalid Jupiter \/build response: body/
+      );
+    });
+
+    it("refuses a route hop without swapInfo", () => {
+      assert.throws(
+        () => readBuildResponse(buildBody({ routePlan: [null] }), EXPECTED),
+        /Invalid Jupiter \/build response: routePlan/
+      );
+    });
   });
 
   describe("buildJupiterSwap", () => {

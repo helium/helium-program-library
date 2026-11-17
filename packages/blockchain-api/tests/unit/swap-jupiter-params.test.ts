@@ -52,6 +52,8 @@ let jupiterCalls: JupiterCall[] = [];
 let buildOverrides: Record<string, unknown> = {};
 /** Fields laid over one `/build` answer each, in call order, after buildOverrides. */
 let buildAnswers: Record<string, unknown>[] = [];
+/** A status and body that replace the stubbed `/build` answer, when a case sets one. */
+let buildReply: { status: number; body: unknown } | undefined;
 /** Every RPC method the handlers called, in order. */
 let rpcMethods: string[] = [];
 const realFetch = globalThis.fetch;
@@ -141,9 +143,9 @@ function startStubRpc(): Promise<string> {
   });
 }
 
-const jsonResponse = (body: unknown) =>
+const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
-    status: 200,
+    status,
     headers: { "content-type": "application/json" },
   });
 
@@ -179,6 +181,9 @@ const stubFetch: typeof fetch = async (input, init) => {
     });
   }
   if (url.pathname === "/swap/v2/build") {
+    if (buildReply) {
+      return jsonResponse(buildReply.body, buildReply.status);
+    }
     return jsonResponse({
       inputMint: url.searchParams.get("inputMint"),
       inAmount: url.searchParams.get("amount"),
@@ -289,6 +294,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     jupiterCalls = [];
     buildOverrides = {};
     buildAnswers = [];
+    buildReply = undefined;
     rpcMethods = [];
   });
 
@@ -610,6 +616,43 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
 
       expect(code).to.eq("JUPITER_ERROR");
+    });
+
+    it("answers a rate-limited /build with RATE_LIMITED", async () => {
+      const quoteResponse = await quote();
+      buildReply = { status: 429, body: { error: "Too many requests" } };
+
+      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+
+      expect(code).to.eq("RATE_LIMITED");
+    });
+
+    it("answers a /build that finds the token not tradable with BAD_REQUEST", async () => {
+      const quoteResponse = await quote();
+      buildReply = { status: 400, body: { errorCode: "TOKEN_NOT_TRADABLE" } };
+
+      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+
+      expect(code).to.eq("BAD_REQUEST");
+    });
+
+    it("answers a failed /build with JUPITER_ERROR", async () => {
+      const quoteResponse = await quote();
+      buildReply = { status: 500, body: { error: "Internal error" } };
+
+      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+
+      expect(code).to.eq("JUPITER_ERROR");
+    });
+
+    it("refuses a 200 /build answer that carries an error with JUPITER_ERROR", async () => {
+      const quoteResponse = await quote();
+      buildReply = { status: 200, body: { error: "No routes found" } };
+
+      const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+      expect(error.code).to.eq("JUPITER_ERROR");
+      expect(error.message).to.contain("No routes found");
     });
 
     it("treats null setupInstructions and otherInstructions as empty", async () => {

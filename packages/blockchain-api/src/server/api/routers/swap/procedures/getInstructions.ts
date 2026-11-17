@@ -248,6 +248,10 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
         attempts,
         retried: true,
         passed: true,
+        final: {
+          otherAmountThreshold: build.otherAmountThreshold,
+          outAmount: build.outAmount,
+        },
       });
     }
 

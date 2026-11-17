@@ -10,9 +10,10 @@ const JUPITER_BUILD_PATH = "/swap/v2/build";
  * over the signed remote task, which carries the swap's instruction data again with `lend_v0`,
  * the `swap_v0` wrapper and `check_repay_v0`, and a `run_task_v0` that lists every account the
  * task touches, plus the DCA's own accounts, which no lookup table holds. That adds about 660
- * bytes to the bare swap, so a bare swap of 520 bytes leaves the submitted transaction about
- * 50 bytes under Solana's 1232-byte limit. A larger budget lets `/build` choose multi-hop routes
- * whose task transaction exceeds the limit and cannot be submitted.
+ * bytes to the bare swap: the observed routes had bare swaps of 500 bytes and task transactions
+ * of 1155 bytes. The margin at 520 bytes is an estimate from those routes, and Jupiter marks
+ * `maxBytes` as experimental. A larger budget lets `/build` choose multi-hop routes whose task
+ * transaction exceeds Solana's 1232-byte limit and cannot be submitted.
  */
 export const DCA_SWAP_MAX_BYTES = 520;
 
