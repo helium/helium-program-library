@@ -23,9 +23,8 @@ const TRANSACTION_SIZE_LIMIT = 1232;
 const FUND_FEES_OVERHEAD_BYTES = 182;
 
 /**
- * Room for what the overhead measurement left out: a platform fee account that no lookup table
- * holds adds about 33 bytes, and Jupiter's own byte count may differ a little from the compiled
- * size.
+ * Room for what the overhead measurement left out: Jupiter's own byte count may differ a little
+ * from the compiled size.
  */
 const FUND_FEES_MARGIN_BYTES = 100;
 
@@ -46,10 +45,20 @@ export const FUND_FEES_MAX_ACCOUNTS = 20;
 const ERROR_BODY_MAX_CHARS = 300;
 
 /**
- * The compute unit limit the fee-funding transaction asks for when `/build` returns none (it
- * returns the unit price only). The priority fee the user repays is this limit times the price.
+ * Jupiter RFQ v2, a liquidity source Metis can route through. Its fills need a market maker's
+ * co-signature that this service does not collect, so every `/build` request excludes it and a
+ * built route through it is refused.
  */
-export const COMPUTE_UNIT_LIMIT = 1_400_000;
+export const RFQ_V2_LABEL = "JupiterRfqV2";
+
+/** Solana's largest compute unit limit for one transaction. */
+export const MAX_COMPUTE_UNIT_LIMIT = 1_400_000;
+
+/**
+ * The headroom over the simulated compute units: the route's pools can move between the
+ * simulation and the landed transaction.
+ */
+const COMPUTE_UNIT_MARGIN = 1.2;
 
 /** The lamports the user repays for the transaction's base fee, before the priority fee. */
 const BASE_FEE_LAMPORTS = 10000;
@@ -62,13 +71,11 @@ export interface BuildSwapRequest {
   inputMint: string;
   outputMint: string;
   amount: string;
+  /** Sent as `x-api-key`; without it Jupiter applies its keyless rate limit. */
+  apiKey?: string;
   /** The account that signs the swap and holds the input. */
   taker: string;
   slippageBps: number;
-  /** The platform fee in basis points; 0 or less sends no fee. */
-  platformFeeBps: number;
-  /** The token account the fee goes to; required when `platformFeeBps` is positive. */
-  feeAccount?: string;
   /** Bound the swap so it fits the fee-funding transaction; a price quote leaves this off. */
   fitFundFeesTransaction: boolean;
 }
@@ -81,15 +88,7 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
   url.searchParams.set("amount", request.amount);
   url.searchParams.set("taker", request.taker);
   url.searchParams.set("slippageBps", String(request.slippageBps));
-  if (request.platformFeeBps > 0) {
-    if (!request.feeAccount) {
-      throw new Error(
-        "JUPITER_FEE_BPS is set without JUPITER_FEE_ACCOUNT: /build needs a fee account for a platform fee"
-      );
-    }
-    url.searchParams.set("platformFeeBps", String(request.platformFeeBps));
-    url.searchParams.set("feeAccount", request.feeAccount);
-  }
+  url.searchParams.set("excludeDexes", RFQ_V2_LABEL);
   if (request.fitFundFeesTransaction) {
     url.searchParams.set("maxAccounts", String(FUND_FEES_MAX_ACCOUNTS));
     url.searchParams.set("maxBytes", String(FUND_FEES_MAX_BYTES));
@@ -105,7 +104,7 @@ export interface BuiltSwap {
   cleanupInstruction: TransactionInstruction | null;
   /** The lookup tables the route's accounts live in, by key. */
   lookupTables: string[];
-  /** What the swap pays out, net of the platform fee. */
+  /** What the swap pays out. */
   outAmount: string;
 }
 
@@ -183,12 +182,27 @@ const readInstructions = (
   return value.map((ix, i) => readInstruction(ix, `${field}[${i}]`));
 };
 
+/** The labels of the route's hops; a hop without a string label reads as "". */
+const routeLabels = (routePlan: unknown): string[] => {
+  if (!Array.isArray(routePlan)) {
+    throw invalid("routePlan");
+  }
+  return routePlan.map((hop) =>
+    isRecord(hop) &&
+    isRecord(hop.swapInfo) &&
+    typeof hop.swapInfo.label === "string"
+      ? hop.swapInfo.label
+      : ""
+  );
+};
+
 /**
  * Reads a `/build` answer into the instructions of the fee-funding transaction.
  *
- * Refuses an answer that is not a swap of the requested mints and amount, and one that carries
- * `otherInstructions`, which nothing here has characterised for a transaction the user signs.
- * `tipInstruction` is present only when `tipAmount` is sent, which this service never does.
+ * Refuses an answer that is not a swap of the requested mints and amount, a route through RFQ
+ * v2, and an answer that carries `otherInstructions`, which nothing here has characterised for
+ * a transaction the user signs. `tipInstruction` is present only when `tipAmount` is sent,
+ * which this service never does.
  */
 export function readBuildResponse(
   raw: unknown,
@@ -211,6 +225,12 @@ export function readBuildResponse(
   ) {
     throw new Error(
       `Jupiter built a swap of ${inAmount} ${inputMint} for ${outputMint}, not the requested ${expected.amount} ${expected.inputMint} for ${expected.outputMint}`
+    );
+  }
+
+  if (routeLabels(raw.routePlan).includes(RFQ_V2_LABEL)) {
+    throw new Error(
+      `Jupiter built a route through ${RFQ_V2_LABEL}, which needs a market maker's signature`
     );
   }
 
@@ -249,7 +269,9 @@ export async function buildJupiterSwap(
   request: BuildSwapRequest,
   fetchImpl: typeof fetch = fetch
 ): Promise<BuiltSwap> {
-  const response = await fetchImpl(buildSwapUrl(request).toString());
+  const response = await fetchImpl(buildSwapUrl(request).toString(), {
+    headers: request.apiKey ? { "x-api-key": request.apiKey } : {},
+  });
   if (!response.ok) {
     const body = (await response.text()).slice(0, ERROR_BODY_MAX_CHARS);
     throw new Error(
@@ -264,48 +286,55 @@ export async function buildJupiterSwap(
 }
 
 /**
+ * The compute unit limit for a transaction that used `unitsConsumed` in simulation: 20% over
+ * it, capped at Solana's largest limit.
+ */
+export function computeUnitLimit(unitsConsumed: number): number {
+  if (!Number.isSafeInteger(unitsConsumed) || unitsConsumed <= 0) {
+    throw new Error(
+      `The fee-funding transaction's simulation reported ${unitsConsumed} compute units`
+    );
+  }
+  return Math.min(
+    Math.ceil(unitsConsumed * COMPUTE_UNIT_MARGIN),
+    MAX_COMPUTE_UNIT_LIMIT
+  );
+}
+
+/**
  * The compute budget instructions the transaction carries, and the lamports the user repays for
  * its fees.
  *
- * `/build` returns the unit price without a limit, so a limit of `COMPUTE_UNIT_LIMIT` is added
- * unless the answer carries one. The fee is the base fee plus limit times price; a fee above
- * 0.01 SOL is refused.
+ * The price comes from `/build`'s compute budget instructions, and the limit from the caller;
+ * a limit in the `/build` answer is ignored. The fee is the base fee plus limit times price; a
+ * fee above 0.01 SOL is refused.
  */
-export function planComputeBudget(budget: TransactionInstruction[]): {
+export function planComputeBudget(
+  budget: TransactionInstruction[],
+  units: number
+): {
   instructions: TransactionInstruction[];
   fee: number;
 } {
-  let units: number | undefined;
   let price = 0;
   for (const instr of budget) {
-    switch (ComputeBudgetInstruction.decodeInstructionType(instr)) {
-      case "SetComputeUnitLimit":
-        units = ComputeBudgetInstruction.decodeSetComputeUnitLimit(instr).units;
-        break;
-      case "RequestUnits":
-        units = ComputeBudgetInstruction.decodeRequestUnits(instr).units;
-        break;
-      case "SetComputeUnitPrice":
-        price = Number(
-          ComputeBudgetInstruction.decodeSetComputeUnitPrice(instr)
-            .microLamports
-        );
-        break;
+    if (
+      ComputeBudgetInstruction.decodeInstructionType(instr) ===
+      "SetComputeUnitPrice"
+    ) {
+      price = Number(
+        ComputeBudgetInstruction.decodeSetComputeUnitPrice(instr).microLamports
+      );
     }
   }
 
-  const instructions =
-    units === undefined
-      ? [
-          ComputeBudgetProgram.setComputeUnitLimit({
-            units: COMPUTE_UNIT_LIMIT,
-          }),
-          ...budget,
-        ]
-      : budget;
-  const fee =
-    BASE_FEE_LAMPORTS +
-    Math.ceil(((units ?? COMPUTE_UNIT_LIMIT) * price) / 1000000);
+  const instructions = [
+    ComputeBudgetProgram.setComputeUnitLimit({ units }),
+    ...(price > 0
+      ? [ComputeBudgetProgram.setComputeUnitPrice({ microLamports: price })]
+      : []),
+  ];
+  const fee = BASE_FEE_LAMPORTS + Math.ceil((units * price) / 1000000);
   if (fee / LAMPORTS_PER_SOL > MAX_FEE_SOL) {
     throw new Error("Priority fees are too high right now, try again later");
   }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  ComputeBudgetInstruction,
   ComputeBudgetProgram,
   Keypair,
   TransactionInstruction,
@@ -8,11 +9,13 @@ import {
   buildJupiterSwap,
   BuildSwapRequest,
   buildSwapUrl,
-  COMPUTE_UNIT_LIMIT,
+  computeUnitLimit,
   FUND_FEES_MAX_ACCOUNTS,
   FUND_FEES_MAX_BYTES,
+  MAX_COMPUTE_UNIT_LIMIT,
   planComputeBudget,
   readBuildResponse,
+  RFQ_V2_LABEL,
 } from "../src/build";
 
 const key = () => Keypair.generate().publicKey.toBase58();
@@ -20,7 +23,6 @@ const key = () => Keypair.generate().publicKey.toBase58();
 const INPUT_MINT = key();
 const OUTPUT_MINT = key();
 const TAKER = key();
-const FEE_ACCOUNT = key();
 const SWAP_PROGRAM = key();
 const SETUP_PROGRAM = key();
 const CLEANUP_PROGRAM = key();
@@ -44,7 +46,6 @@ const REQUEST: BuildSwapRequest = {
   amount: "1000000",
   taker: TAKER,
   slippageBps: 100,
-  platformFeeBps: 0,
   fitFundFeesTransaction: true,
 };
 
@@ -91,6 +92,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         amount: "1000000",
         taker: TAKER,
         slippageBps: "100",
+        excludeDexes: RFQ_V2_LABEL,
         maxAccounts: String(FUND_FEES_MAX_ACCOUNTS),
         maxBytes: String(FUND_FEES_MAX_BYTES),
       });
@@ -102,27 +104,9 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       assert.equal(url.searchParams.has("maxBytes"), false);
     });
 
-    it("sends the platform fee and its account together", () => {
-      const url = buildSwapUrl({
-        ...REQUEST,
-        platformFeeBps: 50,
-        feeAccount: FEE_ACCOUNT,
-      });
-      assert.equal(url.searchParams.get("platformFeeBps"), "50");
-      assert.equal(url.searchParams.get("feeAccount"), FEE_ACCOUNT);
-    });
-
-    it("sends no fee when the fee is 0, even with a fee account", () => {
-      const url = buildSwapUrl({ ...REQUEST, feeAccount: FEE_ACCOUNT });
-      assert.equal(url.searchParams.has("platformFeeBps"), false);
-      assert.equal(url.searchParams.has("feeAccount"), false);
-    });
-
-    it("refuses a platform fee without a fee account", () => {
-      assert.throws(
-        () => buildSwapUrl({ ...REQUEST, platformFeeBps: 50 }),
-        /JUPITER_FEE_BPS is set without JUPITER_FEE_ACCOUNT/
-      );
+    it("excludes RFQ v2 from a price quote too", () => {
+      const url = buildSwapUrl({ ...REQUEST, fitFundFeesTransaction: false });
+      assert.equal(url.searchParams.get("excludeDexes"), RFQ_V2_LABEL);
     });
 
     it("budgets the bare swap so the fee-funding transaction fits 1232 bytes", () => {
@@ -208,6 +192,29 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       );
     });
 
+    it("refuses a route through RFQ v2", () => {
+      assert.throws(
+        () =>
+          readBuildResponse(
+            buildBody({
+              routePlan: [
+                { swapInfo: { label: "Whirlpool" } },
+                { swapInfo: { label: RFQ_V2_LABEL } },
+              ],
+            }),
+            EXPECTED
+          ),
+        /route through JupiterRfqV2/
+      );
+    });
+
+    it("refuses an answer without a route plan", () => {
+      assert.throws(
+        () => readBuildResponse(buildBody({ routePlan: undefined }), EXPECTED),
+        /Invalid Jupiter \/build response: routePlan/
+      );
+    });
+
     it("refuses otherInstructions", () => {
       assert.throws(
         () =>
@@ -283,14 +290,26 @@ describe("tokens-to-rent-service Jupiter /build", () => {
 
   describe("buildJupiterSwap", () => {
     it("requests the built URL and reads the answer", async () => {
-      const calls: string[] = [];
-      const fetchImpl = (async (url: string) => {
-        calls.push(url);
+      const calls: [string, RequestInit | undefined][] = [];
+      const fetchImpl = (async (url: string, init?: RequestInit) => {
+        calls.push([url, init]);
         return new Response(JSON.stringify(buildBody()), { status: 200 });
       }) as typeof fetch;
       const built = await buildJupiterSwap(REQUEST, fetchImpl);
-      assert.deepEqual(calls, [buildSwapUrl(REQUEST).toString()]);
+      assert.deepEqual(calls, [
+        [buildSwapUrl(REQUEST).toString(), { headers: {} }],
+      ]);
       assert.equal(built.outAmount, "20015000");
+    });
+
+    it("sends the API key as x-api-key", async () => {
+      const headers: unknown[] = [];
+      const fetchImpl = (async (_url: string, init?: RequestInit) => {
+        headers.push(init?.headers);
+        return new Response(JSON.stringify(buildBody()), { status: 200 });
+      }) as typeof fetch;
+      await buildJupiterSwap({ ...REQUEST, apiKey: "secret" }, fetchImpl);
+      assert.deepEqual(headers, [{ "x-api-key": "secret" }]);
     });
 
     it("refuses an answer for other mints than the request", async () => {
@@ -336,61 +355,85 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     });
   });
 
+  describe("computeUnitLimit", () => {
+    it("asks for 20% over the simulated units, rounded up", () => {
+      assert.equal(computeUnitLimit(100_000), 120_000);
+      assert.equal(computeUnitLimit(100_001), 120_002);
+    });
+
+    it("caps the limit at 1,400,000", () => {
+      assert.equal(computeUnitLimit(1_200_000), MAX_COMPUTE_UNIT_LIMIT);
+    });
+
+    it("refuses a simulation that reports no units", () => {
+      for (const units of [0, -1, 1.5, Number.NaN]) {
+        assert.throws(() => computeUnitLimit(units), /compute units/);
+      }
+    });
+  });
+
   describe("planComputeBudget", () => {
-    it("adds the default unit limit when /build returns only a price", () => {
-      const { instructions, fee } = planComputeBudget([PRICE_IX]);
-      assert.equal(instructions.length, 2);
-      assert.deepEqual(
-        [...instructions[0].data],
-        [
-          ...ComputeBudgetProgram.setComputeUnitLimit({
-            units: COMPUTE_UNIT_LIMIT,
-          }).data,
-        ]
+    const limitOf = (ix: TransactionInstruction) =>
+      ComputeBudgetInstruction.decodeSetComputeUnitLimit(ix).units;
+    const priceOf = (ix: TransactionInstruction) =>
+      Number(
+        ComputeBudgetInstruction.decodeSetComputeUnitPrice(ix).microLamports
       );
-      assert.equal(instructions[1], PRICE_IX);
-      // 10000 base + 1_400_000 units * 2000 micro-lamports
-      assert.equal(fee, 10000 + 2800);
+
+    it("asks for the given limit at /build's price and charges for both", () => {
+      const { instructions, fee } = planComputeBudget([PRICE_IX], 150_000);
+      assert.equal(instructions.length, 2);
+      assert.equal(limitOf(instructions[0]), 150_000);
+      assert.equal(priceOf(instructions[1]), 2000);
+      // 10000 base + 150_000 units * 2000 micro-lamports
+      assert.equal(fee, 10000 + 300);
     });
 
-    it("keeps a limit that /build returns and charges for it", () => {
-      const { instructions, fee } = planComputeBudget([LIMIT_IX, PRICE_IX]);
-      assert.deepEqual(instructions, [LIMIT_IX, PRICE_IX]);
-      assert.equal(fee, 10000 + 600);
+    it("ignores a limit in the /build answer", () => {
+      const { instructions, fee } = planComputeBudget(
+        [LIMIT_IX, PRICE_IX],
+        150_000
+      );
+      assert.equal(limitOf(instructions[0]), 150_000);
+      assert.equal(fee, 10000 + 300);
     });
 
-    it("charges only the base fee when /build returns no price", () => {
-      const { instructions, fee } = planComputeBudget([]);
+    it("sets no price and charges only the base fee when /build returns no price", () => {
+      const { instructions, fee } = planComputeBudget([], 150_000);
       assert.equal(instructions.length, 1);
+      assert.equal(limitOf(instructions[0]), 150_000);
       assert.equal(fee, 10000);
     });
 
     it("rounds the priority fee up to a lamport", () => {
-      const { fee } = planComputeBudget([
-        ComputeBudgetProgram.setComputeUnitLimit({ units: 1 }),
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
-      ]);
+      const { fee } = planComputeBudget(
+        [ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 })],
+        1
+      );
       assert.equal(fee, 10001);
     });
 
     it("refuses a fee above 0.01 SOL and accepts one of exactly 0.01 SOL", () => {
-      const limit = ComputeBudgetProgram.setComputeUnitLimit({
-        units: 1_000_000,
-      });
       // 10000 base + 1_000_000 units * 9_990_000 micro-lamports = 10_000_000 lamports
-      const { fee } = planComputeBudget([
-        limit,
-        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 9_990_000 }),
-      ]);
+      const { fee } = planComputeBudget(
+        [
+          ComputeBudgetProgram.setComputeUnitPrice({
+            microLamports: 9_990_000,
+          }),
+        ],
+        1_000_000
+      );
       assert.equal(fee, 10_000_000);
       assert.throws(
         () =>
-          planComputeBudget([
-            limit,
-            ComputeBudgetProgram.setComputeUnitPrice({
-              microLamports: 9_990_001,
-            }),
-          ]),
+          planComputeBudget(
+            [
+              ComputeBudgetProgram.setComputeUnitPrice({
+                microLamports: 9_990_001,
+              }),
+            ],
+            1_000_000
+          ),
         /Priority fees are too high/
       );
     });
