@@ -12,7 +12,7 @@ export const GetQuoteInputSchema = z
     amount: z.string().min(1),
     swapMode: z.enum(["ExactIn", "ExactOut"]).default("ExactIn"),
     slippageBps: z.coerce.number().min(0).max(10000).default(50),
-    // Absent leaves Jupiter's default (V1) in place.
+    // Absent leaves Jupiter's default in place.
     instructionVersion: z
       .enum(["V1", "V2"])
       .optional()
