@@ -197,7 +197,12 @@ describe("swap endpoints' optional Jupiter parameters", () => {
   };
 
   /** The error code a getInstructions call rejects with. */
-  const rejectionCode = async (input: Record<string, unknown>) => {
+  const rejectionCode = async (
+    input: {
+      quoteResponse: Awaited<ReturnType<typeof quote>>;
+      userPublicKey: string;
+    }
+  ) => {
     try {
       await call(getInstructions, input);
     } catch (error) {
