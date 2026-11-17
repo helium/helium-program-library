@@ -1,6 +1,7 @@
 import { createServer, Server } from "http";
 import { AddressInfo } from "net";
-import { call } from "@orpc/server";
+import { call, ORPCError } from "@orpc/server";
+import { VersionedTransaction } from "@solana/web3.js";
 import { expect } from "chai";
 import { after, afterEach, before, describe, it } from "mocha";
 
@@ -17,14 +18,24 @@ const WALLET = "GZairnxHiWXk73YhsEtkGU2XnfGw3QcUsjJr8VW2R172";
 const HNT_MINT = "hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrdu1oxWux";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const SYSTEM_PROGRAM = "11111111111111111111111111111111";
+const MEMO_PROGRAM = "MemoSq4gqABAXKb96qnH8TuhgWdtsRHB4ShcXcV3Ftu";
+const LOOKUP_TABLE = "CuEETU2svDekhZ2mAdASYARmmyQkeQBN23MP9QzWZUvV";
+/** An account only reachable through LOOKUP_TABLE in the built transaction. */
+const ROUTE_ACCOUNT = "8BKagzPLX7WSJMhExppgvp9yQSfa2m1BTxrEAMpBDrk7";
 
 /** One request the handlers sent to the stubbed Jupiter API. */
 interface JupiterCall {
   url: URL;
+  method: string;
+  apiKey: string | null;
   body?: Record<string, unknown>;
 }
 
 let jupiterCalls: JupiterCall[] = [];
+/** Fields each case lays over the stubbed `/build` answer. */
+let buildOverrides: Record<string, unknown> = {};
+/** Every RPC method the handlers called, in order. */
+let rpcMethods: string[] = [];
 const realFetch = globalThis.fetch;
 let rpc: Server;
 
@@ -63,6 +74,7 @@ function startStubRpc(): Promise<string> {
       req.on("data", (chunk) => (body += chunk));
       req.on("end", () => {
         const answer = ({ id, method }: { id: unknown; method: string }) => {
+          rpcMethods.push(method);
           const result = rpcResult(method);
           return result === undefined
             ? {
@@ -101,11 +113,16 @@ const stubFetch: typeof fetch = async (input, init) => {
       ? input.toString()
       : input.url
   );
-  if (!url.pathname.startsWith("/swap/v1/")) {
+  if (!/^\/swap\/v[12]\//.test(url.pathname)) {
     return realFetch(input, init);
   }
   const body = init?.body ? JSON.parse(init.body as string) : undefined;
-  jupiterCalls.push({ url, body });
+  jupiterCalls.push({
+    url,
+    method: init?.method ?? "GET",
+    apiKey: new Headers(init?.headers).get("x-api-key"),
+    body,
+  });
 
   if (url.pathname === "/swap/v1/quote") {
     return jsonResponse({
@@ -115,15 +132,33 @@ const stubFetch: typeof fetch = async (input, init) => {
       outAmount: "1",
       otherAmountThreshold: "1",
       swapMode: "ExactIn",
-      slippageBps: 50,
+      slippageBps: Number(url.searchParams.get("slippageBps")),
       priceImpactPct: "0",
       routePlan: [],
     });
   }
-  return jsonResponse({
-    swapInstruction: { programId: SYSTEM_PROGRAM, accounts: [], data: "" },
-    addressLookupTableAddresses: [],
-  });
+  if (url.pathname === "/swap/v2/build") {
+    return jsonResponse({
+      inputMint: url.searchParams.get("inputMint"),
+      inAmount: url.searchParams.get("amount"),
+      outputMint: url.searchParams.get("outputMint"),
+      outAmount: "777",
+      otherAmountThreshold: "773",
+      swapMode: "ExactIn",
+      slippageBps: Number(url.searchParams.get("slippageBps")),
+      priceImpactPct: "0",
+      routePlan: [],
+      computeBudgetInstructions: [],
+      setupInstructions: [],
+      swapInstruction: { programId: SYSTEM_PROGRAM, accounts: [], data: "" },
+      cleanupInstruction: null,
+      otherInstructions: [],
+      tipInstruction: null,
+      addressesByLookupTableAddress: {},
+      ...buildOverrides,
+    });
+  }
+  return new Response("unstubbed Jupiter path", { status: 404 });
 };
 
 describe("swap endpoints' optional Jupiter parameters", () => {
@@ -144,18 +179,32 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       ...extra,
     });
 
+  /** Build a swap from a fresh ExactIn quote; returns the `/build` calls and the result. */
   const swapInstructions = async (extra: Record<string, unknown> = {}) => {
     const quoteResponse = await quote();
     jupiterCalls = [];
-    await call(getInstructions, {
+    rpcMethods = [];
+    const result = await call(getInstructions, {
       quoteResponse,
       userPublicKey: WALLET,
       dynamicComputeUnitLimit: true,
       ...extra,
     });
-    return jupiterCalls.filter(
-      (c) => c.url.pathname === "/swap/v1/swap-instructions"
+    const calls = jupiterCalls.filter(
+      (c) => c.url.pathname === "/swap/v2/build"
     );
+    return { quoteResponse, calls, result };
+  };
+
+  /** The error code a getInstructions call rejects with. */
+  const rejectionCode = async (input: Record<string, unknown>) => {
+    try {
+      await call(getInstructions, input);
+    } catch (error) {
+      expect(error).to.be.instanceOf(ORPCError);
+      return (error as ORPCError<string, unknown>).code;
+    }
+    expect.fail("getInstructions resolved");
   };
 
   before(async () => {
@@ -186,6 +235,8 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
   afterEach(() => {
     jupiterCalls = [];
+    buildOverrides = {};
+    rpcMethods = [];
   });
 
   describe("quote excludeDexes", () => {
@@ -241,57 +292,154 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     });
   });
 
-  describe("swap instructions useSharedAccounts", () => {
-    it("forwards useSharedAccounts: true to Jupiter", async () => {
-      const calls = await swapInstructions({ useSharedAccounts: true });
+  describe("swap instructions through /build", () => {
+    it("GETs /swap/v2/build with the quote's mints, amount and slippage and the user as taker", async () => {
+      const { quoteResponse, calls } = await swapInstructions();
 
+      expect(jupiterCalls).to.have.length(1);
       expect(calls).to.have.length(1);
-      expect(calls[0].body).to.have.property("useSharedAccounts", true);
-    });
-
-    it("forwards useSharedAccounts: false to Jupiter", async () => {
-      const calls = await swapInstructions({ useSharedAccounts: false });
-
-      expect(calls).to.have.length(1);
-      expect(calls[0].body).to.have.property("useSharedAccounts", false);
-    });
-
-    it("leaves the useSharedAccounts key out when the caller sets none", async () => {
-      const calls = await swapInstructions();
-
-      expect(calls).to.have.length(1);
-      expect(calls[0].body).to.not.have.property("useSharedAccounts");
-      expect(calls[0].body).to.have.property("userPublicKey", WALLET);
-    });
-  });
-
-  describe("swap instructions quoteResponse", () => {
-    it("hands Jupiter the quote as received, instructionVersion and unknown keys included", async () => {
-      const quoteResponse = {
+      expect(calls[0].method).to.eq("GET");
+      expect(calls[0].apiKey).to.eq("test");
+      expect(calls[0].body).to.eq(undefined);
+      const params = Object.fromEntries(calls[0].url.searchParams);
+      expect(params).to.deep.eq({
         inputMint: HNT_MINT,
-        inAmount: freshAmount(),
         outputMint: USDC_MINT,
-        outAmount: "1",
-        otherAmountThreshold: "1",
-        swapMode: "ExactIn",
-        slippageBps: 50,
-        priceImpactPct: "0",
-        routePlan: [],
-        instructionVersion: "V2",
-        someUnknownKey: { nested: true },
-      };
-      await call(getInstructions, {
-        quoteResponse,
-        userPublicKey: WALLET,
-        dynamicComputeUnitLimit: true,
+        amount: quoteResponse.inAmount,
+        taker: WALLET,
+        slippageBps: "50",
+      });
+    });
+
+    it("takes slippageBps from the quote", async () => {
+      const quoteResponse = await quote({ slippageBps: 125 });
+      jupiterCalls = [];
+      await call(getInstructions, { quoteResponse, userPublicKey: WALLET });
+
+      expect(jupiterCalls).to.have.length(1);
+      expect(jupiterCalls[0].url.searchParams.get("slippageBps")).to.eq("125");
+    });
+
+    it("forwards excludeDexes to /build", async () => {
+      const { calls } = await swapInstructions({ excludeDexes: "Raydium CP" });
+
+      expect(calls).to.have.length(1);
+      expect(calls[0].url.searchParams.get("excludeDexes")).to.eq("Raydium CP");
+    });
+
+    it("leaves an empty excludeDexes out", async () => {
+      const { calls } = await swapInstructions({ excludeDexes: "" });
+
+      expect(calls).to.have.length(1);
+      expect(calls[0].url.searchParams.has("excludeDexes")).to.eq(false);
+    });
+
+    for (const useSharedAccounts of [true, false]) {
+      it(`does not forward useSharedAccounts: ${useSharedAccounts}`, async () => {
+        const { calls } = await swapInstructions({ useSharedAccounts });
+
+        expect(calls).to.have.length(1);
+        expect(calls[0].url.searchParams.has("useSharedAccounts")).to.eq(false);
+      });
+    }
+
+    it("forwards destinationTokenAccount and names it in the metadata", async () => {
+      const destination = ROUTE_ACCOUNT;
+      const { calls, result } = await swapInstructions({
+        destinationTokenAccount: destination,
       });
 
-      const calls = jupiterCalls.filter(
-        (c) => c.url.pathname === "/swap/v1/swap-instructions"
-      );
       expect(calls).to.have.length(1);
-      expect(calls[0].body).to.have.property("quoteResponse");
-      expect(calls[0].body!.quoteResponse).to.deep.eq(quoteResponse);
+      expect(calls[0].url.searchParams.get("destinationTokenAccount")).to.eq(
+        destination
+      );
+      expect(result.transactions[0].metadata?.description).to.match(
+        new RegExp(` to ${destination}$`)
+      );
+    });
+
+    it("refuses an ExactOut quote without calling Jupiter", async () => {
+      const quoteResponse = { ...(await quote()), swapMode: "ExactOut" };
+      jupiterCalls = [];
+
+      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+
+      expect(code).to.eq("BAD_REQUEST");
+      expect(jupiterCalls).to.have.length(0);
+    });
+
+    it("refuses a /build answer for a different amount than the quote", async () => {
+      const quoteResponse = await quote();
+      buildOverrides = { inAmount: "1" };
+
+      const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+
+      expect(code).to.eq("JUPITER_ERROR");
+    });
+
+    it("compiles against the lookup tables /build resolved, reading none from the RPC", async () => {
+      buildOverrides = {
+        swapInstruction: {
+          programId: MEMO_PROGRAM,
+          accounts: [
+            { pubkey: WALLET, isSigner: true, isWritable: true },
+            { pubkey: ROUTE_ACCOUNT, isSigner: false, isWritable: true },
+          ],
+          data: "",
+        },
+        addressesByLookupTableAddress: { [LOOKUP_TABLE]: [ROUTE_ACCOUNT] },
+      };
+      const { result } = await swapInstructions();
+
+      const tx = VersionedTransaction.deserialize(
+        Buffer.from(result.transactions[0].serializedTransaction, "base64")
+      );
+      const lookups = tx.message.addressTableLookups;
+      expect(lookups).to.have.length(1);
+      expect(lookups[0].accountKey.toBase58()).to.eq(LOOKUP_TABLE);
+      expect(lookups[0].writableIndexes).to.deep.eq([0]);
+      expect(
+        tx.message.staticAccountKeys.map((k) => k.toBase58())
+      ).to.not.include(ROUTE_ACCOUNT);
+      expect(rpcMethods).to.not.include("getMultipleAccounts");
+      expect(rpcMethods).to.not.include("getAccountInfo");
+    });
+
+    it("puts otherInstructions in the transaction and leaves Jupiter's compute budget out", async () => {
+      buildOverrides = {
+        computeBudgetInstructions: [
+          { programId: SYSTEM_PROGRAM, accounts: [], data: "AQ==" },
+        ],
+        otherInstructions: [
+          { programId: MEMO_PROGRAM, accounts: [], data: "" },
+        ],
+      };
+      const { result } = await swapInstructions();
+
+      const tx = VersionedTransaction.deserialize(
+        Buffer.from(result.transactions[0].serializedTransaction, "base64")
+      );
+      const programs = tx.message.compiledInstructions.map((ix) =>
+        tx.message.staticAccountKeys[ix.programIdIndex].toBase58()
+      );
+      expect(programs.filter((p) => p === MEMO_PROGRAM)).to.have.length(1);
+      expect(programs.filter((p) => p === SYSTEM_PROGRAM)).to.have.length(1);
+    });
+
+    it("describes the output /build returned, not the earlier quote's", async () => {
+      const { quoteResponse, result } = await swapInstructions();
+
+      expect(quoteResponse.outAmount).to.eq("1");
+      const metadata = result.transactions[0].metadata!;
+      expect(metadata.outputAmount).to.eq("777");
+      expect(metadata.inputAmount).to.eq(quoteResponse.inAmount);
+      expect(metadata.description).to.eq(
+        `Swap ${quoteResponse.inAmount} ${HNT_MINT} for 777 ${USDC_MINT}`
+      );
+      const action = result.actionMetadata as {
+        outputTokenAmount: { amount: string };
+      };
+      expect(action.outputTokenAmount.amount).to.eq("777");
     });
   });
 });
