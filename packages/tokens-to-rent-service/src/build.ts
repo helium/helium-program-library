@@ -434,16 +434,32 @@ export function computeUnitLimit(unitsConsumed: number): number {
 }
 
 /**
- * The compute budget instructions the transaction carries.
+ * The compute budget instructions the transaction carries, from a simulation of it at the
+ * largest limit. A failed simulation is refused.
  *
- * The limit comes from the caller. `/build`'s unit price is dropped, so the transaction pays
- * the base fee only, which `repayLamports` covers.
+ * `/build`'s unit price is dropped, so the transaction pays the base fee only, which
+ * `repayLamports` covers.
  */
-export function planComputeBudget(units: number): {
+export function planComputeBudget(simulation: {
+  err: unknown;
+  logs?: string[] | null;
+  unitsConsumed?: number;
+}): {
   instructions: TransactionInstruction[];
 } {
+  if (simulation.err) {
+    throw new Error(
+      `The fee-funding transaction fails in simulation: ${JSON.stringify(
+        simulation.err
+      )}: ${(simulation.logs ?? []).slice(-5).join(" | ")}`
+    );
+  }
   return {
-    instructions: [ComputeBudgetProgram.setComputeUnitLimit({ units })],
+    instructions: [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: computeUnitLimit(simulation.unitsConsumed ?? 0),
+      }),
+    ],
   };
 }
 
@@ -464,6 +480,8 @@ export type FundFeesSwap = BuiltSwap;
  * Builds the swap the user signs for the fee-funding transaction: the bounded `/build` request
  * for the user, refused when its setup creates a token account besides the user's wrapped SOL
  * account (the rent loan covers that one), or when it quotes less SOL than `minOutLamports`.
+ * The platform wallet is refused as the user before the request, and an answer with an
+ * instruction that names the platform wallet is refused.
  * The compute budget is planned after a simulation of
  * the assembled transaction, so it is not part of this result.
  */
@@ -471,10 +489,21 @@ export async function buildFundFeesSwap(
   params: Parameters<typeof fundFeesRequest>[0] & {
     /** The least SOL the swap may pay out, in lamports. */
     minOutLamports: number;
+    /** The fee payer that lends the rent. */
+    platformWallet: string;
   },
   fetchImpl: typeof fetch = fetch
 ): Promise<FundFeesSwap> {
+  refusePlatformUser(params.userWallet, params.platformWallet);
   const built = await buildJupiterSwap(fundFeesRequest(params), fetchImpl);
+  refusePlatformKey(
+    [
+      ...built.setupInstructions,
+      built.swapInstruction,
+      ...(built.cleanupInstruction ? [built.cleanupInstruction] : []),
+    ],
+    params.platformWallet
+  );
   refuseExtraAccountCreations(built.setupInstructions, params.userWallet);
   if (Number(built.outAmount) < params.minOutLamports) {
     throw new Error("Jupiter quoted less SOL than the fee estimate");

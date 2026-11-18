@@ -589,6 +589,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
     );
     const USER = Keypair.generate().publicKey;
+    const PLATFORM_WALLET = Keypair.generate().publicKey;
     const ataOf = (mint: string) =>
       PublicKey.findProgramAddressSync(
         [
@@ -617,6 +618,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       userWallet: USER.toBase58(),
       apiKey: "secret",
       minOutLamports: 19_014_250,
+      platformWallet: PLATFORM_WALLET.toBase58(),
     };
     const answer = (overrides: Record<string, unknown> = {}) =>
       buildBody({
@@ -679,6 +681,41 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       );
     });
 
+    it("refuses the platform wallet as the user before it calls Jupiter", async () => {
+      const calls: string[] = [];
+      await assert.rejects(
+        buildFundFeesSwap(
+          { ...PARAMS, userWallet: PLATFORM_WALLET.toBase58() },
+          serving(answer(), calls)
+        ),
+        /The platform wallet cannot fund its own fees/
+      );
+      assert.equal(calls.length, 0);
+    });
+
+    it("refuses an answer with an instruction that names the platform wallet", async () => {
+      const named = {
+        ...instruction(SWAP_PROGRAM, "u2T6zA=="),
+        accounts: [
+          {
+            pubkey: PLATFORM_WALLET.toBase58(),
+            isSigner: false,
+            isWritable: false,
+          },
+        ],
+      };
+      for (const overrides of [
+        { swapInstruction: named },
+        { cleanupInstruction: named },
+        { setupInstructions: [createData(WSOL), named] },
+      ]) {
+        await assert.rejects(
+          buildFundFeesSwap(PARAMS, serving(answer(overrides))),
+          /needs the platform wallet's signature/
+        );
+      }
+    });
+
     it("accepts an answer that pays out the minimum SOL", async () => {
       const built = await buildFundFeesSwap(
         PARAMS,
@@ -713,11 +750,36 @@ describe("tokens-to-rent-service Jupiter /build", () => {
   });
 
   describe("planComputeBudget", () => {
-    it("sets the given limit and no unit price", () => {
-      const { instructions } = planComputeBudget(57_444);
+    it("sets the limit from the simulated units and no unit price", () => {
+      const { instructions } = planComputeBudget({
+        err: null,
+        logs: [],
+        unitsConsumed: 47_870,
+      });
       assert.deepEqual(instructions, [
         ComputeBudgetProgram.setComputeUnitLimit({ units: 57_444 }),
       ]);
+    });
+
+    it("refuses a failed simulation with its error and last logs", () => {
+      assert.throws(
+        () =>
+          planComputeBudget({
+            err: { InstructionError: [3, { Custom: 1 }] },
+            logs: ["a", "b", "c", "d", "e", "f"],
+            unitsConsumed: 47_870,
+          }),
+        (e: Error) =>
+          e.message ===
+          'The fee-funding transaction fails in simulation: {"InstructionError":[3,{"Custom":1}]}: b | c | d | e | f'
+      );
+    });
+
+    it("refuses a simulation that reports no units", () => {
+      assert.throws(
+        () => planComputeBudget({ err: null, logs: [] }),
+        /compute units/
+      );
     });
   });
 });

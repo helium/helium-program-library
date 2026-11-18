@@ -15,11 +15,8 @@ import {
   MIN_FUND_FEES_OUT_LAMPORTS,
   buildFundFeesSwap,
   buildJupiterSwap,
-  computeUnitLimit,
   estimateRequest,
   planComputeBudget,
-  refusePlatformKey,
-  refusePlatformUser,
   repayLamports,
 } from "./build";
 import { JUPITER_API_KEY, JUPITER_API_URL } from "./env";
@@ -101,7 +98,6 @@ export const fundFees = async ({
 
   const connection = provider.connection;
   const platformWallet = provider.wallet;
-  refusePlatformUser(userWallet, platformWallet.publicKey);
   const inputAmount = await estimate({ mint });
 
   // Tx contains instructions to create/close WSOL token account
@@ -118,15 +114,8 @@ export const fundFees = async ({
     inputAmount,
     userWallet: userWallet.toBase58(),
     minOutLamports: MIN_FUND_FEES_OUT_LAMPORTS,
+    platformWallet: platformWallet.publicKey.toBase58(),
   });
-  refusePlatformKey(
-    [
-      ...setupInstructions,
-      swapInstruction,
-      ...(cleanupInstruction ? [cleanupInstruction] : []),
-    ],
-    platformWallet.publicKey
-  );
 
   // create rent flash loan instructions
   const ataRent =
@@ -178,15 +167,8 @@ export const fundFees = async ({
     ),
     { sigVerify: false, replaceRecentBlockhash: true }
   );
-  if (simulation.value.err) {
-    throw new Error(
-      `The fee-funding transaction fails in simulation: ${JSON.stringify(
-        simulation.value.err
-      )}: ${(simulation.value.logs ?? []).slice(-5).join(" | ")}`
-    );
-  }
   const { instructions: budgetInstructions } = planComputeBudget(
-    computeUnitLimit(simulation.value.unitsConsumed ?? 0)
+    simulation.value
   );
 
   const blockhash = (await connection.getLatestBlockhash()).blockhash;
