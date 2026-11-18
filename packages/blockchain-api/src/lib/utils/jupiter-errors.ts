@@ -17,22 +17,41 @@ const CLIENT_ERROR_MESSAGES: Record<string, string> = {
 };
 
 /**
+ * Jupiter error texts, from the `error` field of a body that carries no
+ * `errorCode`, that describe the caller's request. Swap V2 `/build` answers a
+ * pair it cannot route with a bare `{"error":"No routes found"}`.
+ */
+const CLIENT_ERROR_TEXTS: Record<string, string> = {
+  "No routes found": "No route found for this swap",
+};
+
+/**
  * Read Jupiter's own `errorCode` field. Only the parsed field counts: a body
  * that merely mentions a code — an echo of the request, a proxy's error page —
  * is not Jupiter classifying the request.
  */
-const parseErrorCode = (body: string): string | undefined => {
+const parseErrorField = (
+  body: string,
+  field: "errorCode" | "error"
+): string | undefined => {
   try {
     const parsed: unknown = JSON.parse(body);
     if (typeof parsed === "object" && parsed !== null) {
-      const code = (parsed as { errorCode?: unknown }).errorCode;
-      return typeof code === "string" ? code : undefined;
+      const value = (parsed as Record<string, unknown>)[field];
+      return typeof value === "string" ? value : undefined;
     }
   } catch {
     return undefined;
   }
   return undefined;
 };
+
+/** The client message `table` holds for `key`, never one off its prototype. */
+const lookup = (
+  table: Record<string, string>,
+  key: string | undefined
+): string | undefined =>
+  key !== undefined && Object.hasOwn(table, key) ? table[key] : undefined;
 
 /**
  * Classify a non-ok Jupiter response body.
@@ -56,11 +75,11 @@ export const classifyJupiterError = ({
     return { kind: "RATE_LIMITED" };
   }
 
-  const errorCode = parseErrorCode(body);
   const clientMessage =
-    errorCode !== undefined && Object.hasOwn(CLIENT_ERROR_MESSAGES, errorCode)
-      ? CLIENT_ERROR_MESSAGES[errorCode]
-      : undefined;
+    lookup(CLIENT_ERROR_MESSAGES, parseErrorField(body, "errorCode")) ??
+    (status === 400
+      ? lookup(CLIENT_ERROR_TEXTS, parseErrorField(body, "error"))
+      : undefined);
   if (clientMessage !== undefined) {
     return { kind: "BAD_REQUEST", message: clientMessage };
   }
