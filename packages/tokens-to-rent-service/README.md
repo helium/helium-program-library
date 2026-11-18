@@ -16,11 +16,11 @@ This is used for the wallet-app feature where we let users top up to 0.02 SOL us
 
 Jupiter has no SOL to IOT route, so IOT is priced from its sale. The service builds the IOT to SOL swap of a 43,000 IOT probe, scales the amount to 0.020015 SOL, and builds the scaled amount to verify it. It refuses a verify that pays out more than 105% or less than 95% of 0.020015 SOL. A verify between 95% and 100% is scaled once more from the verify. An IOT `/fees` request makes up to three `/build` calls. No IOT route fits both bounds, so the IOT swap is bounded by `maxAccounts` only. Every `/fees` transaction over 1232 bytes is refused before its simulation.
 
-`/fees` signs one transaction for a wallet at a time. For 60 seconds after a wallet's request, a request for the same token returns the same signed transaction, and a request for another token is refused with HTTP 429. A failed build releases the wallet. Each instance of the service keeps this record in its own memory, so the rule holds for each instance.
+`/fees` signs one transaction for a wallet and token at a time. While the build is in flight, and for 90 seconds after it resolves, a request for the same wallet and token returns the same signed transaction. A request for another token builds its own transaction. A failed build releases the wallet and token. Each instance of the service keeps this record in its own memory, so the rule holds for each instance.
 
 The service keeps each token's estimate for 15 seconds. `/estimate`, `/estimates` and `/fees` share it, and concurrent requests share one Jupiter call. A failed estimate is not kept.
 
-A failed request answers `{ "error": "<message>" }`. The status is 400 when the request is wrong (a missing or invalid `wallet` or `mint`, a mint the service does not swap, or the platform wallet as the user), 429 for the refusal above, 502 when the service refuses Jupiter's answer, and 500 for any other failure. The service removes the RPC URL and the Jupiter API key from the message and from its logs.
+A failed request answers `{ "error": "<message>" }`. The status is 400 when the request is wrong (a missing or invalid `wallet` or `mint`, a mint the service does not swap, or the platform wallet as the user), 502 when the service refuses Jupiter's answer or Jupiter does not answer in 15 seconds, and 500 for any other failure. The service removes the RPC URL and the Jupiter API key from the message and from its logs.
 
 ## Deployments
 

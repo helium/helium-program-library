@@ -1,10 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  estimateCache,
-  expiringMap,
-  fundFeesStore,
-  OtherMintPendingError,
-} from "../src/reuse";
+import { estimateCache, expiringMap, fundFeesStore } from "../src/reuse";
 
 /** A clock the test moves by hand. */
 const clock = () => {
@@ -62,7 +57,7 @@ describe("fundFeesStore", () => {
     const { build, count } = building();
 
     const first = await signOnce({ wallet: WALLET, mint: HNT }, build);
-    advance(59_999);
+    advance(89_999);
     const second = await signOnce({ wallet: WALLET, mint: HNT }, build);
 
     assert.deepEqual([...first], [1]);
@@ -70,35 +65,78 @@ describe("fundFeesStore", () => {
     assert.equal(count(), 1);
   });
 
-  it("builds again 60 seconds after the wallet's first request", async () => {
+  it("holds the transaction for 90 seconds from when its build resolves", async () => {
     const { now, advance } = clock();
     const signOnce = fundFeesStore(now);
-    const { build, count } = building();
+    const signing = deferred<Uint8Array>();
+    let builds = 0;
+    const build = () => {
+      builds += 1;
+      return builds === 1
+        ? signing.promise
+        : Promise.resolve(Uint8Array.from([2]));
+    };
 
-    await signOnce({ wallet: WALLET, mint: HNT }, build);
-    advance(60_000);
-    const second = await signOnce({ wallet: WALLET, mint: HNT }, build);
+    const first = signOnce({ wallet: WALLET, mint: HNT }, build);
+    advance(5_000);
+    signing.resolve(Uint8Array.from([1]));
+    assert.deepEqual([...(await first)], [1]);
 
-    assert.deepEqual([...second], [2]);
-    assert.equal(count(), 2);
+    advance(55_000);
+    const atRequestPlus60 = await signOnce(
+      { wallet: WALLET, mint: HNT },
+      build
+    );
+    advance(34_999);
+    const atResolvePlus89999 = await signOnce(
+      { wallet: WALLET, mint: HNT },
+      build
+    );
+    advance(1);
+    const atResolvePlus90 = await signOnce(
+      { wallet: WALLET, mint: HNT },
+      build
+    );
+
+    assert.deepEqual([...atRequestPlus60], [1]);
+    assert.deepEqual([...atResolvePlus89999], [1]);
+    assert.deepEqual([...atResolvePlus90], [2]);
+    assert.equal(builds, 2);
   });
 
-  it("refuses another mint while the wallet's transaction is held", async () => {
+  it("holds a build in flight past the hold time, through a sweep", async () => {
     const { now, advance } = clock();
     const signOnce = fundFeesStore(now);
+    const signing = deferred<Uint8Array>();
+    let builds = 0;
+    const build = () => {
+      builds += 1;
+      return signing.promise;
+    };
+
+    const first = signOnce({ wallet: WALLET, mint: HNT }, build);
+    advance(200_000);
+    await signOnce({ wallet: "other", mint: HNT }, async () =>
+      Uint8Array.from([9])
+    );
+    const second = signOnce({ wallet: WALLET, mint: HNT }, build);
+    signing.resolve(Uint8Array.from([7]));
+
+    assert.deepEqual([...(await first)], [7]);
+    assert.deepEqual([...(await second)], [7]);
+    assert.equal(builds, 1);
+  });
+
+  it("builds and returns a transaction for each mint of a wallet", async () => {
+    const signOnce = fundFeesStore(clock().now);
     const { build, count } = building();
 
-    await signOnce({ wallet: WALLET, mint: HNT }, build);
-    advance(59_999);
-    await assert.rejects(
-      signOnce({ wallet: WALLET, mint: IOT }, build),
-      OtherMintPendingError
-    );
-    assert.equal(count(), 1);
+    const hnt = await signOnce({ wallet: WALLET, mint: HNT }, build);
+    const iot = await signOnce({ wallet: WALLET, mint: IOT }, build);
 
-    advance(1);
-    const later = await signOnce({ wallet: WALLET, mint: IOT }, build);
-    assert.deepEqual([...later], [2]);
+    assert.deepEqual([...hnt], [1]);
+    assert.deepEqual([...iot], [2]);
+    assert.equal(count(), 2);
   });
 
   it("holds each wallet apart", async () => {
@@ -106,12 +144,12 @@ describe("fundFeesStore", () => {
     const { build } = building();
 
     await signOnce({ wallet: WALLET, mint: HNT }, build);
-    const other = await signOnce({ wallet: "other", mint: IOT }, build);
+    const other = await signOnce({ wallet: "other", mint: HNT }, build);
 
     assert.deepEqual([...other], [2]);
   });
 
-  it("shares one build between concurrent requests for a wallet", async () => {
+  it("shares one build between concurrent requests for a wallet and mint", async () => {
     const signOnce = fundFeesStore(clock().now);
     const signing = deferred<Uint8Array>();
     let builds = 0;
@@ -122,16 +160,14 @@ describe("fundFeesStore", () => {
 
     const first = signOnce({ wallet: WALLET, mint: HNT }, build);
     const second = signOnce({ wallet: WALLET, mint: HNT }, build);
-    const otherMint = signOnce({ wallet: WALLET, mint: IOT }, build);
     signing.resolve(Uint8Array.from([7]));
 
     assert.deepEqual([...(await first)], [7]);
     assert.deepEqual([...(await second)], [7]);
-    await assert.rejects(otherMint, OtherMintPendingError);
     assert.equal(builds, 1);
   });
 
-  it("releases the wallet when its build fails", async () => {
+  it("releases the wallet and mint when its build fails", async () => {
     const signOnce = fundFeesStore(clock().now);
     const { build } = building();
 
@@ -141,26 +177,9 @@ describe("fundFeesStore", () => {
       }),
       /no route/
     );
-    const next = await signOnce({ wallet: WALLET, mint: IOT }, build);
+    const next = await signOnce({ wallet: WALLET, mint: HNT }, build);
 
     assert.deepEqual([...next], [1]);
-  });
-
-  it("keeps the wallet's newer build when an expired one fails", async () => {
-    const { now, advance } = clock();
-    const signOnce = fundFeesStore(now);
-    const slow = deferred<Uint8Array>();
-    const { build, count } = building();
-
-    const expired = signOnce({ wallet: WALLET, mint: HNT }, () => slow.promise);
-    advance(60_000);
-    await signOnce({ wallet: WALLET, mint: HNT }, build);
-    slow.reject(new Error("timed out"));
-    await assert.rejects(expired, /timed out/);
-    const held = await signOnce({ wallet: WALLET, mint: HNT }, build);
-
-    assert.deepEqual([...held], [1]);
-    assert.equal(count(), 1);
   });
 });
 

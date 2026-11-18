@@ -13,7 +13,12 @@ const sendFailure = (res: FastifyReply, err: unknown): void => {
   res.code(status).send(body);
 };
 
-/** Reads the body field `field` as a public key, or refuses the request. */
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
+
+/**
+ * Reads the body field `field` as a public key, or refuses the request. The refusal does not
+ * repeat the value.
+ */
 const readPublicKey = (body: unknown, field: string): PublicKey => {
   const value =
     typeof body === "object" && body !== null
@@ -22,10 +27,15 @@ const readPublicKey = (body: unknown, field: string): PublicKey => {
   if (typeof value !== "string") {
     throw new RequestError(`Missing ${field}`);
   }
+  // A public key is 32 to 44 base58 characters. The bound comes before the decode, which is slow
+  // for a long string.
+  if (value.length < 32 || value.length > 44 || !BASE58.test(value)) {
+    throw new RequestError(`Invalid ${field}`);
+  }
   try {
     return new PublicKey(value);
   } catch {
-    throw new RequestError(`Invalid ${field}: ${value}`);
+    throw new RequestError(`Invalid ${field}`);
   }
 };
 

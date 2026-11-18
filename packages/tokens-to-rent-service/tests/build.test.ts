@@ -350,13 +350,11 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     it("requests the built URL and reads the answer", async () => {
       const calls: unknown[] = [];
       const fetchImpl = (async (url: string, init?: RequestInit) => {
-        calls.push([url, init]);
+        calls.push([url, init?.headers, init?.signal instanceof AbortSignal]);
         return new Response(JSON.stringify(buildBody()), { status: 200 });
       }) as typeof fetch;
       const built = await buildJupiterSwap(REQUEST, fetchImpl);
-      assert.deepEqual(calls, [
-        [buildSwapUrl(REQUEST).toString(), { headers: {} }],
-      ]);
+      assert.deepEqual(calls, [[buildSwapUrl(REQUEST).toString(), {}, true]]);
       assert.equal(built.outAmount, "20015000");
     });
 
@@ -392,6 +390,57 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         refusedUpstream(
           /Jupiter \/build error: 400 Bad Request: No routes found$/
         )
+      );
+    });
+
+    it("refuses an instruction whose programId is not a public key", async () => {
+      const fetchImpl = (async () =>
+        new Response(
+          JSON.stringify(
+            buildBody({ swapInstruction: instruction("not-a-key") })
+          ),
+          { status: 200 }
+        )) as typeof fetch;
+      await assert.rejects(
+        buildJupiterSwap(REQUEST, fetchImpl),
+        refusedUpstream(
+          /Invalid Jupiter \/build response: swapInstruction\.programId/
+        )
+      );
+    });
+
+    it("refuses a 200 answer whose body is not JSON", async () => {
+      const fetchImpl = (async () =>
+        new Response("<html>", { status: 200 })) as typeof fetch;
+      await assert.rejects(
+        buildJupiterSwap(REQUEST, fetchImpl),
+        refusedUpstream(/^Jupiter \/build returned a body that is not JSON$/)
+      );
+    });
+
+    it("refuses a call that times out", async () => {
+      const fetchImpl = (async () => {
+        throw new DOMException("The operation timed out.", "TimeoutError");
+      }) as typeof fetch;
+      await assert.rejects(
+        buildJupiterSwap(REQUEST, fetchImpl),
+        refusedUpstream(/^Jupiter \/build timed out after 15000 ms$/)
+      );
+    });
+
+    it("refuses a failed request whose body times out", async () => {
+      const fetchImpl = (async () =>
+        ({
+          ok: false,
+          status: 500,
+          statusText: "Server Error",
+          text: async () => {
+            throw new DOMException("The operation timed out.", "TimeoutError");
+          },
+        }) as unknown as Response) as typeof fetch;
+      await assert.rejects(
+        buildJupiterSwap(REQUEST, fetchImpl),
+        refusedUpstream(/^Jupiter \/build timed out after 15000 ms$/)
       );
     });
 

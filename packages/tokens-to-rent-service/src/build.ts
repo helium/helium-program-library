@@ -59,6 +59,9 @@ export type RouteBound = "quote" | "fundFees" | "fundFeesAccountsOnly";
 /** How much of a failed `/build` answer's body goes into the error. */
 const ERROR_BODY_MAX_CHARS = 300;
 
+/** How long a Jupiter `/build` call may take, in milliseconds, before it is refused. */
+export const JUPITER_TIMEOUT_MS = 15_000;
+
 /**
  * Jupiter RFQ v2. Its fills need a market maker's co-signature that this service does not
  * collect. `/build` refuses RFQ v2 unless an undocumented `enableRfqV2` parameter is sent, which
@@ -206,6 +209,15 @@ const isRecord = (value: unknown): value is Json =>
 const invalid = (field: string): UpstreamError =>
   new UpstreamError(`Invalid Jupiter /build response: ${field}`);
 
+/** Reads a public key from Jupiter's answer; a key that does not parse is refused. */
+const readKey = (value: string, field: string): PublicKey => {
+  try {
+    return new PublicKey(value);
+  } catch {
+    throw invalid(field);
+  }
+};
+
 const readString = (body: Json, field: string): string => {
   const value = body[field];
   if (typeof value !== "string") {
@@ -244,13 +256,13 @@ const readInstruction = (
       throw invalid(`${field}.accounts`);
     }
     return {
-      pubkey: new PublicKey(account.pubkey),
+      pubkey: readKey(account.pubkey, `${field}.accounts`),
       isSigner: account.isSigner,
       isWritable: account.isWritable,
     };
   });
   return new TransactionInstruction({
-    programId: new PublicKey(value.programId),
+    programId: readKey(value.programId, `${field}.programId`),
     keys,
     data: Buffer.from(value.data, "base64"),
   });
@@ -346,27 +358,57 @@ export function readBuildResponse(
         ? null
         : readInstruction(raw.cleanupInstruction, "cleanupInstruction"),
     lookupTables: Object.keys(tables ?? {}).map((key) =>
-      new PublicKey(key).toBase58()
+      readKey(key, "addressesByLookupTableAddress").toBase58()
     ),
     outAmount: readAmount(raw, "outAmount"),
   };
 }
 
-/** Builds a swap through `/build` and reads the answer. */
+/** True for the error of an aborted or timed-out fetch. */
+const timedOut = (err: unknown): boolean =>
+  err instanceof Error &&
+  (err.name === "TimeoutError" || err.name === "AbortError");
+
+const jupiterTimeout = (): UpstreamError =>
+  new UpstreamError(`Jupiter /build timed out after ${JUPITER_TIMEOUT_MS} ms`);
+
+/**
+ * Builds a swap through `/build` and reads the answer. A call that takes more than
+ * `JUPITER_TIMEOUT_MS` is refused.
+ */
 export async function buildJupiterSwap(
   request: BuildSwapRequest,
   fetchImpl: typeof fetch = fetch
 ): Promise<BuiltSwap> {
-  const response = await fetchImpl(buildSwapUrl(request).toString(), {
-    headers: request.apiKey ? { "x-api-key": request.apiKey } : {},
-  });
+  let response: Response;
+  try {
+    response = await fetchImpl(buildSwapUrl(request).toString(), {
+      headers: request.apiKey ? { "x-api-key": request.apiKey } : {},
+      signal: AbortSignal.timeout(JUPITER_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw timedOut(err) ? jupiterTimeout() : err;
+  }
   if (!response.ok) {
-    const body = (await response.text()).slice(0, ERROR_BODY_MAX_CHARS);
+    let body: string;
+    try {
+      body = (await response.text()).slice(0, ERROR_BODY_MAX_CHARS);
+    } catch (err) {
+      throw timedOut(err) ? jupiterTimeout() : err;
+    }
     throw new UpstreamError(
       `Jupiter /build error: ${response.status} ${response.statusText}: ${body}`
     );
   }
-  return readBuildResponse(await response.json(), {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (err) {
+    throw timedOut(err)
+      ? jupiterTimeout()
+      : new UpstreamError("Jupiter /build returned a body that is not JSON");
+  }
+  return readBuildResponse(body, {
     inputMint: request.inputMint,
     outputMint: request.outputMint,
     amount: request.amount,

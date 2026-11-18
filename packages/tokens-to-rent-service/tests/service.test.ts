@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import { HNT_MINT, IOT_MINT } from "@helium/spl-utils";
-import { OtherMintPendingError } from "../src/reuse";
 import { createService } from "../src/service";
 
 const USER = Keypair.generate().publicKey;
@@ -100,16 +99,18 @@ describe("createService", () => {
     assert.deepEqual([...second], [1]);
   });
 
-  it("refuses a request of the wallet for another mint", async () => {
+  it("builds for a wallet's request for another mint", async () => {
     const service = fakeService();
 
-    await service.fundFees({ userWallet: USER, mint: HNT_MINT });
+    const hnt = await service.fundFees({ userWallet: USER, mint: HNT_MINT });
+    const iot = await service.fundFees({ userWallet: USER, mint: IOT_MINT });
 
-    await assert.rejects(
-      service.fundFees({ userWallet: USER, mint: IOT_MINT }),
-      OtherMintPendingError
+    assert.deepEqual([...hnt], [1]);
+    assert.deepEqual([...iot], [2]);
+    assert.deepEqual(
+      service.built.map(({ mint }) => mint),
+      [HNT_MINT.toBase58(), IOT_MINT.toBase58()]
     );
-    assert.equal(service.built.length, 1);
   });
 
   it("builds again after a failed build", async () => {

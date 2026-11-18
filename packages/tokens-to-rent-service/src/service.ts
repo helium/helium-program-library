@@ -9,7 +9,8 @@ import { Clock, estimateCache, fundFeesStore } from "./reuse";
 
 /**
  * The service's estimate and fee-funding transaction. Each mint's estimate is kept for 15 seconds,
- * and a wallet's signed transaction is held for 60 seconds, see `./reuse`.
+ * and the signed transaction for a wallet and mint is held while it builds and for 90 seconds
+ * after, see `./reuse`.
  */
 export const createService = (deps: {
   estimateSwapInput: typeof estimateSwapInput;

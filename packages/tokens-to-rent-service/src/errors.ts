@@ -1,5 +1,4 @@
 import { inspect } from "node:util";
-import { OtherMintPendingError } from "./reuse";
 
 const REDACTED = "[redacted]";
 
@@ -20,10 +19,7 @@ export class UpstreamError extends Error {
 }
 
 /** The HTTP status for a failed request. */
-const failureStatus = (err: unknown): 400 | 429 | 500 | 502 => {
-  if (err instanceof OtherMintPendingError) {
-    return 429;
-  }
+const failureStatus = (err: unknown): 400 | 500 | 502 => {
   if (err instanceof RequestError) {
     return 400;
   }
@@ -66,8 +62,7 @@ export const redact = (
 
 /**
  * The answer and the log text for a failed request, both redacted. The status is 400 when the
- * request is wrong, 429 when the wallet holds a transaction for another mint, 502 when Jupiter's
- * answer was refused, and 500 for any other failure.
+ * request is wrong, 502 when Jupiter's answer was refused, and 500 for any other failure.
  */
 export const failure = (
   err: unknown,

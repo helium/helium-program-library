@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import { UpstreamError } from "../src/errors";
-import { OtherMintPendingError } from "../src/reuse";
 import { buildServer } from "../src/server";
 
 const RPC_URL = "https://rpc.example.com/v1/abc123";
@@ -142,6 +141,44 @@ describe("buildServer", () => {
       assert.match(res.json().error, /wallet/);
     });
 
+    it("answers 400 fast for a 100,000-character wallet, without repeating it", async () => {
+      const wallet = "2".repeat(100_000);
+      const logged: unknown[] = [];
+      const consoleError = console.error;
+      console.error = (...args: unknown[]) => {
+        logged.push(...args);
+      };
+      const started = Date.now();
+      let res;
+      try {
+        res = await serve().inject({
+          method: "POST",
+          url: "/fees",
+          payload: { wallet, mint: HNT },
+        });
+      } finally {
+        console.error = consoleError;
+      }
+      const elapsed = Date.now() - started;
+
+      assert.equal(res.statusCode, 400);
+      assert.ok(elapsed < 200, `took ${elapsed} ms`);
+      assert.deepEqual(res.json(), { error: "Invalid wallet" });
+      assert.equal(res.body.includes(wallet), false);
+      assert.equal(logged.join(" ").includes(wallet), false);
+    });
+
+    it("answers 400 for a 45-character wallet", async () => {
+      const res = await serve().inject({
+        method: "POST",
+        url: "/fees",
+        payload: { wallet: "1".repeat(45), mint: HNT },
+      });
+
+      assert.equal(res.statusCode, 400);
+      assert.deepEqual(res.json(), { error: "Invalid wallet" });
+    });
+
     it("answers 400 for a mint the service does not swap, before it builds", async () => {
       let builds = 0;
       const res = await serve({
@@ -161,21 +198,6 @@ describe("buildServer", () => {
       assert.equal(res.statusCode, 400);
       assert.match(res.json().error, /Provided mint not supported by service/);
       assert.equal(builds, 0);
-    });
-
-    it("answers 429 when the wallet holds a transaction for another mint", async () => {
-      const res = await serve({
-        fundFees: async () => {
-          throw new OtherMintPendingError();
-        },
-      }).inject({
-        method: "POST",
-        url: "/fees",
-        payload: { wallet: WALLET, mint: HNT },
-      });
-
-      assert.equal(res.statusCode, 429);
-      assert.match(res.json().error, /pending fee-funding transaction/);
     });
 
     it("answers 500 with the redacted error for any other failure", async () => {
