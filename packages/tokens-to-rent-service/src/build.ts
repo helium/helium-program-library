@@ -45,9 +45,9 @@ export const FUND_FEES_MAX_ACCOUNTS = 20;
  * How `/build` bounds the route.
  * - `quote`: unbounded, for a price whose instructions are discarded.
  * - `fundFees`: `maxAccounts` and `maxBytes`, to fit the fee-funding transaction.
- * - `fundFeesAccountsOnly`: `maxAccounts` only. On 2026-11-18 each bound alone gave IOT to SOL a
- *   route and the two together gave none, so IOT relies on `refuseOversizedTransaction`. The
- *   measured IOT transaction was 836 bytes.
+ * - `fundFeesAccountsOnly`: `maxAccounts` only. IOT to SOL gets no route with both bounds, so IOT
+ *   uses `maxAccounts` only. `refuseOversizedTransaction` guards the byte limit before the
+ *   simulation.
  */
 export type RouteBound = "quote" | "fundFees" | "fundFeesAccountsOnly";
 
@@ -526,14 +526,20 @@ export const MIN_FUND_FEES_OUT_LAMPORTS = (ESTIMATE_LAMPORTS * 95) / 100;
 export const MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS =
   (ESTIMATE_LAMPORTS * 105) / 100;
 
-/** The IOT that `estimateBySale` probes with: about 0.02 SOL of IOT on 2026-11-18. */
+/**
+ * The IOT that `estimateBySale` probes with: 43,000 IOT × 10^6 base units = 43e9. Any amount worth
+ * roughly 0.02 SOL works as a probe, because the verify checks the scaled amount.
+ */
 export const IOT_PRICE_PROBE_AMOUNT = "43000000000";
+
+const ZERO = BigInt(0);
+const ONE = BigInt(1);
 
 const mulDivCeil = (
   amount: bigint,
   numerator: bigint,
   denominator: bigint
-): bigint => (amount * numerator + denominator - 1n) / denominator;
+): bigint => (amount * numerator + denominator - ONE) / denominator;
 
 /**
  * The `mint` that sells for `ESTIMATE_LAMPORTS` of SOL, priced from `mint` to SOL builds. It is
@@ -541,12 +547,12 @@ const mulDivCeil = (
  * price comes from the route `/fees` builds.
  *
  * It builds the sale of `probeAmount`, scales that amount to `ESTIMATE_LAMPORTS` (rounded up), and
- * builds the sale of the scaled amount to verify it. A verify that pays out less than
- * `ESTIMATE_LAMPORTS` is scaled once more from the verify, unchecked; `/fees` still refuses a
- * build under 95% of it. A verify that pays out more than 105% of `ESTIMATE_LAMPORTS` is refused,
- * because the probe's price is then not the verify's.
+ * builds the sale of the scaled amount to verify it. A verify that pays out more than 105% or less
+ * than 95% of `ESTIMATE_LAMPORTS` is refused, because the probe's price is then not the verify's.
+ * A verify in [95%, 100%) is scaled once more from the verify, so the second scale adds at most
+ * about 5.3% to the amount.
  */
-export async function estimateBySale(
+export const estimateBySale = async (
   params: {
     apiUrl: string;
     apiKey?: string;
@@ -555,7 +561,7 @@ export async function estimateBySale(
     platformWallet: string;
   },
   fetchImpl: typeof fetch = fetch
-): Promise<string> {
+): Promise<string> => {
   const sell = (inputAmount: bigint) =>
     buildJupiterSwap(
       fundFeesRequest({
@@ -570,7 +576,7 @@ export async function estimateBySale(
   const target = BigInt(ESTIMATE_LAMPORTS);
   const scaleToTarget = (inputAmount: bigint, outAmount: string): bigint => {
     const out = BigInt(outAmount);
-    if (out === 0n) {
+    if (out === ZERO) {
       throw new Error("Jupiter priced the sale at 0 SOL");
     }
     return mulDivCeil(inputAmount, target, out);
@@ -586,10 +592,15 @@ export async function estimateBySale(
       `Jupiter priced ${amount} at ${verifyOut} lamports, over 105% of the ${target} its probe priced it at`
     );
   }
+  if (verifyOut < BigInt(MIN_FUND_FEES_OUT_LAMPORTS)) {
+    throw new Error(
+      `Jupiter priced ${amount} at ${verifyOut} lamports, under 95% of the ${target} its probe priced it at`
+    );
+  }
   return (
     verifyOut < target ? scaleToTarget(amount, verify.outAmount) : amount
   ).toString();
-}
+};
 
 /** What the fee-funding transaction is assembled from. */
 export type FundFeesSwap = BuiltSwap;
@@ -597,7 +608,8 @@ export type FundFeesSwap = BuiltSwap;
 /**
  * Builds the swap the user signs for the fee-funding transaction: the bounded `/build` request
  * for the user, refused when its setup creates a token account besides the user's wrapped SOL
- * account (the rent loan covers that one), or when it quotes less SOL than `minOutLamports`.
+ * account (the rent loan covers that one), or when it quotes less SOL than `minOutLamports` or
+ * more than `maxOutLamports`.
  * The platform wallet is refused as the user before the request, and an answer with an
  * instruction that names the platform wallet is refused.
  * The compute budget is planned after a simulation of
@@ -607,6 +619,8 @@ export async function buildFundFeesSwap(
   params: Parameters<typeof fundFeesRequest>[0] & {
     /** The least SOL the swap may pay out, in lamports. */
     minOutLamports: number;
+    /** The most SOL the swap may pay out, in lamports. */
+    maxOutLamports: number;
     /** The fee payer that lends the rent. */
     platformWallet: string;
   },
@@ -625,6 +639,9 @@ export async function buildFundFeesSwap(
   refuseExtraAccountCreations(built.setupInstructions, params.userWallet);
   if (Number(built.outAmount) < params.minOutLamports) {
     throw new Error("Jupiter quoted less SOL than the fee estimate");
+  }
+  if (Number(built.outAmount) > params.maxOutLamports) {
+    throw new Error("Jupiter quoted more SOL than the fee estimate allows");
   }
   return built;
 }

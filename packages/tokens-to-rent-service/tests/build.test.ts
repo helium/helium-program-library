@@ -141,6 +141,13 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       assert.equal(url.searchParams.has("platformFeeBps"), false);
       assert.equal(url.searchParams.has("feeAccount"), false);
     });
+
+    it("refuses an unknown route bound", () => {
+      assert.throws(
+        () => buildSwapUrl({ ...REQUEST, routeBound: "bogus" as never }),
+        /Unknown route bound/
+      );
+    });
   });
 
   describe("readBuildResponse", () => {
@@ -453,7 +460,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
 
   describe("refuseOversizedTransaction", () => {
     const PAYER = Keypair.generate().publicKey;
-    const transactionNaming = (accounts: number) =>
+    const transactionNaming = (accounts: number, dataBytes = 0) =>
       new VersionedTransaction(
         new TransactionMessage({
           payerKey: PAYER,
@@ -466,21 +473,23 @@ describe("tokens-to-rent-service Jupiter /build", () => {
                 isSigner: false,
                 isWritable: true,
               })),
-              data: Buffer.alloc(0),
+              data: Buffer.alloc(dataBytes),
             }),
           ],
         }).compileToV0Message()
       );
 
-    it("accepts a transaction within 1232 bytes", () => {
-      // 32 unique accounts serialize to 1227 bytes.
-      refuseOversizedTransaction(transactionNaming(32));
+    it("accepts a transaction of exactly 1232 bytes", () => {
+      const transaction = transactionNaming(32, 5);
+      assert.equal(transaction.serialize().length, 1232);
+      refuseOversizedTransaction(transaction);
     });
 
-    it("refuses a transaction just over 1232 bytes", () => {
-      // 33 unique accounts serialize to 1260 bytes.
+    it("refuses a transaction of 1233 bytes", () => {
+      const transaction = transactionNaming(32, 6);
+      assert.equal(transaction.serialize().length, 1233);
       assert.throws(
-        () => refuseOversizedTransaction(transactionNaming(33)),
+        () => refuseOversizedTransaction(transaction),
         /over Solana's 1232-byte limit/
       );
     });
@@ -489,6 +498,19 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       assert.throws(
         () => refuseOversizedTransaction(transactionNaming(80)),
         /over Solana's 1232-byte limit/
+      );
+    });
+
+    it("rethrows a serialize error that is not a RangeError", () => {
+      const failing = {
+        serialize: () => {
+          throw new TypeError("not a size error");
+        },
+      } as unknown as VersionedTransaction;
+      assert.throws(
+        () => refuseOversizedTransaction(failing),
+        (e: unknown) =>
+          e instanceof TypeError && e.message === "not a size error"
       );
     });
   });
@@ -581,6 +603,29 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         ),
         /over 105%/
       );
+    });
+
+    it("refuses a verify that pays out less than 95% of 0.020015 SOL", async () => {
+      // The verify pays out 10,007,500, 50% of 20,015,000.
+      await assert.rejects(
+        estimateBySale(
+          { ...PARAMS, probeAmount: "200" },
+          selling((amount) => (amount === 200n ? 100n : 10_007_500n), [])
+        ),
+        /under 95%/
+      );
+    });
+
+    it("scales once more from a verify at 96% of 0.020015 SOL", async () => {
+      const amounts: string[] = [];
+      // The verify pays out 19,214,400, 96% of 20,015,000.
+      const estimate = await estimateBySale(
+        { ...PARAMS, probeAmount: "200" },
+        selling((amount) => (amount === 200n ? 100n : 19_214_400n), amounts)
+      );
+      assert.deepEqual(amounts, ["200", "40030000"]);
+      // 40,030,000 * 20,015,000 / 19,214,400 = 41,697,916.67, rounded up.
+      assert.equal(estimate, "41697917");
     });
 
     it("accepts a verify at exactly 105% of 0.020015 SOL", async () => {
@@ -796,6 +841,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       userWallet: USER.toBase58(),
       apiKey: "secret",
       minOutLamports: 19_014_250,
+      maxOutLamports: 21_015_750,
       platformWallet: PLATFORM_WALLET.toBase58(),
     };
     const answer = (overrides: Record<string, unknown> = {}) =>
@@ -906,6 +952,21 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       await assert.rejects(
         buildFundFeesSwap(PARAMS, serving(answer({ outAmount: "19014249" }))),
         /Jupiter quoted less SOL than the fee estimate/
+      );
+    });
+
+    it("accepts an answer that pays out the maximum SOL", async () => {
+      const built = await buildFundFeesSwap(
+        PARAMS,
+        serving(answer({ outAmount: "21015750" }))
+      );
+      assert.equal(built.outAmount, "21015750");
+    });
+
+    it("refuses an answer that pays out more than the maximum SOL", async () => {
+      await assert.rejects(
+        buildFundFeesSwap(PARAMS, serving(answer({ outAmount: "21015751" }))),
+        /Jupiter quoted more SOL than the fee estimate allows/
       );
     });
   });

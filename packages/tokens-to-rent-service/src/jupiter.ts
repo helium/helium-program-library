@@ -12,6 +12,7 @@ import {
 import {
   ESTIMATE_LAMPORTS,
   MAX_COMPUTE_UNIT_LIMIT,
+  MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS,
   MIN_FUND_FEES_OUT_LAMPORTS,
   IOT_PRICE_PROBE_AMOUNT,
   buildFundFeesSwap,
@@ -128,6 +129,7 @@ export const fundFees = async ({
     inputAmount,
     userWallet: userWallet.toBase58(),
     minOutLamports: MIN_FUND_FEES_OUT_LAMPORTS,
+    maxOutLamports: MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS,
     platformWallet: platformWallet.publicKey.toBase58(),
   });
 
