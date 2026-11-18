@@ -37,10 +37,10 @@ import { queueAuthorityKey } from "../packages/mini-fanout-sdk/src";
 import { MiniFanout } from "../target/types/mini_fanout";
 import {
   ensureCloned,
-  ensureDumped,
   overwriteAccountData,
   readAccount,
   startBankrun,
+  usePinnedProgram,
   warpTo,
 } from "./utils/bankrun";
 
@@ -153,7 +153,7 @@ describe("mini-fanout under bankrun", () => {
   }
 
   before(async () => {
-    ensureDumped("tuktuk", TUKTUK);
+    usePinnedProgram("tuktuk");
     ctx = await startBankrun(
       [
         { name: "mini_fanout", programId: MINI_FANOUT },
