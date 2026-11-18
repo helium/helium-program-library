@@ -115,6 +115,40 @@ jobs:
           cache: false
           setup-anchor: false
 
+      # SIMD-0500 makes the loader refuse a v0-v2 upgrade. Once its gate is active, a non-v3 build
+      # would fail at the Squads execute, after the buffer is paid for, so it fails here. A v3 build
+      # passes with no RPC read. For any other build the gate is read over RPC, because a CLI
+      # release can predate the feature id. A failed or malformed RPC reply fails the step. A
+      # feature account's first byte is 1 once it is activated. `e_flags` sits at offset 0x30 of
+      # an ELF64 header.
+      - name: Check the build against the SIMD-0500 gate
+        run: |
+          set -euo pipefail
+          E_FLAGS=$(od -An -tu4 -j 48 -N 4 "target/deploy/${PROGRAM_NAME}.so" | tr -d ' ')
+          if [ "$E_FLAGS" = "3" ]; then
+            echo "${PROGRAM_NAME}.so e_flags: 3 (SBPFv3)"
+            exit 0
+          fi
+          GATE=B8JJXCy5amZyWG9r7EnUYLwzXSXTxG7GZ1qZ1qggo83g
+          REPLY=$(curl -sS --fail --retry 3 --retry-all-errors --max-time 30 \
+            https://solana-rpc.web.helium.io -H 'Content-Type: application/json' \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getAccountInfo\",\"params\":[\"${GATE}\",{\"encoding\":\"base64\"}]}")
+          if ! echo "$REPLY" | jq -e 'has("result")' >/dev/null; then
+            echo "::error::could not read the SIMD-0500 gate: ${REPLY}"
+            exit 1
+          fi
+          # A null value means the gate account is not allocated, so the gate is inactive.
+          DATA=$(echo "$REPLY" | jq -r '.result.value.data[0] // ""')
+          ACTIVE=false
+          if [ -n "$DATA" ] && [ "$(echo "$DATA" | base64 -d | head -c 1 | od -An -tu1 | tr -d ' ')" = "1" ]; then
+            ACTIVE=true
+          fi
+          echo "SIMD-0500 active on mainnet: ${ACTIVE}; ${PROGRAM_NAME}.so e_flags: ${E_FLAGS}"
+          if [ "$ACTIVE" = "true" ] && [ "$E_FLAGS" != "3" ]; then
+            echo "::error::SIMD-0500 is active and ${PROGRAM_NAME}.so is not SBPFv3 (e_flags ${E_FLAGS})"
+            exit 1
+          fi
+
       # The release hash. Compare it with `solana-verify get-program-hash` to verify a deploy.
       # `artifact-sha256` covers the two files the build artifact stores, taken before `plan-deploy`.
       - name: Take the release hash

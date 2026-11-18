@@ -55,7 +55,8 @@ runs:
         fi
         ARGS=()
         if [ "$DEVNET" = "true" ]; then ARGS+=(-- --features devnet); fi
-        ~/.cargo/bin/solana-verify build --library-name "$PROGRAM" "${ARGS[@]}"
+        # SBPFv3, as in build-anchor. The 0.5.2 default is v0.
+        ~/.cargo/bin/solana-verify build --arch v3 --library-name "$PROGRAM" "${ARGS[@]}"
       shell: bash
       env:
         DEVNET: ${{ inputs.devnet }}
