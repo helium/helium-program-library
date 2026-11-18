@@ -6,8 +6,8 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.25",
-  "description": "Jupiter Lite API DCA swap service for Helium",
+  "version": "0.12.0",
+  "description": "Jupiter Swap V2 DCA swap service for Helium",
   "repository": {
     "type": "git",
     "url": "https://github.com/helium/helium-program-library"
@@ -28,6 +28,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "build": "tsc -p tsconfig.build.json",
+    "test": "ts-mocha -p ../../tsconfig.test.json -t 10000 'tests/**/*.test.ts'",
     "start": "node lib/esm/index.js",
     "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts"
   },
@@ -39,7 +40,6 @@
     "@helium/tuktuk-dca-sdk": "workspace:^",
     "@helium/tuktuk-idls": "^0.1.1",
     "@helium/tuktuk-sdk": "^0.1.1",
-    "@jup-ag/core": "^4.0.0-beta.18",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
     "dotenv": "^16.0.3",

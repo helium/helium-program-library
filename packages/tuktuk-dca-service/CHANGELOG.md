@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.12.0
+
+### Minor Changes
+
+- [#1394](https://github.com/helium/helium-program-library/pull/1394) [`08fe42c`](https://github.com/helium/helium-program-library/commit/08fe42ca2c47070e74ffc1e9d686ae8c4da89f36) Thanks [@madninja](https://github.com/madninja)! - The DCA service builds each order's swap through Jupiter's Swap V2 `GET /swap/v2/build` instead of `/swap/v1/quote` and `POST /swap/v1/swap-instructions`. The swap payer PDA is the taker, and `maxBytes` of 520 replaces `onlyDirectRoutes`, which `/build` does not take: it aims to keep the bare swap small enough that the crank turner's task transaction, which carries the swap again inside the signed remote task, stays under 1232 bytes. A `/build` answer that fails validation, swaps other mints or another amount than the order, routes through Jupiter RFQ v2 (which every request excludes), or carries `otherInstructions` is refused. A build whose setup holds a System Program instruction, or creates an associated token account that does not exist yet, is refused, because the swap payer PDA would pay for it. Jupiter's compute budget instructions are left out of the task, and the lookup tables are returned by key. The package gains a `test` script for its unit tests. `JUPITER_API_URL` now defaults to `https://api.jup.ag` instead of `https://lite-api.jup.ag`, the service warns at start when `JUPITER_API_KEY` is not set, and the unused `@jup-ag/core` dependency is removed.
+
 ## 0.11.25
 
 ### Patch Changes

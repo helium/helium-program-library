@@ -337,30 +337,28 @@ describe("governance", () => {
       walletAddress = ctx.payer.publicKey.toBase58();
     });
 
-    it("closes a constant lockup position", async () => {
-      // #given position with constant lockup (bypasses time-based expiration)
+    it("returns BAD_REQUEST when closing a constant lockup position", async () => {
+      // #given position with constant lockup, which never expires
       const result = await createAndFundPosition(ctx, {
         amount: "100000000", // 1 HNT
         lockupKind: "constant",
         lockupPeriodsInDays: 30,
       });
 
-      // Flip to cliff so it can be closed (constant positions need flipLockupKind first)
-      // Actually, per close.ts:65-67, constant lockup skips the expiration check entirely
       // #when closing the position
-      const { data, error } = await ctx.safeClient.governance.closePosition({
+      const { error } = await ctx.safeClient.governance.closePosition({
         walletAddress,
         positionMint: result.positionMint,
       });
 
-      // #then transaction builds with correct metadata
-      if (error) {
-        expect.fail(`Unexpected error: ${JSON.stringify(error)}`);
+      // #then returns BAD_REQUEST: it must flip to cliff and decay first
+      if (!isDefinedError(error)) {
+        expect.fail(
+          `Expected defined ORPCError - but got: ${JSON.stringify(error)}`
+        );
       }
-      expect(data?.transactionData?.transactions).to.have.length(1);
-      expect(data?.transactionData?.transactions[0].metadata?.type).to.equal(
-        "position_close"
-      );
+      expect(error.code).to.equal("BAD_REQUEST");
+      expect(error.message).to.include("lockup has not expired");
     });
   });
 

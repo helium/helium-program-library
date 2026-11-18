@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import { PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
+import { settleEstimates } from "./estimates";
 import * as jup from "./jupiter";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 
@@ -47,16 +48,22 @@ server.post<{
 });
 
 server.get<{}>("/estimates", async (req, res) => {
-  try {
-    res.send({
-      [HNT_MINT.toBase58()]: await jup.estimate({ mint: HNT_MINT }),
-      [MOBILE_MINT.toBase58()]: await jup.estimate({ mint: MOBILE_MINT }),
-      [IOT_MINT.toBase58()]: await jup.estimate({ mint: IOT_MINT }),
-    });
-  } catch (err) {
-    res.code(500).send(err);
-    console.error(err);
+  const mints = [HNT_MINT, MOBILE_MINT, IOT_MINT];
+  const results = await Promise.allSettled(
+    mints.map((mint) => jup.estimate({ mint }))
+  );
+  const { estimates, failures, allFailed } = settleEstimates(
+    mints.map((mint) => mint.toBase58()),
+    results
+  );
+  failures.forEach(({ mint, reason }) =>
+    console.error(`Estimate failed for ${mint}`, reason)
+  );
+  if (allFailed) {
+    res.code(500).send(failures[0].reason);
+    return;
   }
+  res.send(estimates);
 });
 
 const start = async () => {
