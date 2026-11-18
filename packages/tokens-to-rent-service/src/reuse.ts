@@ -12,7 +12,7 @@ export const FUND_FEES_HOLD_MS = 60_000;
 export const ESTIMATE_CACHE_MS = 15_000;
 
 /** A map whose entries expire `ttlMs` after they are set. A set removes the expired entries. */
-const expiringMap = <V>(ttlMs: number, now: Clock) => {
+export const expiringMap = <V>(ttlMs: number, now: Clock) => {
   const entries = new Map<string, { value: V; expiresAt: number }>();
   return {
     get: (key: string): V | undefined => {
@@ -33,6 +33,10 @@ const expiringMap = <V>(ttlMs: number, now: Clock) => {
       if (entries.get(key)?.value === value) {
         entries.delete(key);
       }
+    },
+    /** The entries held, expired or not. */
+    get size(): number {
+      return entries.size;
     },
   };
 };

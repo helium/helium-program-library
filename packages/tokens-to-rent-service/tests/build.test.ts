@@ -38,6 +38,15 @@ import {
   RFQ_V2_LABEL,
   SLIPPAGE_BPS,
 } from "../src/build";
+import { RequestError, UpstreamError } from "../src/errors";
+
+/** Checks that the error is Jupiter's answer refused (502) with a matching message. */
+const refusedUpstream = (message: RegExp) => (error: unknown) =>
+  error instanceof UpstreamError && message.test(error.message);
+
+/** Checks that the error is a wrong request (400) with a matching message. */
+const refusedRequest = (message: RegExp) => (error: unknown) =>
+  error instanceof RequestError && message.test(error.message);
 
 const key = () => Keypair.generate().publicKey.toBase58();
 
@@ -239,7 +248,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
             }),
             EXPECTED
           ),
-        /route through JupiterRfqV2/
+        refusedUpstream(/route through JupiterRfqV2/)
       );
     });
 
@@ -250,14 +259,14 @@ describe("tokens-to-rent-service Jupiter /build", () => {
             buildBody({ routePlan: [{ swapInfo: { label: 1 } }] }),
             EXPECTED
           ),
-        /Invalid Jupiter \/build response: routePlan/
+        refusedUpstream(/Invalid Jupiter \/build response: routePlan/)
       );
     });
 
     it("refuses an answer without a route plan", () => {
       assert.throws(
         () => readBuildResponse(buildBody({ routePlan: undefined }), EXPECTED),
-        /Invalid Jupiter \/build response: routePlan/
+        refusedUpstream(/Invalid Jupiter \/build response: routePlan/)
       );
     });
 
@@ -268,14 +277,14 @@ describe("tokens-to-rent-service Jupiter /build", () => {
             buildBody({ otherInstructions: [instruction(SWAP_PROGRAM)] }),
             EXPECTED
           ),
-        /1 otherInstructions/
+        refusedUpstream(/1 otherInstructions/)
       );
     });
 
     it("refuses an error body", () => {
       assert.throws(
         () => readBuildResponse({ error: "No routes found" }, EXPECTED),
-        /returned error: No routes found/
+        refusedUpstream(/returned error: No routes found/)
       );
     });
 
@@ -287,7 +296,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       it(`refuses a swap whose ${field} differs from the request`, () => {
         assert.throws(
           () => readBuildResponse(buildBody({ [field]: value }), EXPECTED),
-          /not the requested/
+          refusedUpstream(/not the requested/)
         );
       });
     }
@@ -303,7 +312,9 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       it(`refuses a response whose ${field} is ${JSON.stringify(value)}`, () => {
         assert.throws(
           () => readBuildResponse(buildBody({ [field]: value }), EXPECTED),
-          new RegExp(`Invalid Jupiter /build response: ${field}`)
+          refusedUpstream(
+            new RegExp(`Invalid Jupiter /build response: ${field}`)
+          )
         );
       });
     }
@@ -321,14 +332,16 @@ describe("tokens-to-rent-service Jupiter /build", () => {
             }),
             EXPECTED
           ),
-        /Invalid Jupiter \/build response: swapInstruction.accounts/
+        refusedUpstream(
+          /Invalid Jupiter \/build response: swapInstruction.accounts/
+        )
       );
     });
 
     it("refuses a body that is not an object", () => {
       assert.throws(
         () => readBuildResponse(null, EXPECTED),
-        /Invalid Jupiter \/build response: body/
+        refusedUpstream(/Invalid Jupiter \/build response: body/)
       );
     });
   });
@@ -364,7 +377,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         })) as typeof fetch;
       await assert.rejects(
         buildJupiterSwap(REQUEST, fetchImpl),
-        /not the requested/
+        refusedUpstream(/not the requested/)
       );
     });
 
@@ -376,7 +389,9 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         })) as typeof fetch;
       await assert.rejects(
         buildJupiterSwap(REQUEST, fetchImpl),
-        /Jupiter \/build error: 400 Bad Request: No routes found$/
+        refusedUpstream(
+          /Jupiter \/build error: 400 Bad Request: No routes found$/
+        )
       );
     });
 
@@ -390,6 +405,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       await assert.rejects(
         buildJupiterSwap(REQUEST, fetchImpl),
         (error: Error) => {
+          assert.ok(error instanceof UpstreamError);
           assert.equal(
             error.message,
             `Jupiter /build error: 500 Server Error: ${"x".repeat(300)}`
@@ -606,7 +622,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
           { ...PARAMS, probeAmount: "200" },
           selling((amount) => (amount === 200n ? 100n : 21_015_751n), [])
         ),
-        /over 105%/
+        refusedUpstream(/over 105%/)
       );
     });
 
@@ -617,7 +633,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
           { ...PARAMS, probeAmount: "200" },
           selling((amount) => (amount === 200n ? 100n : 10_007_500n), [])
         ),
-        /under 95%/
+        refusedUpstream(/under 95%/)
       );
     });
 
@@ -647,7 +663,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
           PARAMS,
           selling(() => 0n, [])
         ),
-        /priced the sale at 0 SOL/
+        refusedUpstream(/priced the sale at 0 SOL/)
       );
     });
   });
@@ -740,7 +756,9 @@ describe("tokens-to-rent-service Jupiter /build", () => {
           { ...WIRING, mint },
           answering(() => 1n, asked)
         ),
-        new RegExp(`Provided mint not supported by service: ${mint}`)
+        refusedRequest(
+          new RegExp(`Provided mint not supported by service: ${mint}`)
+        )
       );
       assert.equal(asked.length, 0);
     });
@@ -799,14 +817,16 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     it("refuses an intermediate token account beside the wrapped SOL one", () => {
       assert.throws(
         () => run([wsolCreate(), create(ataOf(USER, other), other)]),
-        /creates a token account besides the wrapped SOL account/
+        refusedUpstream(
+          /creates a token account besides the wrapped SOL account/
+        )
       );
     });
 
     it("refuses a create of another account for the wrapped SOL mint", () => {
       assert.throws(
         () => run([create(ataOf(other, WSOL), WSOL, [1], other)]),
-        /creates a token account besides/
+        refusedUpstream(/creates a token account besides/)
       );
     });
 
@@ -844,7 +864,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         instructions[position] = ix(PLATFORM, true);
         assert.throws(
           () => refusePlatformKey(instructions, PLATFORM.toBase58()),
-          /platform wallet's signature/
+          refusedUpstream(/platform wallet's signature/)
         );
       }
     });
@@ -852,7 +872,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     it("refuses the platform key as a non-signer", () => {
       assert.throws(
         () => refusePlatformKey([other(), ix(PLATFORM, false)], PLATFORM),
-        /platform wallet's signature/
+        refusedUpstream(/platform wallet's signature/)
       );
     });
 
@@ -864,7 +884,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       });
       assert.throws(
         () => refusePlatformKey([other(), program], PLATFORM),
-        /platform wallet's signature/
+        refusedUpstream(/platform wallet's signature/)
       );
     });
 
@@ -880,7 +900,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     it("refuses the platform wallet as the user", () => {
       assert.throws(
         () => refusePlatformUser(PLATFORM, PLATFORM.toBase58()),
-        /The platform wallet cannot fund its own fees/
+        refusedRequest(/The platform wallet cannot fund its own fees/)
       );
     });
 
@@ -1000,7 +1020,9 @@ describe("tokens-to-rent-service Jupiter /build", () => {
             })
           )
         ),
-        /creates a token account besides the wrapped SOL account/
+        refusedUpstream(
+          /creates a token account besides the wrapped SOL account/
+        )
       );
     });
 
@@ -1011,7 +1033,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
           { ...PARAMS, userWallet: PLATFORM_WALLET.toBase58() },
           serving(answer(), calls)
         ),
-        /The platform wallet cannot fund its own fees/
+        refusedRequest(/The platform wallet cannot fund its own fees/)
       );
       assert.equal(calls.length, 0);
     });
@@ -1034,7 +1056,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
       ]) {
         await assert.rejects(
           buildFundFeesSwap(PARAMS, serving(answer(overrides))),
-          /needs the platform wallet's signature/
+          refusedUpstream(/needs the platform wallet's signature/)
         );
       }
     });
@@ -1050,7 +1072,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     it("refuses an answer that pays out less than the minimum SOL", async () => {
       await assert.rejects(
         buildFundFeesSwap(PARAMS, serving(answer({ outAmount: "19014249" }))),
-        /Jupiter quoted less SOL than the fee estimate/
+        refusedUpstream(/Jupiter quoted less SOL than the fee estimate/)
       );
     });
 
@@ -1065,7 +1087,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     it("refuses an answer that pays out more than the maximum SOL", async () => {
       await assert.rejects(
         buildFundFeesSwap(PARAMS, serving(answer({ outAmount: "21015751" }))),
-        /Jupiter quoted more SOL than the fee estimate allows/
+        refusedUpstream(/Jupiter quoted more SOL than the fee estimate allows/)
       );
     });
   });
@@ -1294,20 +1316,6 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         /fails in simulation/
       );
       assert.equal(calls.signed.length, 0);
-    });
-
-    it("refuses a mint the service does not swap, before it calls Jupiter", async () => {
-      const { deps } = fakes();
-      const requests: string[] = [];
-      await assert.rejects(
-        buildFundFeesTransaction(
-          { ...PARAMS, mint: key() },
-          deps,
-          serving(1, requests)
-        ),
-        /Provided mint not supported by service/
-      );
-      assert.equal(requests.length, 0);
     });
   });
 });

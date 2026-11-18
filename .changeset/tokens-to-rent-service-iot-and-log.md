@@ -8,6 +8,6 @@
 
 The service keeps each token's estimate for 15 seconds. `/estimate`, `/estimates` and `/fees` share it.
 
-A failed request now answers `{ "error": "<message>" }`. The service removes the RPC URL and the Jupiter API key from the message and from its logs, and no longer logs its RPC URL at start.
+A failed request now answers `{ "error": "<message>" }` with HTTP 400 when the request is wrong (a missing or invalid `wallet` or `mint`, a mint the service does not swap, or the platform wallet as the user), 429 for the refusal above, 502 when the service refuses Jupiter's answer, and 500 for any other failure. The service removes the RPC URL and the Jupiter API key from the message and from its logs, and no longer logs its RPC URL at start or in a failure to start.
 
 The build targets ES2020.

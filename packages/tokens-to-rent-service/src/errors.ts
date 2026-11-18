@@ -3,6 +3,36 @@ import { OtherMintPendingError } from "./reuse";
 
 const REDACTED = "[redacted]";
 
+/** The request is wrong: a missing or invalid field, or a mint the service does not swap. */
+export class RequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RequestError";
+  }
+}
+
+/** Jupiter's answer was refused. */
+export class UpstreamError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UpstreamError";
+  }
+}
+
+/** The HTTP status for a failed request. */
+const failureStatus = (err: unknown): 400 | 429 | 500 | 502 => {
+  if (err instanceof OtherMintPendingError) {
+    return 429;
+  }
+  if (err instanceof RequestError) {
+    return 400;
+  }
+  if (err instanceof UpstreamError) {
+    return 502;
+  }
+  return 500;
+};
+
 /** The forms an RPC URL takes in an error text: the URL, the URL without its scheme, and the host. */
 const rpcUrlForms = (rpcUrl: string): string[] => {
   try {
@@ -35,14 +65,19 @@ export const redact = (
     .reduce((redacted, secret) => redacted.split(secret).join(REDACTED), text);
 
 /**
- * The answer and the log text for a failed request, both redacted. The status is 429 when the
- * wallet holds a transaction for another mint, and 500 for any other failure.
+ * The answer and the log text for a failed request, both redacted. The status is 400 when the
+ * request is wrong, 429 when the wallet holds a transaction for another mint, 502 when Jupiter's
+ * answer was refused, and 500 for any other failure.
  */
 export const failure = (
   err: unknown,
   env: NodeJS.ProcessEnv = process.env
-): { status: 429 | 500; body: { error: string }; log: string } => ({
-  status: err instanceof OtherMintPendingError ? 429 : 500,
+): {
+  status: ReturnType<typeof failureStatus>;
+  body: { error: string };
+  log: string;
+} => ({
+  status: failureStatus(err),
   body: {
     error: redact(err instanceof Error ? err.message : String(err), env),
   },

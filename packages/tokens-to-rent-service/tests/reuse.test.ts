@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   estimateCache,
+  expiringMap,
   fundFeesStore,
   OtherMintPendingError,
 } from "../src/reuse";
@@ -26,6 +27,21 @@ const deferred = <T>() => {
   });
   return { promise, resolve, reject };
 };
+
+describe("expiringMap", () => {
+  it("removes the expired entries when another key is set", () => {
+    const { now, advance } = clock();
+    const map = expiringMap<number>(1_000, now);
+
+    map.set("a", 1);
+    map.set("b", 2);
+    advance(1_000);
+    map.set("c", 3);
+
+    assert.equal(map.size, 1);
+    assert.equal(map.get("c"), 3);
+  });
+});
 
 describe("fundFeesStore", () => {
   const WALLET = "wallet";

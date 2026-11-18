@@ -20,7 +20,7 @@ Jupiter has no SOL to IOT route, so IOT is priced from its sale. The service bui
 
 The service keeps each token's estimate for 15 seconds. `/estimate`, `/estimates` and `/fees` share it, and concurrent requests share one Jupiter call. A failed estimate is not kept.
 
-A failed request answers `{ "error": "<message>" }` with HTTP 500, or 429 for the refusal above. The service removes the RPC URL and the Jupiter API key from the message and from its logs.
+A failed request answers `{ "error": "<message>" }`. The status is 400 when the request is wrong (a missing or invalid `wallet` or `mint`, a mint the service does not swap, or the platform wallet as the user), 429 for the refusal above, 502 when the service refuses Jupiter's answer, and 500 for any other failure. The service removes the RPC URL and the Jupiter API key from the message and from its logs.
 
 ## Deployments
 

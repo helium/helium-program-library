@@ -1,7 +1,7 @@
 import { AddressLookupTableAccount, PublicKey } from "@solana/web3.js";
 import { buildFundFeesTransaction, estimateSwapInput } from "./build";
 import { JUPITER_API_KEY, JUPITER_API_URL } from "./env";
-import { estimateCache, fundFeesStore } from "./reuse";
+import { createService } from "./service";
 import { provider } from "./solana";
 
 export const getAdressLookupTableAccounts = async (
@@ -27,42 +27,13 @@ export const getAdressLookupTableAccounts = async (
   }, new Array<AddressLookupTableAccount>());
 };
 
-const cachedEstimate = estimateCache(Date.now);
-const signOnce = fundFeesStore(Date.now);
-
-export const estimate = ({ mint }: { mint: PublicKey }): Promise<string> =>
-  cachedEstimate(mint.toBase58(), () =>
-    estimateSwapInput({
-      apiUrl: JUPITER_API_URL,
-      apiKey: JUPITER_API_KEY,
-      mint: mint.toBase58(),
-      platformWallet: provider.wallet.publicKey.toBase58(),
-    })
-  );
-
-/** The serialized, signed fee-funding transaction. */
-export const fundFees = ({
-  userWallet,
-  mint,
-}: {
-  userWallet: PublicKey;
-  mint: PublicKey;
-}): Promise<Uint8Array> =>
-  signOnce({ wallet: userWallet.toBase58(), mint: mint.toBase58() }, async () =>
-    (
-      await buildFundFeesTransaction(
-        {
-          apiUrl: JUPITER_API_URL,
-          apiKey: JUPITER_API_KEY,
-          mint: mint.toBase58(),
-          inputAmount: await estimate({ mint }),
-          userWallet: userWallet.toBase58(),
-        },
-        {
-          connection: provider.connection,
-          signer: provider.wallet,
-          lookupTableAccounts: getAdressLookupTableAccounts,
-        }
-      )
-    ).serialize()
-  );
+export const { estimate, fundFees } = createService({
+  estimateSwapInput,
+  buildFundFeesTransaction,
+  connection: provider.connection,
+  signer: provider.wallet,
+  lookupTableAccounts: getAdressLookupTableAccounts,
+  now: Date.now,
+  apiUrl: JUPITER_API_URL,
+  apiKey: JUPITER_API_KEY,
+});

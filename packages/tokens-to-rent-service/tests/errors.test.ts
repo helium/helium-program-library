@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { failure, redact } from "../src/errors";
+import { failure, redact, RequestError, UpstreamError } from "../src/errors";
 import { OtherMintPendingError } from "../src/reuse";
 
 const RPC_URL = "https://rpc.example.com/v1/abc123?api-key=def456";
@@ -98,6 +98,28 @@ describe("failure", () => {
     assert.deepEqual(body, {
       error:
         "This wallet has a pending fee-funding transaction for another mint. Try again in a minute.",
+    });
+  });
+
+  it("answers 400 with the redacted message when the request is wrong", () => {
+    const { status, body } = failure(
+      new RequestError(`Invalid mint: ${RPC_URL}`),
+      ENV
+    );
+
+    assert.equal(status, 400);
+    assert.deepEqual(body, { error: "Invalid mint: [redacted]" });
+  });
+
+  it("answers 502 with the redacted message when Jupiter's answer is refused", () => {
+    const { status, body } = failure(
+      new UpstreamError("Jupiter /build error: 401 for jup-key-789"),
+      ENV
+    );
+
+    assert.equal(status, 502);
+    assert.deepEqual(body, {
+      error: "Jupiter /build error: 401 for [redacted]",
     });
   });
 

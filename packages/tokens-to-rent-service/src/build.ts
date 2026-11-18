@@ -9,6 +9,7 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
+import { RequestError, UpstreamError } from "./errors";
 
 /** Jupiter's Swap V2 build endpoint, relative to the API base URL. */
 const JUPITER_BUILD_PATH = "/swap/v2/build";
@@ -202,8 +203,8 @@ type Json = Record<string, unknown>;
 const isRecord = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const invalid = (field: string): Error =>
-  new Error(`Invalid Jupiter /build response: ${field}`);
+const invalid = (field: string): UpstreamError =>
+  new UpstreamError(`Invalid Jupiter /build response: ${field}`);
 
 const readString = (body: Json, field: string): string => {
   const value = body[field];
@@ -303,7 +304,7 @@ export function readBuildResponse(
     throw invalid("body");
   }
   if (typeof raw.error === "string" && raw.error.length > 0) {
-    throw new Error(`Jupiter /build returned error: ${raw.error}`);
+    throw new UpstreamError(`Jupiter /build returned error: ${raw.error}`);
   }
 
   const inputMint = readString(raw, "inputMint");
@@ -314,20 +315,20 @@ export function readBuildResponse(
     outputMint !== expected.outputMint ||
     inAmount !== expected.amount
   ) {
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter built a swap of ${inAmount} ${inputMint} for ${outputMint}, not the requested ${expected.amount} ${expected.inputMint} for ${expected.outputMint}`
     );
   }
 
   if (routeLabels(raw.routePlan).includes(RFQ_V2_LABEL)) {
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter built a route through ${RFQ_V2_LABEL}, which needs a market maker's signature`
     );
   }
 
   const other = readInstructions(raw, "otherInstructions");
   if (other.length > 0) {
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter built a swap with ${other.length} otherInstructions, which this service does not run`
     );
   }
@@ -361,7 +362,7 @@ export async function buildJupiterSwap(
   });
   if (!response.ok) {
     const body = (await response.text()).slice(0, ERROR_BODY_MAX_CHARS);
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter /build error: ${response.status} ${response.statusText}: ${body}`
     );
   }
@@ -389,7 +390,7 @@ export const refusePlatformKey = (
         ix.keys.some((meta) => meta.pubkey.equals(platform))
     )
   ) {
-    throw new Error(
+    throw new UpstreamError(
       "Jupiter built an instruction that needs the platform wallet's signature"
     );
   }
@@ -401,7 +402,7 @@ export const refusePlatformUser = (
   platformKey: PublicKey | string
 ): void => {
   if (new PublicKey(user).equals(new PublicKey(platformKey))) {
-    throw new Error("The platform wallet cannot fund its own fees");
+    throw new RequestError("The platform wallet cannot fund its own fees");
   }
 };
 
@@ -436,7 +437,7 @@ export function refuseExtraAccountCreations(
     }
     const account = ix.keys[1]?.pubkey;
     if (!account || !account.equals(wsolAccount)) {
-      throw new Error(
+      throw new UpstreamError(
         `Jupiter built a swap that creates a token account besides the wrapped SOL account${
           account ? ` (${account.toBase58()})` : ""
         }, which the rent loan does not cover`
@@ -578,7 +579,7 @@ export const estimateBySale = async (
   const scaleToTarget = (inputAmount: bigint, outAmount: string): bigint => {
     const out = BigInt(outAmount);
     if (out === 0n) {
-      throw new Error("Jupiter priced the sale at 0 SOL");
+      throw new UpstreamError("Jupiter priced the sale at 0 SOL");
     }
     return mulDivCeil(inputAmount, target, out);
   };
@@ -589,12 +590,12 @@ export const estimateBySale = async (
   const verify = await sell(amount);
   const verifyOut = BigInt(verify.outAmount);
   if (verifyOut > BigInt(MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS)) {
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter priced ${amount} at ${verifyOut} lamports, over 105% of the ${target} its probe priced it at`
     );
   }
   if (verifyOut < BigInt(MIN_FUND_FEES_OUT_LAMPORTS)) {
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter priced ${amount} at ${verifyOut} lamports, under 95% of the ${target} its probe priced it at`
     );
   }
@@ -608,9 +609,10 @@ const SUPPORTED_MINTS = [HNT_MINT, IOT_MINT, MOBILE_MINT].map((mint) =>
   mint.toBase58()
 );
 
-const refuseUnsupportedMint = (mint: string): void => {
+/** Refuses a mint the service does not swap. */
+export const refuseUnsupportedMint = (mint: string): void => {
   if (!SUPPORTED_MINTS.includes(mint)) {
-    throw new Error(`Provided mint not supported by service: ${mint}`);
+    throw new RequestError(`Provided mint not supported by service: ${mint}`);
   }
 };
 
@@ -678,10 +680,12 @@ export async function buildFundFeesSwap(
   );
   refuseExtraAccountCreations(built.setupInstructions, params.userWallet);
   if (Number(built.outAmount) < params.minOutLamports) {
-    throw new Error("Jupiter quoted less SOL than the fee estimate");
+    throw new UpstreamError("Jupiter quoted less SOL than the fee estimate");
   }
   if (Number(built.outAmount) > params.maxOutLamports) {
-    throw new Error("Jupiter quoted more SOL than the fee estimate allows");
+    throw new UpstreamError(
+      "Jupiter quoted more SOL than the fee estimate allows"
+    );
   }
   return built;
 }
@@ -730,7 +734,6 @@ export const buildFundFeesTransaction = async (
   },
   fetchImpl: typeof fetch = fetch
 ): Promise<VersionedTransaction> => {
-  refuseUnsupportedMint(params.mint);
   const { connection, signer } = deps;
   const userWallet = new PublicKey(params.userWallet);
 
