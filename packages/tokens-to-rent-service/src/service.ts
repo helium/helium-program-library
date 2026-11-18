@@ -20,11 +20,13 @@ export const createService = (deps: {
   signer: FundFeesSigner;
   lookupTableAccounts: (keys: string[]) => Promise<AddressLookupTableAccount[]>;
   now: Clock;
+  /** The most new fee-funding transactions this instance signs in any minute. */
+  maxSignaturesPerMinute: number;
   apiUrl: string;
   apiKey?: string;
 }) => {
   const cachedEstimate = estimateCache(deps.now);
-  const signOnce = fundFeesStore(deps.now);
+  const signOnce = fundFeesStore(deps.now, deps.maxSignaturesPerMinute);
 
   const estimate = ({ mint }: { mint: PublicKey }): Promise<string> =>
     cachedEstimate(mint.toBase58(), () =>

@@ -1,5 +1,10 @@
+import { SignatureLimitError } from "./errors";
+
 /** The time now, in milliseconds. */
 export type Clock = () => number;
+
+/** The window of the signature limit, in milliseconds. */
+export const SIGNATURE_WINDOW_MS = 60_000;
 
 /**
  * How long a signed fee-funding transaction is held after its build resolves, in milliseconds.
@@ -57,13 +62,45 @@ export const expiringMap = <V>(ttlMs: number, now: Clock) => {
 };
 
 /**
+ * Lets at most `limit` builds start in any `SIGNATURE_WINDOW_MS`, whatever the wallet. `take`
+ * refuses with `SignatureLimitError` when the window is full, and returns a release for a build
+ * that failed, which signed nothing.
+ */
+export const signatureLimiter = (limit: number, now: Clock) => {
+  const started: number[] = [];
+  return {
+    take: (): (() => void) => {
+      const time = now();
+      while (started.length > 0 && started[0] <= time - SIGNATURE_WINDOW_MS) {
+        started.shift();
+      }
+      if (started.length >= limit) {
+        throw new SignatureLimitError();
+      }
+      started.push(time);
+      return () => {
+        const index = started.indexOf(time);
+        if (index >= 0) {
+          started.splice(index, 1);
+        }
+      };
+    },
+  };
+};
+
+/**
  * Signs one fee-funding transaction per wallet and mint at a time. While a wallet's build for a
  * mint is in flight, and for `FUND_FEES_HOLD_MS` after it resolves, a request for the same wallet
  * and mint gets the same transaction, built once. Requests for another mint are held apart. A
  * failed build releases the wallet and mint.
+ *
+ * At most `maxPerMinute` new builds start in any minute, over all wallets, so a caller with many
+ * wallets cannot make the fee payer sign without bound. A request served from the hold does not
+ * count, and a failed build gives its place back.
  */
-export const fundFeesStore = (now: Clock) => {
+export const fundFeesStore = (now: Clock, maxPerMinute = Infinity) => {
   const held = expiringMap<Promise<Uint8Array>>(FUND_FEES_HOLD_MS, now);
+  const limiter = signatureLimiter(maxPerMinute, now);
   return async (
     request: { wallet: string; mint: string },
     build: () => Promise<Uint8Array>
@@ -73,11 +110,15 @@ export const fundFeesStore = (now: Clock) => {
     if (pending) {
       return pending;
     }
+    const giveBack = limiter.take();
     const transaction = build();
     held.hold(key, transaction);
     transaction.then(
       () => held.startExpiry(key, transaction),
-      () => held.release(key, transaction)
+      () => {
+        held.release(key, transaction);
+        giveBack();
+      }
     );
     return transaction;
   };

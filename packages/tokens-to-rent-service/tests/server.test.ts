@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
-import { UpstreamError } from "../src/errors";
+import { SignatureLimitError, UpstreamError } from "../src/errors";
 import { buildServer } from "../src/server";
 
 const RPC_URL = "https://rpc.example.com/v1/abc123";
@@ -112,6 +112,21 @@ describe("buildServer", () => {
   });
 
   describe("/fees", () => {
+    it("answers 429 when the instance has signed its limit for the minute", async () => {
+      const res = await serve({
+        fundFees: async () => {
+          throw new SignatureLimitError();
+        },
+      }).inject({
+        method: "POST",
+        url: "/fees",
+        payload: { wallet: WALLET, mint: HNT },
+      });
+
+      assert.equal(res.statusCode, 429);
+      assert.match(res.json().error, /limit of fee-funding transactions/);
+    });
+
     it("answers the signed transaction's bytes", async () => {
       const asked: string[][] = [];
       const res = await serve({

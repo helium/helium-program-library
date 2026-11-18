@@ -18,10 +18,23 @@ export class UpstreamError extends Error {
   }
 }
 
+/** The service signed as many fee-funding transactions as it may in the last minute. */
+export class SignatureLimitError extends Error {
+  constructor() {
+    super(
+      "The service has signed its limit of fee-funding transactions for this minute. Try again in a minute."
+    );
+    this.name = "SignatureLimitError";
+  }
+}
+
 /** The HTTP status for a failed request. */
-const failureStatus = (err: unknown): 400 | 500 | 502 => {
+const failureStatus = (err: unknown): 400 | 429 | 500 | 502 => {
   if (err instanceof RequestError) {
     return 400;
+  }
+  if (err instanceof SignatureLimitError) {
+    return 429;
   }
   if (err instanceof UpstreamError) {
     return 502;
@@ -62,7 +75,8 @@ export const redact = (
 
 /**
  * The answer and the log text for a failed request, both redacted. The status is 400 when the
- * request is wrong, 502 when Jupiter's answer was refused, and 500 for any other failure.
+ * request is wrong, 429 when the service has signed its limit for the minute, 502 when Jupiter's
+ * answer was refused, and 500 for any other failure.
  */
 export const failure = (
   err: unknown,

@@ -7,7 +7,9 @@ const USER = Keypair.generate().publicKey;
 const PLATFORM = Keypair.generate().publicKey;
 
 /** A service over fake builders that record their calls, on a clock the test moves by hand. */
-const fakeService = (options: { failBuilds?: number } = {}) => {
+const fakeService = (
+  options: { failBuilds?: number; maxSignaturesPerMinute?: number } = {}
+) => {
   let time = 1_000_000;
   let estimates = 0;
   let failBuilds = options.failBuilds ?? 0;
@@ -36,6 +38,7 @@ const fakeService = (options: { failBuilds?: number } = {}) => {
     },
     lookupTableAccounts: async () => [],
     now: () => time,
+    maxSignaturesPerMinute: options.maxSignaturesPerMinute ?? 100,
     apiUrl: "https://jupiter.test",
     apiKey: "key",
   });

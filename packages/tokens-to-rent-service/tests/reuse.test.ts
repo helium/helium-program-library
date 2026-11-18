@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { estimateCache, expiringMap, fundFeesStore } from "../src/reuse";
+import { SignatureLimitError } from "../src/errors";
+import {
+  estimateCache,
+  expiringMap,
+  fundFeesStore,
+  SIGNATURE_WINDOW_MS,
+} from "../src/reuse";
 
 /** A clock the test moves by hand. */
 const clock = () => {
@@ -180,6 +186,97 @@ describe("fundFeesStore", () => {
     const next = await signOnce({ wallet: WALLET, mint: HNT }, build);
 
     assert.deepEqual([...next], [1]);
+  });
+
+  describe("signature limit", () => {
+    const LIMIT = 3;
+    /** Asks for a transaction for each wallet in turn, for HNT. */
+    const signFor = (
+      signOnce: ReturnType<typeof fundFeesStore>,
+      build: () => Promise<Uint8Array>,
+      wallets: string[]
+    ) =>
+      Promise.all(
+        wallets.map((wallet) => signOnce({ wallet, mint: HNT }, build))
+      );
+
+    it("refuses a new build past the limit in a minute, over all wallets", async () => {
+      const signOnce = fundFeesStore(clock().now, LIMIT);
+      const { build, count } = building();
+
+      await signFor(signOnce, build, ["a", "b", "c"]);
+
+      await assert.rejects(
+        signOnce({ wallet: "d", mint: HNT }, build),
+        SignatureLimitError
+      );
+      assert.equal(count(), LIMIT);
+    });
+
+    it("counts builds still in flight", async () => {
+      const signOnce = fundFeesStore(clock().now, LIMIT);
+      const pending = deferred<Uint8Array>();
+
+      for (const wallet of ["a", "b", "c"]) {
+        void signOnce({ wallet, mint: HNT }, () => pending.promise);
+      }
+
+      await assert.rejects(
+        signOnce({ wallet: "d", mint: HNT }, building().build),
+        SignatureLimitError
+      );
+      pending.resolve(Uint8Array.from([1]));
+    });
+
+    it("does not count a request served from the hold", async () => {
+      const signOnce = fundFeesStore(clock().now, LIMIT);
+      const { build, count } = building();
+
+      await signFor(signOnce, build, ["a", "b", "c"]);
+      const again = await signOnce({ wallet: "a", mint: HNT }, build);
+
+      assert.deepEqual([...again], [1]);
+      assert.equal(count(), LIMIT);
+    });
+
+    it("gives a failed build's place back", async () => {
+      const signOnce = fundFeesStore(clock().now, LIMIT);
+      const { build } = building();
+
+      await signFor(signOnce, build, ["a", "b"]);
+      await assert.rejects(
+        signOnce({ wallet: "c", mint: HNT }, async () => {
+          throw new Error("no route");
+        }),
+        /no route/
+      );
+      const next = await signOnce({ wallet: "d", mint: HNT }, build);
+
+      assert.deepEqual([...next], [3]);
+    });
+
+    it("lets a new build start once the oldest is a minute old", async () => {
+      const { now, advance } = clock();
+      const signOnce = fundFeesStore(now, LIMIT);
+      const { build } = building();
+
+      await signFor(signOnce, build, ["a"]);
+      advance(1_000);
+      await signFor(signOnce, build, ["b", "c"]);
+      advance(SIGNATURE_WINDOW_MS - 1_001);
+      await assert.rejects(
+        signOnce({ wallet: "d", mint: HNT }, build),
+        SignatureLimitError
+      );
+      advance(1);
+      const next = await signOnce({ wallet: "d", mint: HNT }, build);
+
+      assert.deepEqual([...next], [4]);
+      await assert.rejects(
+        signOnce({ wallet: "e", mint: HNT }, build),
+        SignatureLimitError
+      );
+    });
   });
 });
 

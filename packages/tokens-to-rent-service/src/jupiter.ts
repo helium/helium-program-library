@@ -1,6 +1,10 @@
 import { AddressLookupTableAccount, PublicKey } from "@solana/web3.js";
 import { buildFundFeesTransaction, estimateSwapInput } from "./build";
-import { JUPITER_API_KEY, JUPITER_API_URL } from "./env";
+import {
+  FUND_FEES_MAX_PER_MINUTE,
+  JUPITER_API_KEY,
+  JUPITER_API_URL,
+} from "./env";
 import { createService } from "./service";
 import { provider } from "./solana";
 
@@ -34,6 +38,7 @@ export const { estimate, fundFees } = createService({
   signer: provider.wallet,
   lookupTableAccounts: getAdressLookupTableAccounts,
   now: Date.now,
+  maxSignaturesPerMinute: FUND_FEES_MAX_PER_MINUTE,
   apiUrl: JUPITER_API_URL,
   apiKey: JUPITER_API_KEY,
 });
