@@ -10,12 +10,19 @@ export const GetQuoteInputSchema = z
     inputMint: z.string().min(1),
     outputMint: z.string().min(1),
     amount: z.string().min(1),
-    swapMode: z.enum(["ExactIn", "ExactOut"]).default("ExactIn"),
+    swapMode: z
+      .enum(["ExactIn", "ExactOut"])
+      .default("ExactIn")
+      .describe(
+        "Only ExactIn is supported: getQuote and getInstructions refuse ExactOut with BAD_REQUEST, because Jupiter's Swap V2 /build swaps an exact input only.",
+      ),
     slippageBps: z.coerce.number().min(0).max(10000).default(50),
     excludeDexes: z
       .string()
       .optional()
-      .describe("Comma-separated Jupiter DEX labels to leave out of the route"),
+      .describe(
+        "Comma-separated Jupiter DEX labels to leave out of the quoted route. JupiterRfqV2 is always left out. The quote returns these labels as excludeDexes, and getInstructions applies them again when it builds the swap.",
+      ),
   })
   // A quote from a mint to itself is circular arbitrage, which Jupiter refuses
   // with CIRCULAR_ARBITRAGE_IS_DISABLED. Reject it here so the caller gets a
@@ -39,19 +46,36 @@ export const QuoteResponseSchema = z
     routePlan: z.array(z.unknown()),
     contextSlot: z.number().optional(),
     timeTaken: z.number().optional(),
+    excludeDexes: z.array(z.string()).optional(),
   })
   .passthrough();
 
 export const GetInstructionsInputSchema = z.object({
-  quoteResponse: QuoteResponseSchema,
+  quoteResponse: QuoteResponseSchema.describe(
+    "A getQuote response. The swap is built for its inputMint, outputMint, inAmount and slippageBps; Jupiter quotes the route again, so the output amount can differ from this quote's outAmount. A built swap whose minimum output is below this quote's otherAmountThreshold is built once more at the narrower slippage that keeps that minimum, and otherwise refused with BAD_REQUEST as an expired quote: refresh the quote and try again. Only ExactIn quotes are accepted.",
+  ),
   userPublicKey: z.string().min(1),
-  destinationTokenAccount: z.string().optional(),
-  dynamicComputeUnitLimit: z.boolean().default(true),
+  destinationTokenAccount: z
+    .string()
+    .optional()
+    .describe("SPL token account that receives the output tokens"),
+  excludeDexes: z
+    .string()
+    .optional()
+    .describe(
+      "Comma-separated Jupiter DEX labels to leave out of the built route. Merged with the excludeDexes the quote carries. A built route through a listed label (exact, case-sensitive match) is refused with JUPITER_ERROR.",
+    ),
+  dynamicComputeUnitLimit: z
+    .boolean()
+    .default(true)
+    .describe(
+      "Accepted for compatibility and ignored: the server sets the compute unit limit itself.",
+    ),
   useSharedAccounts: z
     .boolean()
     .optional()
     .describe(
-      "Build the route through Jupiter's shared program accounts instead of the user's own intermediate token accounts.",
+      "Accepted for compatibility and ignored: Jupiter's Swap V2 /build chooses whether the route uses shared program accounts and takes no option for it.",
     ),
   prioritizationFeeLamports: z
     .object({
@@ -60,7 +84,10 @@ export const GetInstructionsInputSchema = z.object({
         priorityLevel: z.enum(["low", "medium", "high"]).default("medium"),
       }),
     })
-    .optional(),
+    .optional()
+    .describe(
+      "Accepted for compatibility and ignored: the server sets the compute unit price itself.",
+    ),
 });
 
 export const TokenSchema = z.object({

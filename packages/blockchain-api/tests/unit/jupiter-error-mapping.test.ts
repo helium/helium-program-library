@@ -29,6 +29,47 @@ describe("classifyJupiterError", () => {
     });
   });
 
+  it("maps a /build no-route answer to a bad request", () => {
+    const classification = classifyJupiterError({
+      status: 400,
+      body: '{"error":"No routes found"}',
+      operation: "Failed to get quote from Jupiter",
+    });
+
+    expect(classification).to.deep.equal({
+      kind: "BAD_REQUEST",
+      message: "No route found for this swap",
+    });
+  });
+
+  it("reports a no-route text on a server failure as a Jupiter error", () => {
+    const classification = classifyJupiterError({
+      status: 500,
+      body: '{"error":"No routes found"}',
+      operation: "Failed to get quote from Jupiter",
+    });
+
+    expect(classification).to.deep.equal({
+      kind: "JUPITER_ERROR",
+      message:
+        'Failed to get quote from Jupiter: HTTP 500: {"error":"No routes found"}',
+    });
+  });
+
+  it("does not read an error text off Object.prototype", () => {
+    const classification = classifyJupiterError({
+      status: 400,
+      body: '{"error":"constructor"}',
+      operation: "Failed to get quote from Jupiter",
+    });
+
+    expect(classification).to.deep.equal({
+      kind: "JUPITER_ERROR",
+      message:
+        'Failed to get quote from Jupiter: HTTP 400: {"error":"constructor"}',
+    });
+  });
+
   it("does not read an error code off Object.prototype", () => {
     // A code such as "constructor" indexes the message table's prototype and
     // would otherwise turn a function into the client's message.
