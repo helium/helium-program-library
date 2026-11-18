@@ -1084,6 +1084,23 @@ describe("voter-stake-registry", () => {
       ).to.be.rejected;
     });
 
+    it("should not allow me to withdraw a constant position after its periods pass", async () => {
+      const { position: constantPosition } = await createAndDeposit(100, 184, {
+        constant: {},
+      });
+      await program.methods
+        .setTimeOffsetV0(new anchor.BN(185 * SECS_PER_DAY))
+        .accountsPartial({ registrar })
+        .rpc({ skipPreflight: true });
+
+      await expect(
+        program.methods
+          .withdrawV0({ amount: toBN(100, 8) })
+          .accountsPartial({ position: constantPosition, depositMint: hntMint })
+          .rpc()
+      ).to.be.rejectedWith("InsufficientUnlockedTokens");
+    });
+
     it("should allow me to extend my lockup", async () => {
       await program.methods
         .resetLockupV0({

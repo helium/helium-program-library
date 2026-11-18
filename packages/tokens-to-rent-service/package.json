@@ -6,7 +6,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "license": "Apache-2.0",
-  "version": "0.11.23",
+  "version": "0.12.0",
   "description": "Service that gives flashloans of sol to allow jupiter swap of small amounts of hnt/mobile/iot to sol for fees",
   "repository": {
     "type": "git",
@@ -28,6 +28,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "precommit": "npx git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath \"{}\"' .",
     "build": "tsc -p tsconfig.build.json",
+    "test": "ts-mocha -p ../../tsconfig.test.json -t 10000 'tests/**/*.test.ts'",
     "start": "node lib/src/index.js",
     "dev": "ts-node-dev --respawn --project tsconfig.cjs.json src/index.ts"
   },
@@ -37,7 +38,6 @@
     "@helium/account-fetch-cache": "workspace:^",
     "@helium/address": "^4.12.0",
     "@helium/spl-utils": "workspace:^",
-    "@jup-ag/api": "^6.0.6",
     "@solana/spl-token": "^0.3.8",
     "@solana/web3.js": "^1.91.1",
     "axios": "^1.9.0",

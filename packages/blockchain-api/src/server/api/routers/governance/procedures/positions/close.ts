@@ -64,8 +64,9 @@ export const close = publicProcedure.governance.closePosition.handler(
     const clock = await connection.getAccountInfo(SYSVAR_CLOCK_PUBKEY);
     const unixNow = Number(clock!.data.readBigInt64LE(8 * 4));
 
+    // A Constant lockup never expires. It must be flipped to Cliff and decay first.
     if (
-      lockupKind !== LockupKind.CONSTANT &&
+      lockupKind === LockupKind.CONSTANT ||
       positionAcc.lockup.endTs.gt(new BN(unixNow))
     ) {
       throw errors.BAD_REQUEST({
