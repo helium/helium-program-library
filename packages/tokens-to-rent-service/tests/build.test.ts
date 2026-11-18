@@ -5,7 +5,10 @@ import {
   PublicKey,
   SystemProgram,
   TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
+import { IOT_MINT } from "@helium/spl-utils";
 import {
   buildFundFeesSwap,
   buildJupiterSwap,
@@ -13,6 +16,7 @@ import {
   buildSwapUrl,
   computeUnitLimit,
   ESTIMATE_LAMPORTS,
+  estimateBySale,
   estimateRequest,
   FUND_FEES_MAX_ACCOUNTS,
   FUND_FEES_MAX_BYTES,
@@ -22,6 +26,7 @@ import {
   planComputeBudget,
   readBuildResponse,
   refuseExtraAccountCreations,
+  refuseOversizedTransaction,
   refusePlatformKey,
   refusePlatformUser,
   repayLamports,
@@ -56,7 +61,7 @@ const REQUEST: BuildSwapRequest = {
   amount: "1000000",
   taker: TAKER,
   slippageBps: 100,
-  fitFundFeesTransaction: true,
+  routeBound: "fundFees",
 };
 
 const EXPECTED = {
@@ -109,14 +114,26 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     });
 
     it("leaves a price quote unbounded", () => {
-      const url = buildSwapUrl({ ...REQUEST, fitFundFeesTransaction: false });
+      const url = buildSwapUrl({ ...REQUEST, routeBound: "quote" });
       assert.equal(url.searchParams.has("maxAccounts"), false);
       assert.equal(url.searchParams.has("maxBytes"), false);
     });
 
     it("excludes RFQ v2 from a price quote too", () => {
-      const url = buildSwapUrl({ ...REQUEST, fitFundFeesTransaction: false });
+      const url = buildSwapUrl({ ...REQUEST, routeBound: "quote" });
       assert.equal(url.searchParams.get("excludeDexes"), RFQ_V2_LABEL);
+    });
+
+    it("bounds an IOT fee-funding swap by accounts only", () => {
+      const url = buildSwapUrl({
+        ...REQUEST,
+        routeBound: "fundFeesAccountsOnly",
+      });
+      assert.equal(
+        url.searchParams.get("maxAccounts"),
+        String(FUND_FEES_MAX_ACCOUNTS)
+      );
+      assert.equal(url.searchParams.has("maxBytes"), false);
     });
 
     it("sends no platform fee", () => {
@@ -395,7 +412,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         taker: PLATFORM,
         apiKey: "secret",
         slippageBps: SLIPPAGE_BPS,
-        fitFundFeesTransaction: false,
+        routeBound: "quote",
       });
     });
 
@@ -413,7 +430,7 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         taker: USER,
         apiKey: "secret",
         slippageBps: SLIPPAGE_BPS,
-        fitFundFeesTransaction: true,
+        routeBound: "fundFees",
       });
       const url = buildSwapUrl(request);
       assert.equal(
@@ -421,6 +438,167 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         String(FUND_FEES_MAX_BYTES)
       );
       assert.equal(url.searchParams.get("taker"), USER);
+    });
+
+    it("builds IOT into SOL bounded by accounts only", () => {
+      const request = fundFeesRequest({
+        ...wiring,
+        mint: IOT_MINT.toBase58(),
+        inputAmount: "123456",
+        userWallet: USER,
+      });
+      assert.equal(request.routeBound, "fundFeesAccountsOnly");
+    });
+  });
+
+  describe("refuseOversizedTransaction", () => {
+    const PAYER = Keypair.generate().publicKey;
+    const transactionNaming = (accounts: number) =>
+      new VersionedTransaction(
+        new TransactionMessage({
+          payerKey: PAYER,
+          recentBlockhash: PublicKey.default.toBase58(),
+          instructions: [
+            new TransactionInstruction({
+              programId: new PublicKey(SWAP_PROGRAM),
+              keys: Array.from({ length: accounts }, () => ({
+                pubkey: Keypair.generate().publicKey,
+                isSigner: false,
+                isWritable: true,
+              })),
+              data: Buffer.alloc(0),
+            }),
+          ],
+        }).compileToV0Message()
+      );
+
+    it("accepts a transaction within 1232 bytes", () => {
+      // 32 unique accounts serialize to 1227 bytes.
+      refuseOversizedTransaction(transactionNaming(32));
+    });
+
+    it("refuses a transaction just over 1232 bytes", () => {
+      // 33 unique accounts serialize to 1260 bytes.
+      assert.throws(
+        () => refuseOversizedTransaction(transactionNaming(33)),
+        /over Solana's 1232-byte limit/
+      );
+    });
+
+    it("refuses a transaction too large to serialize", () => {
+      assert.throws(
+        () => refuseOversizedTransaction(transactionNaming(80)),
+        /over Solana's 1232-byte limit/
+      );
+    });
+  });
+
+  describe("estimateBySale", () => {
+    const WSOL = "So11111111111111111111111111111111111111112";
+    const IOT = IOT_MINT.toBase58();
+    const PLATFORM = key();
+    const PARAMS = {
+      apiUrl: "https://jupiter.test",
+      apiKey: "secret",
+      mint: IOT,
+      probeAmount: "43000000000",
+      platformWallet: PLATFORM,
+    };
+    /** Answers each sale with `outFor(amount)` lamports and records the amounts. */
+    const selling = (outFor: (amount: bigint) => bigint, amounts: string[]) =>
+      (async (url: string) => {
+        const amount = new URL(url).searchParams.get("amount")!;
+        amounts.push(amount);
+        return new Response(
+          JSON.stringify(
+            buildBody({
+              inputMint: IOT,
+              outputMint: WSOL,
+              inAmount: amount,
+              outAmount: outFor(BigInt(amount)).toString(),
+            })
+          ),
+          { status: 200 }
+        );
+      }) as typeof fetch;
+
+    it("scales the probe to 0.020015 SOL, rounded up, and verifies it on the IOT fee-funding route", async () => {
+      const amounts: string[] = [];
+      const urls: string[] = [];
+      const fetchImpl = selling((amount) => amount / 2150n, amounts);
+      const estimate = await estimateBySale(PARAMS, (async (
+        url: string,
+        init?: RequestInit
+      ) => {
+        urls.push(url);
+        return fetchImpl(url, init);
+      }) as typeof fetch);
+      // 43e9 / 2150 = 20,000,000 lamports; 43e9 * 20,015,000 / 20,000,000 = 43,032,250,000.
+      assert.deepEqual(amounts, ["43000000000", "43032250000"]);
+      assert.equal(estimate, "43032250000");
+      for (const url of urls.map((u) => new URL(u))) {
+        assert.equal(url.searchParams.get("inputMint"), IOT);
+        assert.equal(url.searchParams.get("outputMint"), WSOL);
+        assert.equal(url.searchParams.get("taker"), PLATFORM);
+        assert.equal(url.searchParams.has("maxBytes"), false);
+        assert.equal(
+          url.searchParams.get("maxAccounts"),
+          String(FUND_FEES_MAX_ACCOUNTS)
+        );
+      }
+    });
+
+    it("rounds the scaled amount up", async () => {
+      const amounts: string[] = [];
+      // The probe pays 3 lamports for 7 IOT units: 20,015,000 * 7 / 3 = 46,701,666.67.
+      const estimate = await estimateBySale(
+        { ...PARAMS, probeAmount: "7" },
+        selling(
+          (amount) => (amount === 7n ? 3n : BigInt(ESTIMATE_LAMPORTS)),
+          amounts
+        )
+      );
+      assert.equal(estimate, "46701667");
+    });
+
+    it("scales once more from a verify that pays out less than 0.020015 SOL", async () => {
+      const amounts: string[] = [];
+      // The probe prices 2 units per lamport; the verify pays out 20,000,000.
+      const estimate = await estimateBySale(
+        { ...PARAMS, probeAmount: "200" },
+        selling((amount) => (amount === 200n ? 100n : 20_000_000n), amounts)
+      );
+      assert.deepEqual(amounts, ["200", "40030000"]);
+      // 40,030,000 * 20,015,000 / 20,000,000 = 40,060,022.5, rounded up.
+      assert.equal(estimate, "40060023");
+    });
+
+    it("refuses a verify that pays out more than 105% of 0.020015 SOL", async () => {
+      await assert.rejects(
+        estimateBySale(
+          { ...PARAMS, probeAmount: "200" },
+          selling((amount) => (amount === 200n ? 100n : 21_015_751n), [])
+        ),
+        /over 105%/
+      );
+    });
+
+    it("accepts a verify at exactly 105% of 0.020015 SOL", async () => {
+      const estimate = await estimateBySale(
+        { ...PARAMS, probeAmount: "200" },
+        selling((amount) => (amount === 200n ? 100n : 21_015_750n), [])
+      );
+      assert.equal(estimate, "40030000");
+    });
+
+    it("refuses a probe priced at 0 SOL", async () => {
+      await assert.rejects(
+        estimateBySale(
+          PARAMS,
+          selling(() => 0n, [])
+        ),
+        /priced the sale at 0 SOL/
+      );
     });
   });
 

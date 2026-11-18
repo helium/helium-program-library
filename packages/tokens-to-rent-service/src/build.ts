@@ -1,7 +1,9 @@
+import { IOT_MINT } from "@helium/spl-utils";
 import {
   ComputeBudgetProgram,
   PublicKey,
   TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 
 /** Jupiter's Swap V2 build endpoint, relative to the API base URL. */
@@ -38,6 +40,16 @@ export const FUND_FEES_MAX_BYTES =
 
 /** The account limit the fee-funding swap is built with (`maxAccounts`). */
 export const FUND_FEES_MAX_ACCOUNTS = 20;
+
+/**
+ * How `/build` bounds the route.
+ * - `quote`: unbounded, for a price whose instructions are discarded.
+ * - `fundFees`: `maxAccounts` and `maxBytes`, to fit the fee-funding transaction.
+ * - `fundFeesAccountsOnly`: `maxAccounts` only. On 2026-11-18 each bound alone gave IOT to SOL a
+ *   route and the two together gave none, so IOT relies on `refuseOversizedTransaction`. The
+ *   measured IOT transaction was 836 bytes.
+ */
+export type RouteBound = "quote" | "fundFees" | "fundFeesAccountsOnly";
 
 /** How much of a failed `/build` answer's body goes into the error. */
 const ERROR_BODY_MAX_CHARS = 300;
@@ -89,8 +101,7 @@ export interface BuildSwapRequest {
   /** The account that signs the swap and holds the input. */
   taker: string;
   slippageBps: number;
-  /** Bound the swap so it fits the fee-funding transaction; a price quote leaves this off. */
-  fitFundFeesTransaction: boolean;
+  routeBound: RouteBound;
 }
 
 /** The `/build` request, as a URL. */
@@ -102,9 +113,20 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
   url.searchParams.set("taker", request.taker);
   url.searchParams.set("slippageBps", String(request.slippageBps));
   url.searchParams.set("excludeDexes", RFQ_V2_LABEL);
-  if (request.fitFundFeesTransaction) {
-    url.searchParams.set("maxAccounts", String(FUND_FEES_MAX_ACCOUNTS));
-    url.searchParams.set("maxBytes", String(FUND_FEES_MAX_BYTES));
+  switch (request.routeBound) {
+    case "quote":
+      break;
+    case "fundFees":
+      url.searchParams.set("maxAccounts", String(FUND_FEES_MAX_ACCOUNTS));
+      url.searchParams.set("maxBytes", String(FUND_FEES_MAX_BYTES));
+      break;
+    case "fundFeesAccountsOnly":
+      url.searchParams.set("maxAccounts", String(FUND_FEES_MAX_ACCOUNTS));
+      break;
+    default: {
+      const unknownBound: never = request.routeBound;
+      throw new Error(`Unknown route bound: ${unknownBound}`);
+    }
   }
   return url;
 }
@@ -130,13 +152,14 @@ export function estimateRequest(params: {
     taker: params.platformWallet,
     slippageBps: SLIPPAGE_BPS,
     apiKey: params.apiKey,
-    fitFundFeesTransaction: false,
+    routeBound: "quote",
   };
 }
 
 /**
  * The `/build` request for the swap the user signs: `inputAmount` of `mint` into SOL, built for
- * the user and bounded to fit the fee-funding transaction.
+ * the user and bounded to fit the fee-funding transaction. IOT drops the byte bound, see
+ * `RouteBound`.
  */
 export function fundFeesRequest(params: {
   apiUrl: string;
@@ -153,7 +176,8 @@ export function fundFeesRequest(params: {
     taker: params.userWallet,
     slippageBps: SLIPPAGE_BPS,
     apiKey: params.apiKey,
-    fitFundFeesTransaction: true,
+    routeBound:
+      params.mint === IOT_MINT.toBase58() ? "fundFeesAccountsOnly" : "fundFees",
   };
 }
 
@@ -418,6 +442,28 @@ export function refuseExtraAccountCreations(
 }
 
 /**
+ * Refuses a transaction over Solana's 1232-byte limit. web3.js throws a RangeError for a
+ * message that alone is over the limit, which is refused the same way.
+ */
+export const refuseOversizedTransaction = (
+  transaction: VersionedTransaction
+): void => {
+  let size = Infinity;
+  try {
+    size = transaction.serialize().length;
+  } catch (error) {
+    if (!(error instanceof RangeError)) {
+      throw error;
+    }
+  }
+  if (size > TRANSACTION_SIZE_LIMIT) {
+    throw new Error(
+      `The fee-funding transaction is over Solana's ${TRANSACTION_SIZE_LIMIT}-byte limit`
+    );
+  }
+};
+
+/**
  * The compute unit limit for a transaction that used `unitsConsumed` in simulation: 20% over
  * it, capped at Solana's largest limit.
  */
@@ -472,6 +518,78 @@ export const ESTIMATE_LAMPORTS = 20_015_000;
 
 /** The least SOL the fee-funding swap may pay out, in lamports: 95% of `ESTIMATE_LAMPORTS`. */
 export const MIN_FUND_FEES_OUT_LAMPORTS = (ESTIMATE_LAMPORTS * 95) / 100;
+
+/**
+ * The most SOL the verifying build of `estimateBySale` may pay out, in lamports: 105% of
+ * `ESTIMATE_LAMPORTS`.
+ */
+export const MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS =
+  (ESTIMATE_LAMPORTS * 105) / 100;
+
+/** The IOT that `estimateBySale` probes with: about 0.02 SOL of IOT on 2026-11-18. */
+export const IOT_PRICE_PROBE_AMOUNT = "43000000000";
+
+const mulDivCeil = (
+  amount: bigint,
+  numerator: bigint,
+  denominator: bigint
+): bigint => (amount * numerator + denominator - 1n) / denominator;
+
+/**
+ * The `mint` that sells for `ESTIMATE_LAMPORTS` of SOL, priced from `mint` to SOL builds. It is
+ * for a mint that Jupiter cannot buy with SOL (IOT), and uses the fee-funding route bound, so the
+ * price comes from the route `/fees` builds.
+ *
+ * It builds the sale of `probeAmount`, scales that amount to `ESTIMATE_LAMPORTS` (rounded up), and
+ * builds the sale of the scaled amount to verify it. A verify that pays out less than
+ * `ESTIMATE_LAMPORTS` is scaled once more from the verify, unchecked; `/fees` still refuses a
+ * build under 95% of it. A verify that pays out more than 105% of `ESTIMATE_LAMPORTS` is refused,
+ * because the probe's price is then not the verify's.
+ */
+export async function estimateBySale(
+  params: {
+    apiUrl: string;
+    apiKey?: string;
+    mint: string;
+    probeAmount: string;
+    platformWallet: string;
+  },
+  fetchImpl: typeof fetch = fetch
+): Promise<string> {
+  const sell = (inputAmount: bigint) =>
+    buildJupiterSwap(
+      fundFeesRequest({
+        apiUrl: params.apiUrl,
+        apiKey: params.apiKey,
+        mint: params.mint,
+        inputAmount: inputAmount.toString(),
+        userWallet: params.platformWallet,
+      }),
+      fetchImpl
+    );
+  const target = BigInt(ESTIMATE_LAMPORTS);
+  const scaleToTarget = (inputAmount: bigint, outAmount: string): bigint => {
+    const out = BigInt(outAmount);
+    if (out === 0n) {
+      throw new Error("Jupiter priced the sale at 0 SOL");
+    }
+    return mulDivCeil(inputAmount, target, out);
+  };
+
+  const probeAmount = BigInt(params.probeAmount);
+  const probe = await sell(probeAmount);
+  const amount = scaleToTarget(probeAmount, probe.outAmount);
+  const verify = await sell(amount);
+  const verifyOut = BigInt(verify.outAmount);
+  if (verifyOut > BigInt(MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS)) {
+    throw new Error(
+      `Jupiter priced ${amount} at ${verifyOut} lamports, over 105% of the ${target} its probe priced it at`
+    );
+  }
+  return (
+    verifyOut < target ? scaleToTarget(amount, verify.outAmount) : amount
+  ).toString();
+}
 
 /** What the fee-funding transaction is assembled from. */
 export type FundFeesSwap = BuiltSwap;

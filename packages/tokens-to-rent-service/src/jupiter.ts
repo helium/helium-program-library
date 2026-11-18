@@ -13,10 +13,13 @@ import {
   ESTIMATE_LAMPORTS,
   MAX_COMPUTE_UNIT_LIMIT,
   MIN_FUND_FEES_OUT_LAMPORTS,
+  IOT_PRICE_PROBE_AMOUNT,
   buildFundFeesSwap,
   buildJupiterSwap,
+  estimateBySale,
   estimateRequest,
   planComputeBudget,
+  refuseOversizedTransaction,
   repayLamports,
 } from "./build";
 import { JUPITER_API_KEY, JUPITER_API_URL } from "./env";
@@ -60,6 +63,17 @@ export const estimate = async ({
     throw new Error(
       `Provided mint not supported by service: ${mint.toBase58()}`
     );
+  }
+
+  // Jupiter has no SOL to IOT route, so IOT is priced from its sale.
+  if (mint.equals(IOT_MINT)) {
+    return estimateBySale({
+      apiUrl: JUPITER_API_URL,
+      apiKey: JUPITER_API_KEY,
+      mint: mint.toBase58(),
+      probeAmount: IOT_PRICE_PROBE_AMOUNT,
+      platformWallet: provider.wallet.publicKey.toBase58(),
+    });
   }
 
   // /build has no quote-only form, so the price comes from a build for the platform wallet,
@@ -155,18 +169,21 @@ export const fundFees = async ({
 
   // /build returns no compute unit limit, so the limit comes from a simulation of the
   // transaction at the largest limit. The repay amount does not change the units it uses.
-  const simulation = await connection.simulateTransaction(
-    compile(
-      [
-        ComputeBudgetProgram.setComputeUnitLimit({
-          units: MAX_COMPUTE_UNIT_LIMIT,
-        }),
-      ],
-      ataRent,
-      PublicKey.default.toBase58()
-    ),
-    { sigVerify: false, replaceRecentBlockhash: true }
+  // Neither the limit nor the repay amount changes the size, so the size is checked here.
+  const simulated = compile(
+    [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: MAX_COMPUTE_UNIT_LIMIT,
+      }),
+    ],
+    ataRent,
+    PublicKey.default.toBase58()
   );
+  refuseOversizedTransaction(simulated);
+  const simulation = await connection.simulateTransaction(simulated, {
+    sigVerify: false,
+    replaceRecentBlockhash: true,
+  });
   const { instructions: budgetInstructions } = planComputeBudget(
     simulation.value
   );
