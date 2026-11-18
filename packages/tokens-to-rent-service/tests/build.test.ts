@@ -1,16 +1,20 @@
 import assert from "node:assert/strict";
+import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
+  ComputeBudgetInstruction,
   ComputeBudgetProgram,
   Keypair,
   PublicKey,
+  SystemInstruction,
   SystemProgram,
   TransactionInstruction,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { IOT_MINT } from "@helium/spl-utils";
+import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 import {
   buildFundFeesSwap,
+  buildFundFeesTransaction,
   buildJupiterSwap,
   BuildSwapRequest,
   buildSwapUrl,
@@ -18,6 +22,7 @@ import {
   ESTIMATE_LAMPORTS,
   estimateBySale,
   estimateRequest,
+  estimateSwapInput,
   FUND_FEES_MAX_ACCOUNTS,
   FUND_FEES_MAX_BYTES,
   fundFeesRequest,
@@ -647,6 +652,100 @@ describe("tokens-to-rent-service Jupiter /build", () => {
     });
   });
 
+  describe("estimateSwapInput", () => {
+    const WSOL = "So11111111111111111111111111111111111111112";
+    const IOT = IOT_MINT.toBase58();
+    const PLATFORM = key();
+    const WIRING = {
+      apiUrl: "https://jupiter.test",
+      apiKey: "secret",
+      platformWallet: PLATFORM,
+    };
+    /** Answers each build as asked, paying out `outFor(amount)`, and records the requests. */
+    const answering = (
+      outFor: (amount: bigint) => bigint,
+      asked: URLSearchParams[]
+    ) =>
+      (async (url: string) => {
+        const params = new URL(url).searchParams;
+        asked.push(params);
+        const amount = params.get("amount")!;
+        return new Response(
+          JSON.stringify(
+            buildBody({
+              inputMint: params.get("inputMint"),
+              outputMint: params.get("outputMint"),
+              inAmount: amount,
+              outAmount: outFor(BigInt(amount)).toString(),
+            })
+          ),
+          { status: 200 }
+        );
+      }) as typeof fetch;
+
+    for (const [name, mint] of [
+      ["HNT", HNT_MINT.toBase58()],
+      ["MOBILE", MOBILE_MINT.toBase58()],
+    ] as const) {
+      it(`prices ${name} from one unbounded build that buys it with 0.020015 SOL`, async () => {
+        const asked: URLSearchParams[] = [];
+        const estimate = await estimateSwapInput(
+          { ...WIRING, mint },
+          answering(() => 123456n, asked)
+        );
+        assert.equal(estimate, "123456");
+        assert.deepEqual(
+          asked.map((params) => Object.fromEntries(params)),
+          [
+            {
+              inputMint: WSOL,
+              outputMint: mint,
+              amount: "20015000",
+              taker: PLATFORM,
+              slippageBps: "100",
+              excludeDexes: RFQ_V2_LABEL,
+            },
+          ]
+        );
+      });
+    }
+
+    it("prices IOT from its sale, not from a build that buys it", async () => {
+      const asked: URLSearchParams[] = [];
+      const estimate = await estimateSwapInput(
+        { ...WIRING, mint: IOT },
+        answering((amount) => amount / 2150n, asked)
+      );
+      // The 43,000 IOT probe sells for 20,000,000 lamports;
+      // 43e9 * 20,015,000 / 20,000,000 = 43,032,250,000.
+      assert.equal(estimate, "43032250000");
+      assert.deepEqual(
+        asked.map((params) => [
+          params.get("inputMint"),
+          params.get("outputMint"),
+          params.get("amount"),
+        ]),
+        [
+          [IOT, WSOL, "43000000000"],
+          [IOT, WSOL, "43032250000"],
+        ]
+      );
+    });
+
+    it("refuses a mint the service does not swap, before it calls Jupiter", async () => {
+      const asked: URLSearchParams[] = [];
+      const mint = key();
+      await assert.rejects(
+        estimateSwapInput(
+          { ...WIRING, mint },
+          answering(() => 1n, asked)
+        ),
+        new RegExp(`Provided mint not supported by service: ${mint}`)
+      );
+      assert.equal(asked.length, 0);
+    });
+  });
+
   describe("refuseExtraAccountCreations", () => {
     const ATA_PROGRAM = new PublicKey(
       "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
@@ -1019,6 +1118,196 @@ describe("tokens-to-rent-service Jupiter /build", () => {
         () => planComputeBudget({ err: null, logs: [] }),
         /compute units/
       );
+    });
+  });
+
+  describe("buildFundFeesTransaction", () => {
+    const WSOL = "So11111111111111111111111111111111111111112";
+    const HNT = HNT_MINT.toBase58();
+    const USER = Keypair.generate().publicKey;
+    const PLATFORM = Keypair.generate().publicKey;
+    const BLOCKHASH = key();
+    const PARAMS = {
+      apiUrl: "https://jupiter.test",
+      mint: HNT,
+      inputAmount: "1000000",
+      userWallet: USER.toBase58(),
+    };
+    /** Answers the build with a swap that names the user and `accounts` other accounts. */
+    const serving = (accounts: number, calls: string[] = []) =>
+      (async (url: string) => {
+        calls.push(url);
+        return new Response(
+          JSON.stringify(
+            buildBody({
+              inputMint: HNT,
+              outputMint: WSOL,
+              swapInstruction: {
+                programId: SWAP_PROGRAM,
+                accounts: [
+                  { pubkey: USER.toBase58(), isSigner: true, isWritable: true },
+                  ...Array.from({ length: accounts }, () => ({
+                    pubkey: key(),
+                    isSigner: false,
+                    isWritable: true,
+                  })),
+                ],
+                data: "u2T6zA==",
+              },
+            })
+          ),
+          { status: 200 }
+        );
+      }) as typeof fetch;
+    /** A connection, a signer and a lookup table loader that record their calls. */
+    const fakes = (
+      simulation: { err: unknown; logs: string[]; unitsConsumed?: number } = {
+        err: null,
+        logs: [],
+        unitsConsumed: 100_000,
+      }
+    ) => {
+      const calls = {
+        rentSizes: [] as number[],
+        lookups: [] as string[][],
+        simulated: [] as {
+          transaction: VersionedTransaction;
+          config: unknown;
+        }[],
+        blockhashes: 0,
+        signed: [] as VersionedTransaction[],
+      };
+      return {
+        calls,
+        deps: {
+          connection: {
+            getMinimumBalanceForRentExemption: async (size: number) => {
+              calls.rentSizes.push(size);
+              return 2_039_280;
+            },
+            simulateTransaction: async (
+              transaction: VersionedTransaction,
+              config: unknown
+            ) => {
+              calls.simulated.push({ transaction, config });
+              return { value: simulation };
+            },
+            getLatestBlockhash: async () => {
+              calls.blockhashes += 1;
+              return { blockhash: BLOCKHASH };
+            },
+          },
+          signer: {
+            publicKey: PLATFORM,
+            signTransaction: async (transaction: VersionedTransaction) => {
+              calls.signed.push(transaction);
+              return transaction;
+            },
+          },
+          lookupTableAccounts: async (keys: string[]) => {
+            calls.lookups.push(keys);
+            return [];
+          },
+        },
+      };
+    };
+    const transfer = (ix: TransactionInstruction) => {
+      const { fromPubkey, toPubkey, lamports } =
+        SystemInstruction.decodeTransfer(ix);
+      return {
+        from: fromPubkey.toBase58(),
+        to: toPubkey.toBase58(),
+        lamports,
+      };
+    };
+    const unitLimit = (ix: TransactionInstruction) =>
+      ComputeBudgetInstruction.decodeSetComputeUnitLimit(ix).units;
+
+    it("lends the rent, swaps, repays the rent and fees, and signs with the simulated compute limit", async () => {
+      const { calls, deps } = fakes();
+      const transaction = await buildFundFeesTransaction(
+        PARAMS,
+        deps,
+        serving(1)
+      );
+
+      assert.deepEqual(calls.rentSizes, [ACCOUNT_SIZE]);
+      assert.deepEqual(calls.lookups, [[TABLE_A, TABLE_B]]);
+      assert.equal(calls.simulated.length, 1);
+      assert.deepEqual(calls.simulated[0].config, {
+        sigVerify: false,
+        replaceRecentBlockhash: true,
+      });
+      assert.equal(
+        unitLimit(
+          TransactionMessage.decompile(calls.simulated[0].transaction.message)
+            .instructions[0]
+        ),
+        1_400_000
+      );
+      assert.equal(calls.signed.length, 1);
+      assert.equal(calls.signed[0], transaction);
+
+      const message = TransactionMessage.decompile(transaction.message);
+      assert.equal(message.payerKey.toBase58(), PLATFORM.toBase58());
+      assert.equal(message.recentBlockhash, BLOCKHASH);
+      assert.equal(message.instructions.length, 6);
+      const [limit, borrow, setup, swap, cleanup, repay] = message.instructions;
+      // 20% over the 100,000 simulated units.
+      assert.equal(unitLimit(limit), 120_000);
+      assert.deepEqual(transfer(borrow), {
+        from: PLATFORM.toBase58(),
+        to: USER.toBase58(),
+        lamports: 2_039_280n,
+      });
+      assert.deepEqual(
+        [setup, swap, cleanup].map((ix) => ix.programId.toBase58()),
+        [SETUP_PROGRAM, SWAP_PROGRAM, CLEANUP_PROGRAM]
+      );
+      // The 2,039,280 lamport loan and 10,000 lamports of fees.
+      assert.deepEqual(transfer(repay), {
+        from: USER.toBase58(),
+        to: PLATFORM.toBase58(),
+        lamports: 2_049_280n,
+      });
+    });
+
+    it("refuses a transaction over 1232 bytes before it simulates", async () => {
+      const { calls, deps } = fakes();
+      // 40 accounts of 32 bytes are 1280 bytes of keys alone.
+      await assert.rejects(
+        buildFundFeesTransaction(PARAMS, deps, serving(40)),
+        /over Solana's 1232-byte limit/
+      );
+      assert.equal(calls.simulated.length, 0);
+      assert.equal(calls.blockhashes, 0);
+      assert.equal(calls.signed.length, 0);
+    });
+
+    it("refuses a transaction that fails in simulation, and does not sign it", async () => {
+      const { calls, deps } = fakes({
+        err: { InstructionError: [3, { Custom: 1 }] },
+        logs: ["insufficient funds"],
+      });
+      await assert.rejects(
+        buildFundFeesTransaction(PARAMS, deps, serving(1)),
+        /fails in simulation/
+      );
+      assert.equal(calls.signed.length, 0);
+    });
+
+    it("refuses a mint the service does not swap, before it calls Jupiter", async () => {
+      const { deps } = fakes();
+      const requests: string[] = [];
+      await assert.rejects(
+        buildFundFeesTransaction(
+          { ...PARAMS, mint: key() },
+          deps,
+          serving(1, requests)
+        ),
+        /Provided mint not supported by service/
+      );
+      assert.equal(requests.length, 0);
     });
   });
 });

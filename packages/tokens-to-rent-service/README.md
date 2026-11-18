@@ -14,7 +14,13 @@ This is used for the wallet-app feature where we let users top up to 0.02 SOL us
 
 `/build` takes the input amount only (ExactIn), has no quote-only form, and returns the compute unit price without a limit. `/estimate` builds a swap of 0.020015 SOL into the token for the platform wallet and reports its output; `/fees` builds the token to SOL swap for the user, bounded with `maxAccounts` for every token and also `maxBytes` for HNT and MOBILE, so the transaction aims to stay within Solana's 1232-byte limit (an estimate from measured routes). IOT uses `maxAccounts` only. It simulates the transaction to set the compute unit limit at 20% over the units used, and refuses the request when the simulation fails. The transaction carries no compute unit price, so the user repays the base fee and the rent loan only. A build whose setup creates any token account besides the user's wrapped SOL account is refused. A build that quotes less than 95% or more than 105% of the 0.020015 SOL is refused. Every request excludes Jupiter RFQ v2, whose fills need a market maker's signature.
 
-Jupiter has no SOL to IOT route, so IOT is priced from its sale. The service builds the IOT to SOL swap of a 43,000 IOT probe, scales the amount to 0.020015 SOL, and builds the scaled amount to verify it. It refuses a verify that pays out more than 105% or less than 95% of 0.020015 SOL. A verify between 95% and 100% is scaled once more from the verify. An IOT `/fees` request makes three `/build` calls. No IOT route fits both bounds, so the IOT swap is bounded by `maxAccounts` only. Every `/fees` transaction over 1232 bytes is refused before its simulation.
+Jupiter has no SOL to IOT route, so IOT is priced from its sale. The service builds the IOT to SOL swap of a 43,000 IOT probe, scales the amount to 0.020015 SOL, and builds the scaled amount to verify it. It refuses a verify that pays out more than 105% or less than 95% of 0.020015 SOL. A verify between 95% and 100% is scaled once more from the verify. An IOT `/fees` request makes up to three `/build` calls. No IOT route fits both bounds, so the IOT swap is bounded by `maxAccounts` only. Every `/fees` transaction over 1232 bytes is refused before its simulation.
+
+`/fees` signs one transaction for a wallet at a time. For 60 seconds after a wallet's request, a request for the same token returns the same signed transaction, and a request for another token is refused with HTTP 429. A failed build releases the wallet. Each instance of the service keeps this record in its own memory, so the rule holds for each instance.
+
+The service keeps each token's estimate for 15 seconds. `/estimate`, `/estimates` and `/fees` share it, and concurrent requests share one Jupiter call. A failed estimate is not kept.
+
+A failed request answers `{ "error": "<message>" }` with HTTP 500, or 429 for the refusal above. The service removes the RPC URL and the Jupiter API key from the message and from its logs.
 
 ## Deployments
 

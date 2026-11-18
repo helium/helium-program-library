@@ -1,8 +1,12 @@
-import { IOT_MINT } from "@helium/spl-utils";
+import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
+  AddressLookupTableAccount,
   ComputeBudgetProgram,
   PublicKey,
+  SystemProgram,
   TransactionInstruction,
+  TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 
@@ -532,14 +536,11 @@ export const MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS =
  */
 export const IOT_PRICE_PROBE_AMOUNT = "43000000000";
 
-const ZERO = BigInt(0);
-const ONE = BigInt(1);
-
 const mulDivCeil = (
   amount: bigint,
   numerator: bigint,
   denominator: bigint
-): bigint => (amount * numerator + denominator - ONE) / denominator;
+): bigint => (amount * numerator + denominator - 1n) / denominator;
 
 /**
  * The `mint` that sells for `ESTIMATE_LAMPORTS` of SOL, priced from `mint` to SOL builds. It is
@@ -576,7 +577,7 @@ export const estimateBySale = async (
   const target = BigInt(ESTIMATE_LAMPORTS);
   const scaleToTarget = (inputAmount: bigint, outAmount: string): bigint => {
     const out = BigInt(outAmount);
-    if (out === ZERO) {
+    if (out === 0n) {
       throw new Error("Jupiter priced the sale at 0 SOL");
     }
     return mulDivCeil(inputAmount, target, out);
@@ -600,6 +601,45 @@ export const estimateBySale = async (
   return (
     verifyOut < target ? scaleToTarget(amount, verify.outAmount) : amount
   ).toString();
+};
+
+/** The mints the service swaps to SOL. */
+const SUPPORTED_MINTS = [HNT_MINT, IOT_MINT, MOBILE_MINT].map((mint) =>
+  mint.toBase58()
+);
+
+const refuseUnsupportedMint = (mint: string): void => {
+  if (!SUPPORTED_MINTS.includes(mint)) {
+    throw new Error(`Provided mint not supported by service: ${mint}`);
+  }
+};
+
+/**
+ * The amount of `mint` the fee-funding swap sells: what `ESTIMATE_LAMPORTS` of SOL buys.
+ * `/build` has no quote-only form, so the price comes from a build for the platform wallet, whose
+ * instructions are discarded. Jupiter has no SOL to IOT route, so IOT is priced from its sale.
+ */
+export const estimateSwapInput = async (
+  params: {
+    apiUrl: string;
+    apiKey?: string;
+    mint: string;
+    platformWallet: string;
+  },
+  fetchImpl: typeof fetch = fetch
+): Promise<string> => {
+  refuseUnsupportedMint(params.mint);
+  if (params.mint === IOT_MINT.toBase58()) {
+    return estimateBySale(
+      { ...params, probeAmount: IOT_PRICE_PROBE_AMOUNT },
+      fetchImpl
+    );
+  }
+  const quote = await buildJupiterSwap(
+    estimateRequest({ ...params, solAmount: ESTIMATE_LAMPORTS.toString() }),
+    fetchImpl
+  );
+  return quote.outAmount;
 };
 
 /** What the fee-funding transaction is assembled from. */
@@ -645,3 +685,131 @@ export async function buildFundFeesSwap(
   }
   return built;
 }
+
+/** The RPC calls the fee-funding transaction is built with. */
+export interface FundFeesConnection {
+  getMinimumBalanceForRentExemption(dataLength: number): Promise<number>;
+  simulateTransaction(
+    transaction: VersionedTransaction,
+    config: { sigVerify: false; replaceRecentBlockhash: true }
+  ): Promise<{ value: Parameters<typeof planComputeBudget>[0] }>;
+  getLatestBlockhash(): Promise<{ blockhash: string }>;
+}
+
+/** The platform wallet: the fee payer, which lends the rent and signs the transaction. */
+export interface FundFeesSigner {
+  publicKey: PublicKey;
+  signTransaction(
+    transaction: VersionedTransaction
+  ): Promise<VersionedTransaction>;
+}
+
+/**
+ * Builds and signs the fee-funding transaction: the platform wallet lends the user the rent of
+ * the wrapped SOL account, the user swaps `inputAmount` of `mint` to SOL, and the user repays the
+ * loan and the fees.
+ *
+ * A transaction over Solana's size limit is refused before its simulation, and one that fails in
+ * simulation is refused before it is signed.
+ */
+export const buildFundFeesTransaction = async (
+  params: {
+    apiUrl: string;
+    apiKey?: string;
+    mint: string;
+    inputAmount: string;
+    userWallet: string;
+  },
+  deps: {
+    connection: FundFeesConnection;
+    signer: FundFeesSigner;
+    /** Loads the route's lookup tables by key. */
+    lookupTableAccounts: (
+      keys: string[]
+    ) => Promise<AddressLookupTableAccount[]>;
+  },
+  fetchImpl: typeof fetch = fetch
+): Promise<VersionedTransaction> => {
+  refuseUnsupportedMint(params.mint);
+  const { connection, signer } = deps;
+  const userWallet = new PublicKey(params.userWallet);
+
+  // Tx contains instructions to create/close WSOL token account
+  // The loan below covers the rent of one account, the wrapped SOL one.
+  const {
+    setupInstructions,
+    swapInstruction,
+    cleanupInstruction,
+    lookupTables,
+  } = await buildFundFeesSwap(
+    {
+      ...params,
+      minOutLamports: MIN_FUND_FEES_OUT_LAMPORTS,
+      maxOutLamports: MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS,
+      platformWallet: signer.publicKey.toBase58(),
+    },
+    fetchImpl
+  );
+
+  // create rent flash loan instructions
+  const ataRent =
+    await connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE);
+
+  const borrowIx = SystemProgram.transfer({
+    fromPubkey: signer.publicKey,
+    toPubkey: userWallet,
+    lamports: ataRent,
+  });
+
+  const addressLookupTableAccounts =
+    await deps.lookupTableAccounts(lookupTables);
+  const compile = (
+    budgetInstructions: TransactionInstruction[],
+    repayLamports: number,
+    recentBlockhash: string
+  ): VersionedTransaction =>
+    new VersionedTransaction(
+      new TransactionMessage({
+        payerKey: signer.publicKey,
+        recentBlockhash,
+        instructions: [
+          ...budgetInstructions,
+          borrowIx,
+          ...setupInstructions,
+          swapInstruction,
+          ...(cleanupInstruction ? [cleanupInstruction] : []),
+          SystemProgram.transfer({
+            fromPubkey: userWallet,
+            toPubkey: signer.publicKey,
+            lamports: repayLamports,
+          }),
+        ],
+      }).compileToV0Message(addressLookupTableAccounts)
+    );
+
+  // /build returns no compute unit limit, so the limit comes from a simulation of the
+  // transaction at the largest limit. The repay amount does not change the units it uses.
+  // Neither the limit nor the repay amount changes the size, so the size is checked here.
+  const simulated = compile(
+    [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: MAX_COMPUTE_UNIT_LIMIT,
+      }),
+    ],
+    ataRent,
+    PublicKey.default.toBase58()
+  );
+  refuseOversizedTransaction(simulated);
+  const simulation = await connection.simulateTransaction(simulated, {
+    sigVerify: false,
+    replaceRecentBlockhash: true,
+  });
+  const { instructions: budgetInstructions } = planComputeBudget(
+    simulation.value
+  );
+
+  const blockhash = (await connection.getLatestBlockhash()).blockhash;
+  return signer.signTransaction(
+    compile(budgetInstructions, repayLamports(ataRent), blockhash)
+  );
+};

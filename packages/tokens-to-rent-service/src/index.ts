@@ -1,12 +1,20 @@
 import cors from "@fastify/cors";
 import { PublicKey } from "@solana/web3.js";
-import Fastify, { FastifyInstance } from "fastify";
+import Fastify, { FastifyInstance, FastifyReply } from "fastify";
+import { failure } from "./errors";
 import { settleEstimates } from "./estimates";
 import * as jup from "./jupiter";
 import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
 
 const server: FastifyInstance = Fastify({ logger: true });
 server.register(cors, { origin: "*" });
+
+/** Logs the failure and answers with it. Both texts are redacted. */
+const sendFailure = (res: FastifyReply, err: unknown): void => {
+  const { status, body, log } = failure(err);
+  console.error(log);
+  res.code(status).send(body);
+};
 
 server.get("/health", async (req, res) => {
   res.send({ ok: true });
@@ -22,12 +30,11 @@ server.post<{
 
     res.send(
       Buffer.from(
-        (await jup.fundFees({ userWallet: walletPk, mint: mintPk })).serialize()
+        await jup.fundFees({ userWallet: walletPk, mint: mintPk })
       ).toJSON().data
     );
   } catch (err) {
-    res.code(500).send(err);
-    console.error(err);
+    sendFailure(res, err);
   }
 });
 
@@ -42,8 +49,7 @@ server.post<{
       estimate: await jup.estimate({ mint: mintPk }),
     });
   } catch (err) {
-    res.code(500).send(err);
-    console.error(err);
+    sendFailure(res, err);
   }
 });
 
@@ -57,10 +63,11 @@ server.get<{}>("/estimates", async (req, res) => {
     results
   );
   failures.forEach(({ mint, reason }) =>
-    console.error(`Estimate failed for ${mint}`, reason)
+    console.error(`Estimate failed for ${mint}`, failure(reason).log)
   );
   if (allFailed) {
-    res.code(500).send(failures[0].reason);
+    const { status, body } = failure(failures[0].reason);
+    res.code(status).send(body);
     return;
   }
   res.send(estimates);
