@@ -1,8 +1,15 @@
+import { HNT_MINT, IOT_MINT, MOBILE_MINT } from "@helium/spl-utils";
+import { ACCOUNT_SIZE } from "@solana/spl-token";
 import {
+  AddressLookupTableAccount,
   ComputeBudgetProgram,
   PublicKey,
+  SystemProgram,
   TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
+import { RequestError, UpstreamError } from "./errors";
 
 /** Jupiter's Swap V2 build endpoint, relative to the API base URL. */
 const JUPITER_BUILD_PATH = "/swap/v2/build";
@@ -39,8 +46,21 @@ export const FUND_FEES_MAX_BYTES =
 /** The account limit the fee-funding swap is built with (`maxAccounts`). */
 export const FUND_FEES_MAX_ACCOUNTS = 20;
 
+/**
+ * How `/build` bounds the route.
+ * - `quote`: unbounded, for a price whose instructions are discarded.
+ * - `fundFees`: `maxAccounts` and `maxBytes`, to fit the fee-funding transaction.
+ * - `fundFeesAccountsOnly`: `maxAccounts` only. IOT to SOL gets no route with both bounds, so IOT
+ *   uses `maxAccounts` only. `refuseOversizedTransaction` guards the byte limit before the
+ *   simulation.
+ */
+export type RouteBound = "quote" | "fundFees" | "fundFeesAccountsOnly";
+
 /** How much of a failed `/build` answer's body goes into the error. */
 const ERROR_BODY_MAX_CHARS = 300;
+
+/** How long a Jupiter `/build` call may take, in milliseconds, before it is refused. */
+export const JUPITER_TIMEOUT_MS = 15_000;
 
 /**
  * Jupiter RFQ v2. Its fills need a market maker's co-signature that this service does not
@@ -89,8 +109,7 @@ export interface BuildSwapRequest {
   /** The account that signs the swap and holds the input. */
   taker: string;
   slippageBps: number;
-  /** Bound the swap so it fits the fee-funding transaction; a price quote leaves this off. */
-  fitFundFeesTransaction: boolean;
+  routeBound: RouteBound;
 }
 
 /** The `/build` request, as a URL. */
@@ -102,9 +121,20 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
   url.searchParams.set("taker", request.taker);
   url.searchParams.set("slippageBps", String(request.slippageBps));
   url.searchParams.set("excludeDexes", RFQ_V2_LABEL);
-  if (request.fitFundFeesTransaction) {
-    url.searchParams.set("maxAccounts", String(FUND_FEES_MAX_ACCOUNTS));
-    url.searchParams.set("maxBytes", String(FUND_FEES_MAX_BYTES));
+  switch (request.routeBound) {
+    case "quote":
+      break;
+    case "fundFees":
+      url.searchParams.set("maxAccounts", String(FUND_FEES_MAX_ACCOUNTS));
+      url.searchParams.set("maxBytes", String(FUND_FEES_MAX_BYTES));
+      break;
+    case "fundFeesAccountsOnly":
+      url.searchParams.set("maxAccounts", String(FUND_FEES_MAX_ACCOUNTS));
+      break;
+    default: {
+      const unknownBound: never = request.routeBound;
+      throw new Error(`Unknown route bound: ${unknownBound}`);
+    }
   }
   return url;
 }
@@ -130,13 +160,14 @@ export function estimateRequest(params: {
     taker: params.platformWallet,
     slippageBps: SLIPPAGE_BPS,
     apiKey: params.apiKey,
-    fitFundFeesTransaction: false,
+    routeBound: "quote",
   };
 }
 
 /**
  * The `/build` request for the swap the user signs: `inputAmount` of `mint` into SOL, built for
- * the user and bounded to fit the fee-funding transaction.
+ * the user and bounded to fit the fee-funding transaction. IOT drops the byte bound, see
+ * `RouteBound`.
  */
 export function fundFeesRequest(params: {
   apiUrl: string;
@@ -153,7 +184,8 @@ export function fundFeesRequest(params: {
     taker: params.userWallet,
     slippageBps: SLIPPAGE_BPS,
     apiKey: params.apiKey,
-    fitFundFeesTransaction: true,
+    routeBound:
+      params.mint === IOT_MINT.toBase58() ? "fundFeesAccountsOnly" : "fundFees",
   };
 }
 
@@ -174,8 +206,17 @@ type Json = Record<string, unknown>;
 const isRecord = (value: unknown): value is Json =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const invalid = (field: string): Error =>
-  new Error(`Invalid Jupiter /build response: ${field}`);
+const invalid = (field: string): UpstreamError =>
+  new UpstreamError(`Invalid Jupiter /build response: ${field}`);
+
+/** Reads a public key from Jupiter's answer; a key that does not parse is refused. */
+const readKey = (value: string, field: string): PublicKey => {
+  try {
+    return new PublicKey(value);
+  } catch {
+    throw invalid(field);
+  }
+};
 
 const readString = (body: Json, field: string): string => {
   const value = body[field];
@@ -215,13 +256,13 @@ const readInstruction = (
       throw invalid(`${field}.accounts`);
     }
     return {
-      pubkey: new PublicKey(account.pubkey),
+      pubkey: readKey(account.pubkey, `${field}.accounts`),
       isSigner: account.isSigner,
       isWritable: account.isWritable,
     };
   });
   return new TransactionInstruction({
-    programId: new PublicKey(value.programId),
+    programId: readKey(value.programId, `${field}.programId`),
     keys,
     data: Buffer.from(value.data, "base64"),
   });
@@ -275,7 +316,7 @@ export function readBuildResponse(
     throw invalid("body");
   }
   if (typeof raw.error === "string" && raw.error.length > 0) {
-    throw new Error(`Jupiter /build returned error: ${raw.error}`);
+    throw new UpstreamError(`Jupiter /build returned error: ${raw.error}`);
   }
 
   const inputMint = readString(raw, "inputMint");
@@ -286,20 +327,20 @@ export function readBuildResponse(
     outputMint !== expected.outputMint ||
     inAmount !== expected.amount
   ) {
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter built a swap of ${inAmount} ${inputMint} for ${outputMint}, not the requested ${expected.amount} ${expected.inputMint} for ${expected.outputMint}`
     );
   }
 
   if (routeLabels(raw.routePlan).includes(RFQ_V2_LABEL)) {
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter built a route through ${RFQ_V2_LABEL}, which needs a market maker's signature`
     );
   }
 
   const other = readInstructions(raw, "otherInstructions");
   if (other.length > 0) {
-    throw new Error(
+    throw new UpstreamError(
       `Jupiter built a swap with ${other.length} otherInstructions, which this service does not run`
     );
   }
@@ -317,27 +358,57 @@ export function readBuildResponse(
         ? null
         : readInstruction(raw.cleanupInstruction, "cleanupInstruction"),
     lookupTables: Object.keys(tables ?? {}).map((key) =>
-      new PublicKey(key).toBase58()
+      readKey(key, "addressesByLookupTableAddress").toBase58()
     ),
     outAmount: readAmount(raw, "outAmount"),
   };
 }
 
-/** Builds a swap through `/build` and reads the answer. */
+/** True for the error of an aborted or timed-out fetch. */
+const timedOut = (err: unknown): boolean =>
+  err instanceof Error &&
+  (err.name === "TimeoutError" || err.name === "AbortError");
+
+const jupiterTimeout = (): UpstreamError =>
+  new UpstreamError(`Jupiter /build timed out after ${JUPITER_TIMEOUT_MS} ms`);
+
+/**
+ * Builds a swap through `/build` and reads the answer. A call that takes more than
+ * `JUPITER_TIMEOUT_MS` is refused.
+ */
 export async function buildJupiterSwap(
   request: BuildSwapRequest,
   fetchImpl: typeof fetch = fetch
 ): Promise<BuiltSwap> {
-  const response = await fetchImpl(buildSwapUrl(request).toString(), {
-    headers: request.apiKey ? { "x-api-key": request.apiKey } : {},
-  });
+  let response: Response;
+  try {
+    response = await fetchImpl(buildSwapUrl(request).toString(), {
+      headers: request.apiKey ? { "x-api-key": request.apiKey } : {},
+      signal: AbortSignal.timeout(JUPITER_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw timedOut(err) ? jupiterTimeout() : err;
+  }
   if (!response.ok) {
-    const body = (await response.text()).slice(0, ERROR_BODY_MAX_CHARS);
-    throw new Error(
+    let body: string;
+    try {
+      body = (await response.text()).slice(0, ERROR_BODY_MAX_CHARS);
+    } catch (err) {
+      throw timedOut(err) ? jupiterTimeout() : err;
+    }
+    throw new UpstreamError(
       `Jupiter /build error: ${response.status} ${response.statusText}: ${body}`
     );
   }
-  return readBuildResponse(await response.json(), {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (err) {
+    throw timedOut(err)
+      ? jupiterTimeout()
+      : new UpstreamError("Jupiter /build returned a body that is not JSON");
+  }
+  return readBuildResponse(body, {
     inputMint: request.inputMint,
     outputMint: request.outputMint,
     amount: request.amount,
@@ -361,7 +432,7 @@ export const refusePlatformKey = (
         ix.keys.some((meta) => meta.pubkey.equals(platform))
     )
   ) {
-    throw new Error(
+    throw new UpstreamError(
       "Jupiter built an instruction that needs the platform wallet's signature"
     );
   }
@@ -373,7 +444,7 @@ export const refusePlatformUser = (
   platformKey: PublicKey | string
 ): void => {
   if (new PublicKey(user).equals(new PublicKey(platformKey))) {
-    throw new Error("The platform wallet cannot fund its own fees");
+    throw new RequestError("The platform wallet cannot fund its own fees");
   }
 };
 
@@ -408,7 +479,7 @@ export function refuseExtraAccountCreations(
     }
     const account = ix.keys[1]?.pubkey;
     if (!account || !account.equals(wsolAccount)) {
-      throw new Error(
+      throw new UpstreamError(
         `Jupiter built a swap that creates a token account besides the wrapped SOL account${
           account ? ` (${account.toBase58()})` : ""
         }, which the rent loan does not cover`
@@ -416,6 +487,28 @@ export function refuseExtraAccountCreations(
     }
   }
 }
+
+/**
+ * Refuses a transaction over Solana's 1232-byte limit. web3.js throws a RangeError for a
+ * message that alone is over the limit, which is refused the same way.
+ */
+export const refuseOversizedTransaction = (
+  transaction: VersionedTransaction
+): void => {
+  let size = Infinity;
+  try {
+    size = transaction.serialize().length;
+  } catch (error) {
+    if (!(error instanceof RangeError)) {
+      throw error;
+    }
+  }
+  if (size > TRANSACTION_SIZE_LIMIT) {
+    throw new Error(
+      `The fee-funding transaction is over Solana's ${TRANSACTION_SIZE_LIMIT}-byte limit`
+    );
+  }
+};
 
 /**
  * The compute unit limit for a transaction that used `unitsConsumed` in simulation: 20% over
@@ -473,13 +566,134 @@ export const ESTIMATE_LAMPORTS = 20_015_000;
 /** The least SOL the fee-funding swap may pay out, in lamports: 95% of `ESTIMATE_LAMPORTS`. */
 export const MIN_FUND_FEES_OUT_LAMPORTS = (ESTIMATE_LAMPORTS * 95) / 100;
 
+/**
+ * The most SOL the verifying build of `estimateBySale` may pay out, in lamports: 105% of
+ * `ESTIMATE_LAMPORTS`.
+ */
+export const MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS =
+  (ESTIMATE_LAMPORTS * 105) / 100;
+
+/**
+ * The IOT that `estimateBySale` probes with: 43,000 IOT × 10^6 base units = 43e9. Any amount worth
+ * roughly 0.02 SOL works as a probe, because the verify checks the scaled amount.
+ */
+export const IOT_PRICE_PROBE_AMOUNT = "43000000000";
+
+const mulDivCeil = (
+  amount: bigint,
+  numerator: bigint,
+  denominator: bigint
+): bigint => (amount * numerator + denominator - 1n) / denominator;
+
+/**
+ * The `mint` that sells for `ESTIMATE_LAMPORTS` of SOL, priced from `mint` to SOL builds. It is
+ * for a mint that Jupiter cannot buy with SOL (IOT), and uses the fee-funding route bound, so the
+ * price comes from the route `/fees` builds.
+ *
+ * It builds the sale of `probeAmount`, scales that amount to `ESTIMATE_LAMPORTS` (rounded up), and
+ * builds the sale of the scaled amount to verify it. A verify that pays out more than 105% or less
+ * than 95% of `ESTIMATE_LAMPORTS` is refused, because the probe's price is then not the verify's.
+ * A verify in [95%, 100%) is scaled once more from the verify, so the second scale adds at most
+ * about 5.3% to the amount.
+ */
+export const estimateBySale = async (
+  params: {
+    apiUrl: string;
+    apiKey?: string;
+    mint: string;
+    probeAmount: string;
+    platformWallet: string;
+  },
+  fetchImpl: typeof fetch = fetch
+): Promise<string> => {
+  const sell = (inputAmount: bigint) =>
+    buildJupiterSwap(
+      fundFeesRequest({
+        apiUrl: params.apiUrl,
+        apiKey: params.apiKey,
+        mint: params.mint,
+        inputAmount: inputAmount.toString(),
+        userWallet: params.platformWallet,
+      }),
+      fetchImpl
+    );
+  const target = BigInt(ESTIMATE_LAMPORTS);
+  const scaleToTarget = (inputAmount: bigint, outAmount: string): bigint => {
+    const out = BigInt(outAmount);
+    if (out === 0n) {
+      throw new UpstreamError("Jupiter priced the sale at 0 SOL");
+    }
+    return mulDivCeil(inputAmount, target, out);
+  };
+
+  const probeAmount = BigInt(params.probeAmount);
+  const probe = await sell(probeAmount);
+  const amount = scaleToTarget(probeAmount, probe.outAmount);
+  const verify = await sell(amount);
+  const verifyOut = BigInt(verify.outAmount);
+  if (verifyOut > BigInt(MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS)) {
+    throw new UpstreamError(
+      `Jupiter priced ${amount} at ${verifyOut} lamports, over 105% of the ${target} its probe priced it at`
+    );
+  }
+  if (verifyOut < BigInt(MIN_FUND_FEES_OUT_LAMPORTS)) {
+    throw new UpstreamError(
+      `Jupiter priced ${amount} at ${verifyOut} lamports, under 95% of the ${target} its probe priced it at`
+    );
+  }
+  return (
+    verifyOut < target ? scaleToTarget(amount, verify.outAmount) : amount
+  ).toString();
+};
+
+/** The mints the service swaps to SOL. */
+const SUPPORTED_MINTS = [HNT_MINT, IOT_MINT, MOBILE_MINT].map((mint) =>
+  mint.toBase58()
+);
+
+/** Refuses a mint the service does not swap. */
+export const refuseUnsupportedMint = (mint: string): void => {
+  if (!SUPPORTED_MINTS.includes(mint)) {
+    throw new RequestError(`Provided mint not supported by service: ${mint}`);
+  }
+};
+
+/**
+ * The amount of `mint` the fee-funding swap sells: what `ESTIMATE_LAMPORTS` of SOL buys.
+ * `/build` has no quote-only form, so the price comes from a build for the platform wallet, whose
+ * instructions are discarded. Jupiter has no SOL to IOT route, so IOT is priced from its sale.
+ */
+export const estimateSwapInput = async (
+  params: {
+    apiUrl: string;
+    apiKey?: string;
+    mint: string;
+    platformWallet: string;
+  },
+  fetchImpl: typeof fetch = fetch
+): Promise<string> => {
+  refuseUnsupportedMint(params.mint);
+  if (params.mint === IOT_MINT.toBase58()) {
+    return estimateBySale(
+      { ...params, probeAmount: IOT_PRICE_PROBE_AMOUNT },
+      fetchImpl
+    );
+  }
+  const quote = await buildJupiterSwap(
+    estimateRequest({ ...params, solAmount: ESTIMATE_LAMPORTS.toString() }),
+    fetchImpl
+  );
+  return quote.outAmount;
+};
+
 /** What the fee-funding transaction is assembled from. */
 export type FundFeesSwap = BuiltSwap;
 
 /**
  * Builds the swap the user signs for the fee-funding transaction: the bounded `/build` request
  * for the user, refused when its setup creates a token account besides the user's wrapped SOL
- * account (the rent loan covers that one), or when it quotes less SOL than `minOutLamports`.
+ * account (the rent loan covers that one), or when it quotes less SOL than `minOutLamports` or
+ * more than `maxOutLamports`.
  * The platform wallet is refused as the user before the request, and an answer with an
  * instruction that names the platform wallet is refused.
  * The compute budget is planned after a simulation of
@@ -489,6 +703,8 @@ export async function buildFundFeesSwap(
   params: Parameters<typeof fundFeesRequest>[0] & {
     /** The least SOL the swap may pay out, in lamports. */
     minOutLamports: number;
+    /** The most SOL the swap may pay out, in lamports. */
+    maxOutLamports: number;
     /** The fee payer that lends the rent. */
     platformWallet: string;
   },
@@ -506,7 +722,139 @@ export async function buildFundFeesSwap(
   );
   refuseExtraAccountCreations(built.setupInstructions, params.userWallet);
   if (Number(built.outAmount) < params.minOutLamports) {
-    throw new Error("Jupiter quoted less SOL than the fee estimate");
+    throw new UpstreamError("Jupiter quoted less SOL than the fee estimate");
+  }
+  if (Number(built.outAmount) > params.maxOutLamports) {
+    throw new UpstreamError(
+      "Jupiter quoted more SOL than the fee estimate allows"
+    );
   }
   return built;
 }
+
+/** The RPC calls the fee-funding transaction is built with. */
+export interface FundFeesConnection {
+  getMinimumBalanceForRentExemption(dataLength: number): Promise<number>;
+  simulateTransaction(
+    transaction: VersionedTransaction,
+    config: { sigVerify: false; replaceRecentBlockhash: true }
+  ): Promise<{ value: Parameters<typeof planComputeBudget>[0] }>;
+  getLatestBlockhash(): Promise<{ blockhash: string }>;
+}
+
+/** The platform wallet: the fee payer, which lends the rent and signs the transaction. */
+export interface FundFeesSigner {
+  publicKey: PublicKey;
+  signTransaction(
+    transaction: VersionedTransaction
+  ): Promise<VersionedTransaction>;
+}
+
+/**
+ * Builds and signs the fee-funding transaction: the platform wallet lends the user the rent of
+ * the wrapped SOL account, the user swaps `inputAmount` of `mint` to SOL, and the user repays the
+ * loan and the fees.
+ *
+ * A transaction over Solana's size limit is refused before its simulation, and one that fails in
+ * simulation is refused before it is signed.
+ */
+export const buildFundFeesTransaction = async (
+  params: {
+    apiUrl: string;
+    apiKey?: string;
+    mint: string;
+    inputAmount: string;
+    userWallet: string;
+  },
+  deps: {
+    connection: FundFeesConnection;
+    signer: FundFeesSigner;
+    /** Loads the route's lookup tables by key. */
+    lookupTableAccounts: (
+      keys: string[]
+    ) => Promise<AddressLookupTableAccount[]>;
+  },
+  fetchImpl: typeof fetch = fetch
+): Promise<VersionedTransaction> => {
+  const { connection, signer } = deps;
+  const userWallet = new PublicKey(params.userWallet);
+
+  // Tx contains instructions to create/close WSOL token account
+  // The loan below covers the rent of one account, the wrapped SOL one.
+  const {
+    setupInstructions,
+    swapInstruction,
+    cleanupInstruction,
+    lookupTables,
+  } = await buildFundFeesSwap(
+    {
+      ...params,
+      minOutLamports: MIN_FUND_FEES_OUT_LAMPORTS,
+      maxOutLamports: MAX_ESTIMATE_BY_SALE_OUT_LAMPORTS,
+      platformWallet: signer.publicKey.toBase58(),
+    },
+    fetchImpl
+  );
+
+  // create rent flash loan instructions
+  const ataRent =
+    await connection.getMinimumBalanceForRentExemption(ACCOUNT_SIZE);
+
+  const borrowIx = SystemProgram.transfer({
+    fromPubkey: signer.publicKey,
+    toPubkey: userWallet,
+    lamports: ataRent,
+  });
+
+  const addressLookupTableAccounts =
+    await deps.lookupTableAccounts(lookupTables);
+  const compile = (
+    budgetInstructions: TransactionInstruction[],
+    repayLamports: number,
+    recentBlockhash: string
+  ): VersionedTransaction =>
+    new VersionedTransaction(
+      new TransactionMessage({
+        payerKey: signer.publicKey,
+        recentBlockhash,
+        instructions: [
+          ...budgetInstructions,
+          borrowIx,
+          ...setupInstructions,
+          swapInstruction,
+          ...(cleanupInstruction ? [cleanupInstruction] : []),
+          SystemProgram.transfer({
+            fromPubkey: userWallet,
+            toPubkey: signer.publicKey,
+            lamports: repayLamports,
+          }),
+        ],
+      }).compileToV0Message(addressLookupTableAccounts)
+    );
+
+  // /build returns no compute unit limit, so the limit comes from a simulation of the
+  // transaction at the largest limit. The repay amount does not change the units it uses.
+  // Neither the limit nor the repay amount changes the size, so the size is checked here.
+  const simulated = compile(
+    [
+      ComputeBudgetProgram.setComputeUnitLimit({
+        units: MAX_COMPUTE_UNIT_LIMIT,
+      }),
+    ],
+    ataRent,
+    PublicKey.default.toBase58()
+  );
+  refuseOversizedTransaction(simulated);
+  const simulation = await connection.simulateTransaction(simulated, {
+    sigVerify: false,
+    replaceRecentBlockhash: true,
+  });
+  const { instructions: budgetInstructions } = planComputeBudget(
+    simulation.value
+  );
+
+  const blockhash = (await connection.getLatestBlockhash()).blockhash;
+  return signer.signTransaction(
+    compile(budgetInstructions, repayLamports(ataRent), blockhash)
+  );
+};

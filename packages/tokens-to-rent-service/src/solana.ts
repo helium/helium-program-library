@@ -17,7 +17,6 @@ export const cache = new AccountFetchCache({
 export const wallet: Keypair = loadKeypair(process.env.ANCHOR_WALLET!);
 
 export function loadKeypair(keypair: string): Keypair {
-  console.log(process.env.ANCHOR_PROVIDER_URL);
   anchor.setProvider(anchor.AnchorProvider.env());
 
   return Keypair.fromSecretKey(

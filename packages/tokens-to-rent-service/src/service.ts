@@ -1,0 +1,71 @@
+import { AddressLookupTableAccount, PublicKey } from "@solana/web3.js";
+import {
+  buildFundFeesTransaction,
+  estimateSwapInput,
+  FundFeesConnection,
+  FundFeesSigner,
+} from "./build";
+import { Clock, estimateCache, fundFeesStore } from "./reuse";
+
+/**
+ * The service's estimate and fee-funding transaction. Each mint's estimate is kept for 15 seconds,
+ * and the signed transaction for a wallet and mint is held while it builds and for 90 seconds
+ * after, see `./reuse`.
+ */
+export const createService = (deps: {
+  estimateSwapInput: typeof estimateSwapInput;
+  buildFundFeesTransaction: typeof buildFundFeesTransaction;
+  connection: FundFeesConnection;
+  /** The platform wallet: it prices the estimate and signs the transaction. */
+  signer: FundFeesSigner;
+  lookupTableAccounts: (keys: string[]) => Promise<AddressLookupTableAccount[]>;
+  now: Clock;
+  /** The most new fee-funding transactions this instance signs in any minute. */
+  maxSignaturesPerMinute: number;
+  apiUrl: string;
+  apiKey?: string;
+}) => {
+  const cachedEstimate = estimateCache(deps.now);
+  const signOnce = fundFeesStore(deps.now, deps.maxSignaturesPerMinute);
+
+  const estimate = ({ mint }: { mint: PublicKey }): Promise<string> =>
+    cachedEstimate(mint.toBase58(), () =>
+      deps.estimateSwapInput({
+        apiUrl: deps.apiUrl,
+        apiKey: deps.apiKey,
+        mint: mint.toBase58(),
+        platformWallet: deps.signer.publicKey.toBase58(),
+      })
+    );
+
+  /** The serialized, signed fee-funding transaction. */
+  const fundFees = ({
+    userWallet,
+    mint,
+  }: {
+    userWallet: PublicKey;
+    mint: PublicKey;
+  }): Promise<Uint8Array> =>
+    signOnce(
+      { wallet: userWallet.toBase58(), mint: mint.toBase58() },
+      async () =>
+        (
+          await deps.buildFundFeesTransaction(
+            {
+              apiUrl: deps.apiUrl,
+              apiKey: deps.apiKey,
+              mint: mint.toBase58(),
+              inputAmount: await estimate({ mint }),
+              userWallet: userWallet.toBase58(),
+            },
+            {
+              connection: deps.connection,
+              signer: deps.signer,
+              lookupTableAccounts: deps.lookupTableAccounts,
+            }
+          )
+        ).serialize()
+    );
+
+  return { estimate, fundFees };
+};

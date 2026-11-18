@@ -218,8 +218,9 @@ jobs:
   # turbo run builds only the four packages the suites import. automation-hooks
   # and voter-stake-registry-hooks run their suites directly: their dependency
   # graphs need an anchor build, and their tests load only source through swc.
-  # tuktuk-dca-service and tokens-to-rent-service run their suites directly too:
-  # the modules they test import only @solana/web3.js.
+  # tuktuk-dca-service and tokens-to-rent-service run their suites directly too.
+  # The tokens-to-rent-service modules import @helium/spl-utils, which the
+  # turbo run below builds first (test depends on build).
   test-ts-unit:
     name: spl-utils, sus, account-fetch-cache and automation-hooks Unit Tests
     if: ${{ !(github.event_name == 'push' && github.ref_name == 'develop') }}
