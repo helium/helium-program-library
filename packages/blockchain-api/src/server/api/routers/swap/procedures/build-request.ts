@@ -1,6 +1,34 @@
 /** The only swap mode `/build` quotes and builds. */
 export const BUILD_SWAP_MODE = "ExactIn";
 
+/**
+ * The `maxAccounts` every `/build` request starts at, for the quote and the
+ * build alike, so the quoted route and the built route are drawn from the
+ * same bound. Jupiter accepts 1 to 64 and defaults to 64, a route that can
+ * take every account a transaction may name. getInstructions then adds
+ * compute budget instructions, which name one more program account, and the
+ * transaction carries a signature slot for each signer, so the route is held
+ * 4 accounts below that default. Jupiter's guidance is to lower the bound
+ * gradually and to expect no route or a worse price below 50, which the
+ * requote sequence below stays above.
+ */
+export const BUILD_MAX_ACCOUNTS = 60;
+
+/** How much each requote lowers `maxAccounts` by. */
+export const MAX_ACCOUNTS_STEP = 3;
+
+/**
+ * How many times getInstructions asks `/build` again with a lower
+ * `maxAccounts` when the transaction it built is over the packet limit. The
+ * last requote asks for `BUILD_MAX_ACCOUNTS - SIZE_REQUOTES * MAX_ACCOUNTS_STEP`
+ * = 51 accounts.
+ */
+export const SIZE_REQUOTES = 3;
+
+/** The `maxAccounts` of requote number `requote`; requote 0 is the first request. */
+export const maxAccountsForRequote = (requote: number): number =>
+  BUILD_MAX_ACCOUNTS - requote * MAX_ACCOUNTS_STEP;
+
 /** The DEX labels in a comma-separated `excludeDexes`, without blanks. */
 export const excludedLabels = (excludeDexes: string | undefined): Set<string> =>
   new Set(

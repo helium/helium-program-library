@@ -10,6 +10,11 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import { expect } from "chai";
+import {
+  BUILD_MAX_ACCOUNTS,
+  maxAccountsForRequote,
+  SIZE_REQUOTES,
+} from "../../src/server/api/routers/swap/procedures/build-request";
 import { after, afterEach, before, beforeEach, describe, it } from "mocha";
 
 /**
@@ -396,6 +401,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         taker: SYSTEM_PROGRAM,
         slippageBps: "50",
         excludeDexes: "JupiterRfqV2",
+        maxAccounts: String(BUILD_MAX_ACCOUNTS),
       });
     });
 
@@ -659,6 +665,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         taker: WALLET,
         slippageBps: "50",
         excludeDexes: "JupiterRfqV2",
+        maxAccounts: String(BUILD_MAX_ACCOUNTS),
       });
     });
 
@@ -1634,6 +1641,232 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         outputTokenAmount: { amount: string };
       };
       expect(action.outputTokenAmount.amount).to.eq("777");
+    });
+
+    describe("packet size", () => {
+      const PACKET_LIMIT = 1232;
+      const TOO_LARGE_MESSAGE =
+        "The swap route does not fit in one transaction; try a smaller amount or a different pair";
+      const realWarn = console.warn;
+      let overLimitWarnings: Record<string, unknown>[] = [];
+
+      beforeEach(() => {
+        overLimitWarnings = [];
+        console.warn = (...args: unknown[]) => {
+          if (
+            String(args[0]).startsWith(
+              "Jupiter /build transaction over the packet limit"
+            )
+          ) {
+            overLimitWarnings.push(args[1] as Record<string, unknown>);
+          }
+        };
+      });
+
+      afterEach(() => {
+        console.warn = realWarn;
+      });
+
+      /** A setup instruction that carries `bytes` bytes of data. */
+      const padding = (bytes: number) => ({
+        setupInstructions: [
+          {
+            programId: MEMO_PROGRAM,
+            accounts: [],
+            data: Buffer.alloc(bytes, 1).toString("base64"),
+          },
+        ],
+      });
+
+      /**
+       * A route whose message fits the packet but whose transaction does not
+       * once the signature slot is counted.
+       */
+      const OVER_WITH_SIGNATURE = padding(1000);
+      /** A route whose message alone does not fit a packet. */
+      const OVER_AS_MESSAGE = padding(1500);
+
+      const buildCalls = () =>
+        jupiterCalls.filter((c) => c.url.pathname === "/swap/v2/build");
+      const maxAccountsSent = () =>
+        buildCalls().map((c) => c.url.searchParams.get("maxAccounts"));
+
+      const sizeOf = (result: {
+        transactions: { serializedTransaction: string }[];
+      }) =>
+        Buffer.from(result.transactions[0].serializedTransaction, "base64")
+          .length;
+
+      it("sends the quote's maxAccounts on the quote and on the build", async () => {
+        await quote();
+        const quoted = jupiterCalls[0].url.searchParams.get("maxAccounts");
+        const { calls } = await swapInstructions();
+
+        expect(quoted).to.eq("60");
+        expect(calls[0].url.searchParams.get("maxAccounts")).to.eq(quoted);
+      });
+
+      it("lowers maxAccounts by 3 per requote, down to 51", () => {
+        expect(
+          Array.from({ length: SIZE_REQUOTES + 1 }, (_, i) =>
+            maxAccountsForRequote(i)
+          )
+        ).to.deep.eq([60, 57, 54, 51]);
+      });
+
+      it("returns a fitting build unchanged after one request", async () => {
+        const { calls, result } = await swapInstructions();
+
+        expect(calls).to.have.length(1);
+        expect(maxAccountsSent()).to.deep.eq(["60"]);
+        expect(sizeOf(result)).to.be.at.most(PACKET_LIMIT);
+        expect(overLimitWarnings).to.have.length(0);
+      });
+
+      it("returns a build that serializes to exactly the packet limit without a requote", async () => {
+        // 973 bytes of padding make the transaction 1232 bytes: the padding
+        // plus 259 bytes of signature slot, header, accounts and the
+        // server's compute budget instructions.
+        buildOverrides = padding(973);
+        const { calls, result } = await swapInstructions();
+
+        expect(sizeOf(result)).to.eq(PACKET_LIMIT);
+        expect(calls).to.have.length(1);
+      });
+
+      it("requotes a build one byte over the packet limit", async () => {
+        buildAnswers = [padding(974)];
+        const { result } = await swapInstructions();
+
+        expect(maxAccountsSent()).to.deep.eq(["60", "57"]);
+        expect(overLimitWarnings[0].size).to.eq(PACKET_LIMIT + 1);
+        expect(sizeOf(result)).to.be.at.most(PACKET_LIMIT);
+      });
+
+      it("asks /build again with a lower maxAccounts when the transaction is over the packet limit", async () => {
+        buildAnswers = [{ ...OVER_WITH_SIGNATURE, outAmount: "778" }];
+        const { result } = await swapInstructions();
+
+        expect(maxAccountsSent()).to.deep.eq(["60", "57"]);
+        expect(sizeOf(result)).to.be.at.most(PACKET_LIMIT);
+        // The requote's answer is the one built.
+        expect(result.transactions[0].metadata?.outputAmount).to.eq("777");
+        expect(overLimitWarnings).to.have.length(1);
+        expect(overLimitWarnings[0]).to.deep.include({
+          maxAccounts: 60,
+          limit: PACKET_LIMIT,
+        });
+        expect(overLimitWarnings[0].size).to.be.greaterThan(PACKET_LIMIT);
+      });
+
+      it("keeps the other parameters on a requote", async () => {
+        buildAnswers = [OVER_WITH_SIGNATURE];
+        const { calls } = await swapInstructions({
+          excludeDexes: "Foo",
+          destinationTokenAccount: ROUTE_ACCOUNT,
+        });
+
+        expect(calls).to.have.length(2);
+        const [first, second] = calls.map((c) =>
+          Object.fromEntries(c.url.searchParams)
+        );
+        expect({ ...second, maxAccounts: first.maxAccounts }).to.deep.eq(first);
+      });
+
+      it("requotes a route whose message alone does not fit a packet", async () => {
+        buildAnswers = [OVER_AS_MESSAGE];
+        const { result } = await swapInstructions();
+
+        expect(maxAccountsSent()).to.deep.eq(["60", "57"]);
+        expect(sizeOf(result)).to.be.at.most(PACKET_LIMIT);
+        expect(overLimitWarnings[0].size).to.eq(null);
+      });
+
+      it("stops requoting at the first build that fits", async () => {
+        buildAnswers = [OVER_WITH_SIGNATURE, OVER_AS_MESSAGE];
+        await swapInstructions();
+
+        expect(maxAccountsSent()).to.deep.eq(["60", "57", "54"]);
+      });
+
+      for (const [name, overrides] of [
+        ["its message alone", OVER_AS_MESSAGE],
+        ["its signature slot", OVER_WITH_SIGNATURE],
+      ] as const) {
+        it(`refuses with TRANSACTION_TOO_LARGE when the build stays over the limit through ${name}`, async () => {
+          buildOverrides = overrides;
+          const quoteResponse = await quote();
+          jupiterCalls = [];
+          const error = await rejection({
+            quoteResponse,
+            userPublicKey: WALLET,
+          });
+
+          expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
+          expect(error.message).to.eq(TOO_LARGE_MESSAGE);
+          expect(maxAccountsSent()).to.deep.eq(["60", "57", "54", "51"]);
+          expect(overLimitWarnings).to.have.length(SIZE_REQUOTES);
+          // Nothing past the build is spent on a refused route.
+          expect(rpcMethods).to.not.include("getBalance");
+        });
+      }
+
+      it("holds the minimum-output check on every requote and bounds the calls at 8", async () => {
+        const quoteResponse = {
+          ...(await quote()),
+          otherAmountThreshold: "951",
+        };
+        jupiterCalls = [];
+        // Each maxAccounts gets a below-minimum answer, then one at the
+        // narrower slippage that clears it, both over the limit.
+        buildAnswers = Array.from({ length: SIZE_REQUOTES + 1 }, () => [
+          {
+            ...OVER_WITH_SIGNATURE,
+            outAmount: "1003",
+            otherAmountThreshold: "900",
+          },
+          {
+            ...OVER_WITH_SIGNATURE,
+            outAmount: "1002",
+            otherAmountThreshold: "951",
+          },
+        ]).flat();
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
+        expect(buildCalls()).to.have.length(8);
+        expect(
+          buildCalls().map((c) => [
+            c.url.searchParams.get("maxAccounts"),
+            c.url.searchParams.get("slippageBps"),
+          ])
+        ).to.deep.eq([
+          ["60", "50"],
+          ["60", "518"],
+          ["57", "50"],
+          ["57", "518"],
+          ["54", "50"],
+          ["54", "518"],
+          ["51", "50"],
+          ["51", "518"],
+        ]);
+      });
+
+      it("refuses a requote whose output falls below the quote's minimum as an expired quote", async () => {
+        const quoteResponse = {
+          ...(await quote()),
+          otherAmountThreshold: "773",
+        };
+        jupiterCalls = [];
+        buildAnswers = [
+          OVER_WITH_SIGNATURE,
+          { otherAmountThreshold: "700", outAmount: "700" },
+        ];
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("BAD_REQUEST");
+        expect(error.message).to.match(/^Quote expired: /);
+      });
     });
   });
 });

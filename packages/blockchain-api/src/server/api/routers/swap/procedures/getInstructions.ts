@@ -3,9 +3,11 @@ import { env } from "@/lib/env";
 import {
   AccountInfo,
   Connection,
+  PACKET_DATA_SIZE,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import {
   buildVersionedTransaction,
@@ -38,6 +40,8 @@ import {
   BUILD_SWAP_MODE,
   checkBuildAnswer,
   excludedLabels,
+  maxAccountsForRequote,
+  SIZE_REQUOTES,
 } from "./build-request";
 import BN from "bn.js";
 import { z } from "zod";
@@ -304,8 +308,11 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       ...ALWAYS_EXCLUDED_LABELS,
     ]);
 
-    /** One `/build` request at `slippageBps`, validated against the quote. */
-    const requestBuild = async (slippageBps: number) => {
+    /**
+     * One `/build` request at `slippageBps` for a route of at most
+     * `maxAccounts` accounts, validated against the quote.
+     */
+    const requestBuild = async (slippageBps: number, maxAccounts: number) => {
       const buildUrl = new URL(`${env.JUPITER_API_URL}/swap/v2/build`);
       buildUrl.searchParams.set("inputMint", quoteResponse.inputMint);
       buildUrl.searchParams.set("outputMint", quoteResponse.outputMint);
@@ -313,6 +320,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       buildUrl.searchParams.set("taker", userPublicKey);
       buildUrl.searchParams.set("slippageBps", String(slippageBps));
       buildUrl.searchParams.set("excludeDexes", [...excluded].join(","));
+      buildUrl.searchParams.set("maxAccounts", String(maxAccounts));
       if (destinationTokenAccount) {
         buildUrl.searchParams.set(
           "destinationTokenAccount",
@@ -374,82 +382,132 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       return build;
     };
 
-    // otherAmountThreshold is the minimum output the swap instruction enforces
-    // on chain, and a re-quote at the quote's slippage enforces less than the
-    // quote whenever its output is lower. While the re-quote's output still
-    // clears the quote's minimum, a narrower slippage restores that minimum,
-    // so /build is asked again with it. Otherwise the swap is refused, so the
-    // chain enforces at least the minimum the signer was shown.
-    const quoteMinimum = BigInt(quoteResponse.otherAmountThreshold);
-    let build = await requestBuild(quoteResponse.slippageBps);
-    const attempts: { otherAmountThreshold: string; outAmount: string }[] = [];
-    while (BigInt(build.otherAmountThreshold) < quoteMinimum) {
-      attempts.push({
-        otherAmountThreshold: build.otherAmountThreshold,
-        outAmount: build.outAmount,
-      });
-      const slippageBps = slippageBpsKeeping(
-        BigInt(build.outAmount),
-        quoteMinimum,
-      );
-      if (attempts.length > MIN_OUTPUT_RETRIES || slippageBps === BigInt(0)) {
+    const connection = new Connection(process.env.SOLANA_RPC_URL!);
+
+    /**
+     * The route `/build` answers for at most `maxAccounts` accounts, with the
+     * minimum-output check applied, built into a transaction.
+     */
+    const buildAt = async (maxAccounts: number) => {
+      // otherAmountThreshold is the minimum output the swap instruction enforces
+      // on chain, and a re-quote at the quote's slippage enforces less than the
+      // quote whenever its output is lower. While the re-quote's output still
+      // clears the quote's minimum, a narrower slippage restores that minimum,
+      // so /build is asked again with it. Otherwise the swap is refused, so the
+      // chain enforces at least the minimum the signer was shown.
+      const quoteMinimum = BigInt(quoteResponse.otherAmountThreshold);
+      let build = await requestBuild(quoteResponse.slippageBps, maxAccounts);
+      const attempts: { otherAmountThreshold: string; outAmount: string }[] =
+        [];
+      while (BigInt(build.otherAmountThreshold) < quoteMinimum) {
+        attempts.push({
+          otherAmountThreshold: build.otherAmountThreshold,
+          outAmount: build.outAmount,
+        });
+        const slippageBps = slippageBpsKeeping(
+          BigInt(build.outAmount),
+          quoteMinimum,
+        );
+        if (attempts.length > MIN_OUTPUT_RETRIES || slippageBps === BigInt(0)) {
+          console.warn("Jupiter /build minimum output below the quote's", {
+            quoteMinimum: quoteResponse.otherAmountThreshold,
+            attempts,
+            retried: attempts.length > 1,
+            passed: false,
+          });
+          throw errors.BAD_REQUEST({ message: QUOTE_EXPIRED_MESSAGE });
+        }
+        build = await requestBuild(Number(slippageBps), maxAccounts);
+      }
+      if (attempts.length > 0) {
         console.warn("Jupiter /build minimum output below the quote's", {
           quoteMinimum: quoteResponse.otherAmountThreshold,
           attempts,
-          retried: attempts.length > 1,
-          passed: false,
+          retried: true,
+          passed: true,
+          final: {
+            otherAmountThreshold: build.otherAmountThreshold,
+            outAmount: build.outAmount,
+          },
         });
-        throw errors.BAD_REQUEST({ message: QUOTE_EXPIRED_MESSAGE });
       }
-      build = await requestBuild(Number(slippageBps));
-    }
-    if (attempts.length > 0) {
-      console.warn("Jupiter /build minimum output below the quote's", {
-        quoteMinimum: quoteResponse.otherAmountThreshold,
-        attempts,
-        retried: true,
-        passed: true,
-        final: {
-          otherAmountThreshold: build.otherAmountThreshold,
-          outAmount: build.outAmount,
+
+      // otherInstructions are not characterised for /build, so the signer is
+      // not handed instructions nobody has checked.
+      const otherCount = build.otherInstructions?.length ?? 0;
+      if (otherCount > 0) {
+        throw errors.JUPITER_ERROR({
+          message: `Jupiter built a swap with ${otherCount} otherInstructions, which this procedure does not sign`,
+        });
+      }
+
+      // computeBudgetInstructions are left out: buildVersionedTransaction sets
+      // the compute unit limit and price itself. tipInstruction is only present
+      // when tipAmount is requested, which this procedure never sends.
+      const jupIxs = [
+        ...(build.setupInstructions ?? []).map(toInstruction),
+        toInstruction(build.swapInstruction),
+        ...(build.cleanupInstruction
+          ? [toInstruction(build.cleanupInstruction)]
+          : []),
+      ];
+
+      const tx = await buildVersionedTransaction({
+        connection,
+        draft: {
+          instructions: jupIxs,
+          feePayer: new PublicKey(userPublicKey),
+          // The tables are read from chain by key, so the transaction compiles
+          // against their on-chain contents.
+          addressLookupTableAddresses: Object.keys(
+            build.addressesByLookupTableAddress ?? {},
+          ).map((key) => new PublicKey(key)),
         },
       });
-    }
+      return { build, tx };
+    };
 
-    // otherInstructions are not characterised for /build, so the signer is
-    // not handed instructions nobody has checked.
-    const otherCount = build.otherInstructions?.length ?? 0;
-    if (otherCount > 0) {
-      throw errors.JUPITER_ERROR({
-        message: `Jupiter built a swap with ${otherCount} otherInstructions, which this procedure does not sign`,
+    // A built route can serialize over the packet limit once the compute
+    // budget instructions and signature slots are added, and Jupiter reports
+    // no size for it. The serialized transaction is measured, and /build is
+    // asked again for a route of fewer accounts, up to SIZE_REQUOTES times,
+    // until it fits. A transaction over the limit is never returned.
+    //
+    // /build is requested at most (1 + SIZE_REQUOTES) * (1 + MIN_OUTPUT_RETRIES)
+    // = 8 times: each of the 1 + SIZE_REQUOTES values of maxAccounts gets its
+    // own minimum-output check, which asks again at most MIN_OUTPUT_RETRIES
+    // times. A requote can route worse, so it is held to the quote's minimum
+    // like the first request, and the two loops share no other state.
+    const serializedSize = (tx: VersionedTransaction) => {
+      try {
+        return tx.serialize().length;
+      } catch (error) {
+        // serialize writes into a fixed-size buffer and throws when a message
+        // alone is past the packet limit.
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes("encoding overruns")) throw error;
+        return Infinity;
+      }
+    };
+    let built = await buildAt(maxAccountsForRequote(0));
+    let size = serializedSize(built.tx);
+    for (
+      let requote = 1;
+      size > PACKET_DATA_SIZE && requote <= SIZE_REQUOTES;
+      requote++
+    ) {
+      console.warn("Jupiter /build transaction over the packet limit", {
+        maxAccounts: maxAccountsForRequote(requote - 1),
+        size: Number.isFinite(size) ? size : null,
+        limit: PACKET_DATA_SIZE,
       });
+      built = await buildAt(maxAccountsForRequote(requote));
+      size = serializedSize(built.tx);
     }
-
-    const connection = new Connection(process.env.SOLANA_RPC_URL!);
-
-    // computeBudgetInstructions are left out: buildVersionedTransaction sets
-    // the compute unit limit and price itself. tipInstruction is only present
-    // when tipAmount is requested, which this procedure never sends.
-    const jupIxs = [
-      ...(build.setupInstructions ?? []).map(toInstruction),
-      toInstruction(build.swapInstruction),
-      ...(build.cleanupInstruction
-        ? [toInstruction(build.cleanupInstruction)]
-        : []),
-    ];
-
-    const tx = await buildVersionedTransaction({
-      connection,
-      draft: {
-        instructions: jupIxs,
-        feePayer: new PublicKey(userPublicKey),
-        // The tables are read from chain by key, so the transaction compiles
-        // against their on-chain contents.
-        addressLookupTableAddresses: Object.keys(
-          build.addressesByLookupTableAddress ?? {},
-        ).map((key) => new PublicKey(key)),
-      },
-    });
+    if (size > PACKET_DATA_SIZE) {
+      throw errors.TRANSACTION_TOO_LARGE();
+    }
+    const { build, tx } = built;
 
     // Check wallet has sufficient balance using actual transaction fees
     const [walletBalance, txFee] = await Promise.all([
