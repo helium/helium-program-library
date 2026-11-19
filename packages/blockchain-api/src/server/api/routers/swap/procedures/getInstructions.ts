@@ -3,9 +3,11 @@ import { env } from "@/lib/env";
 import {
   AccountInfo,
   Connection,
+  PACKET_DATA_SIZE,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import {
   buildVersionedTransaction,
@@ -36,6 +38,7 @@ import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
 import {
   ALWAYS_EXCLUDED_LABELS,
   BUILD_SWAP_MODE,
+  boundRoute,
   checkBuildAnswer,
   excludedLabels,
 } from "./build-request";
@@ -98,6 +101,19 @@ const QUOTE_EXPIRED_MESSAGE =
  */
 const slippageBpsKeeping = (outAmount: bigint, minimum: bigint): bigint =>
   outAmount < minimum ? BigInt(0) : ((outAmount - minimum) * BPS) / outAmount;
+
+/**
+ * The signed size of `tx` in bytes, or undefined when its message alone runs
+ * past the packet limit: web3.js cannot serialize such a message at all.
+ */
+const signedSize = (tx: VersionedTransaction): number | undefined => {
+  try {
+    return tx.serialize().length;
+  } catch (error) {
+    if (error instanceof RangeError) return undefined;
+    throw error;
+  }
+};
 
 const toInstruction = (instruction: JupiterInstruction) =>
   new TransactionInstruction({
@@ -313,6 +329,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       buildUrl.searchParams.set("taker", userPublicKey);
       buildUrl.searchParams.set("slippageBps", String(slippageBps));
       buildUrl.searchParams.set("excludeDexes", [...excluded].join(","));
+      boundRoute(buildUrl);
       if (destinationTokenAccount) {
         buildUrl.searchParams.set(
           "destinationTokenAccount",
@@ -450,6 +467,20 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
         ).map((key) => new PublicKey(key)),
       },
     });
+
+    // The route bounds aim to keep the swap inside the packet limit, but
+    // Jupiter marks maxBytes as experimental, so a transaction that still does
+    // not fit is refused here instead of failing when it is submitted.
+    const size = signedSize(tx);
+    if (size === undefined || size > PACKET_DATA_SIZE) {
+      console.warn("Jupiter /build swap too large for one transaction", {
+        size: size ?? `message over ${PACKET_DATA_SIZE}`,
+        route: build.routePlan.map((hop) => hop.swapInfo.label),
+      });
+      throw errors.JUPITER_ERROR({
+        message: `Jupiter built a swap too large for one transaction (${size ?? "over " + PACKET_DATA_SIZE} bytes, limit ${PACKET_DATA_SIZE}); refresh the quote`,
+      });
+    }
 
     // Check wallet has sufficient balance using actual transaction fees
     const [walletBalance, txFee] = await Promise.all([

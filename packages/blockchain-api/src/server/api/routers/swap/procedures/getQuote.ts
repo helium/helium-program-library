@@ -5,6 +5,7 @@ import { createTtlCache } from "@/lib/utils/ttl-cache";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
 import {
   BUILD_SWAP_MODE,
+  boundRoute,
   checkBuildAnswer,
   excludedLabels,
   excludedWithDefaults,
@@ -60,6 +61,7 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       quoteUrl.searchParams.set("taker", QUOTE_TAKER);
       quoteUrl.searchParams.set("slippageBps", slippageBps.toString());
       quoteUrl.searchParams.set("excludeDexes", excluded);
+      boundRoute(quoteUrl);
 
       const quoteResponse = await fetch(quoteUrl.toString(), {
         headers: {

@@ -1,3 +1,5 @@
+import { PACKET_DATA_SIZE } from "@solana/web3.js";
+
 /** The only swap mode `/build` quotes and builds. */
 export const BUILD_SWAP_MODE = "ExactIn";
 
@@ -27,6 +29,39 @@ export const excludedWithDefaults = (
   excludeDexes: string | undefined,
 ): Set<string> =>
   new Set([...excludedLabels(excludeDexes), ...ALWAYS_EXCLUDED_LABELS]);
+
+/**
+ * What buildVersionedTransaction adds to Jupiter's bare swap (setup, swap and
+ * cleanup instructions compiled alone): the compute unit limit and price
+ * instructions and the compute budget program's key. Measured from live
+ * `/build` answers: 52 bytes.
+ */
+const COMPUTE_BUDGET_OVERHEAD_BYTES = 52;
+
+/** Room for Jupiter's own byte count to differ from the compiled size. */
+const ROUTE_MARGIN_BYTES = 100;
+
+/**
+ * The byte budget `/build` gets for the bare swap (`maxBytes`), so the swap
+ * transaction fits Solana's packet limit. Unbounded, `/build` answered routes
+ * whose transaction ran past it. Jupiter marks `maxBytes` as experimental, so
+ * `maxAccounts` bounds the route too, and getInstructions refuses a
+ * transaction that still does not fit.
+ */
+export const ROUTE_MAX_BYTES =
+  PACKET_DATA_SIZE - COMPUTE_BUDGET_OVERHEAD_BYTES - ROUTE_MARGIN_BYTES;
+
+/** The account limit every `/build` route is built with (`maxAccounts`). */
+export const ROUTE_MAX_ACCOUNTS = 40;
+
+/**
+ * Bound the route a `/build` request may answer with. getQuote and
+ * getInstructions both apply it, so the quoted route is one that can be built.
+ */
+export const boundRoute = (url: URL): void => {
+  url.searchParams.set("maxAccounts", String(ROUTE_MAX_ACCOUNTS));
+  url.searchParams.set("maxBytes", String(ROUTE_MAX_BYTES));
+};
 
 /** A base-10 token amount in base units, as Jupiter writes amounts. */
 const AMOUNT = /^\d+$/;

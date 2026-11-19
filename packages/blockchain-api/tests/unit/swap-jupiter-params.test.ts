@@ -396,6 +396,8 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         taker: SYSTEM_PROGRAM,
         slippageBps: "50",
         excludeDexes: "JupiterRfqV2",
+        maxAccounts: "40",
+        maxBytes: "1080",
       });
     });
 
@@ -659,6 +661,8 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         taker: WALLET,
         slippageBps: "50",
         excludeDexes: "JupiterRfqV2",
+        maxAccounts: "40",
+        maxBytes: "1080",
       });
     });
 
@@ -1512,6 +1516,49 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const { result } = await swapInstructions();
 
       expect(result.transactions).to.have.length(1);
+    });
+
+    describe("transaction size", () => {
+      /** A /build answer whose swap instruction carries `bytes` bytes of data. */
+      const swapWithData = (bytes: number) => ({
+        swapInstruction: {
+          programId: MEMO_PROGRAM,
+          accounts: [],
+          data: Buffer.alloc(bytes).toString("base64"),
+        },
+      });
+
+      // Seen in production: a route whose message fits but whose signed
+      // transaction runs past 1232 bytes, and one whose message alone does.
+      for (const [label, bytes] of [
+        ["whose signed transaction exceeds the packet limit", 1026],
+        ["whose message alone exceeds the packet limit", 1200],
+      ] as const) {
+        it(`refuses a /build answer ${label} with JUPITER_ERROR`, async () => {
+          const quoteResponse = await quote();
+          buildOverrides = swapWithData(bytes);
+
+          const error = await rejection({
+            quoteResponse,
+            userPublicKey: WALLET,
+          });
+
+          expect(error.code).to.eq("JUPITER_ERROR");
+          expect(error.message).to.match(/too large/);
+        });
+      }
+
+      it("builds a /build answer that fits the packet limit", async () => {
+        buildOverrides = swapWithData(900);
+
+        const { result } = await swapInstructions();
+
+        const serialized = Buffer.from(
+          result.transactions[0].serializedTransaction,
+          "base64"
+        );
+        expect(serialized.length).to.be.at.most(1232);
+      });
     });
 
     it("refuses a /build answer with otherInstructions", async () => {
