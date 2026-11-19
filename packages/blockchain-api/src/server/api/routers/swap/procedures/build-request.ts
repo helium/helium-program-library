@@ -42,8 +42,8 @@ const COMPUTE_BUDGET_OVERHEAD_BYTES = 52;
  * Room left under the packet limit for the guard instructions a wallet appends
  * after the server builds the swap: Phantom and Solflare add Lighthouse
  * assertions, each with the Lighthouse program's key and its own data. An
- * estimate, not a measurement; the wallets skip their guards when there is no
- * room, so a short reserve costs protection, not the swap.
+ * estimate, not a measurement: a wallet that adds more than this to a swap
+ * near the limit can still push it past the packet limit.
  */
 const WALLET_GUARD_RESERVE_BYTES = 100;
 
