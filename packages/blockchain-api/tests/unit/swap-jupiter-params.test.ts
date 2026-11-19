@@ -519,12 +519,17 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const error = await quoteRejection();
 
       expect(error.code).to.eq("JUPITER_ERROR");
-      expect(error.message).to.eq("Jupiter API returned error: No routes found");
+      expect(error.message).to.eq(
+        "Jupiter API returned error: No routes found"
+      );
     });
 
     it("refuses an answer whose outAmount is not base-10 digits with JUPITER_ERROR", async () => {
       const amount = freshAmount();
-      quoteReply = { status: 200, body: quoteBody(amount, { outAmount: "1e3" }) };
+      quoteReply = {
+        status: 200,
+        body: quoteBody(amount, { outAmount: "1e3" }),
+      };
 
       const error = await quoteRejection({}, amount);
 
@@ -712,6 +717,60 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(calls[0].url.searchParams.has("useSharedAccounts")).to.eq(false);
       });
     }
+
+    describe("deprecated params", () => {
+      const realWarn = console.warn;
+      let warnings: unknown[][] = [];
+
+      beforeEach(() => {
+        warnings = [];
+        // Only the deprecated-params log: building the transaction warns too.
+        console.warn = (...args: unknown[]) => {
+          if (args[0] === "swap.getInstructions deprecated params") {
+            warnings.push(args);
+          }
+        };
+      });
+
+      afterEach(() => {
+        console.warn = realWarn;
+      });
+
+      it("logs the deprecated params a caller sends, with its user agent", async () => {
+        const quoteResponse = await quote();
+        await call(
+          getInstructions,
+          {
+            quoteResponse,
+            userPublicKey: WALLET,
+            dynamicComputeUnitLimit: true,
+            useSharedAccounts: false,
+          },
+          {
+            context: {
+              reqHeaders: new Headers({ "user-agent": "wallet/1.2.3" }),
+            },
+          }
+        );
+
+        expect(warnings).to.deep.eq([
+          [
+            "swap.getInstructions deprecated params",
+            {
+              params: ["dynamicComputeUnitLimit", "useSharedAccounts"],
+              userAgent: "wallet/1.2.3",
+            },
+          ],
+        ]);
+      });
+
+      it("logs nothing when a caller sends no deprecated params", async () => {
+        const quoteResponse = await quote();
+        await call(getInstructions, { quoteResponse, userPublicKey: WALLET });
+
+        expect(warnings).to.deep.eq([]);
+      });
+    });
 
     it("forwards destinationTokenAccount and names it in the metadata", async () => {
       const destination = ROUTE_ACCOUNT;
@@ -944,7 +1003,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         jupiterCalls = [];
         buildOverrides = { routePlan: routeThrough("X") };
 
-        const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+        const code = await rejectionCode({
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
 
         const calls = jupiterCalls.filter(
           (c) => c.url.pathname === "/swap/v2/build"

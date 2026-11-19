@@ -292,10 +292,25 @@ const takerRentLamports = async (
  * was shown; a re-quote that falls below it is built once more at a narrower
  * slippage, or refused as an expired quote.
  */
+/** Inputs that Swap V2 ignores. Logged with the caller's user agent, to find the clients that still send them. */
+const DEPRECATED_PARAMS = [
+  "dynamicComputeUnitLimit",
+  "useSharedAccounts",
+  "prioritizationFeeLamports",
+] as const;
+
 export const getInstructions = publicProcedure.swap.getInstructions.handler(
-  async ({ input, errors }) => {
+  async ({ input, errors, context }) => {
     const { quoteResponse, userPublicKey, destinationTokenAccount, excludeDexes } =
       input;
+
+    const deprecated = DEPRECATED_PARAMS.filter((name) => input[name] !== undefined);
+    if (deprecated.length > 0) {
+      console.warn("swap.getInstructions deprecated params", {
+        params: deprecated,
+        userAgent: context.reqHeaders?.get("user-agent") ?? undefined,
+      });
+    }
 
     // `/build` has no swap mode and always swaps an exact input. Building an
     // ExactOut quote through it would spend the quote's inAmount as an input
