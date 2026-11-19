@@ -1581,7 +1581,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       expect(
         tx.message.staticAccountKeys.map((k) => k.toBase58())
       ).to.not.include(ROUTE_ACCOUNT);
-      expect(rpcMethods).to.include("getMultipleAccounts");
+      // Read once, for both the transaction and the bare swap's estimate.
+      expect(
+        rpcMethods.filter((method) => method === "getMultipleAccounts")
+      ).to.have.length(1);
     });
 
     it("compiles against the on-chain table, not the addresses /build lists", async () => {
@@ -1806,6 +1809,30 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(overLimitWarnings).to.deep.eq([
           { maxBytes: null, size: PACKET_LIMIT + 27, limit: PACKET_LIMIT },
         ]);
+      });
+
+      it("estimates the bare swap of a route through a lookup table against that table", async () => {
+        buildAnswers = [
+          {
+            ...padding(AT_LIMIT + 10),
+            swapInstruction: {
+              programId: MEMO_PROGRAM,
+              accounts: [
+                { pubkey: ROUTE_ACCOUNT, isSigner: false, isWritable: true },
+              ],
+              data: "",
+            },
+            addressesByLookupTableAddress: { [LOOKUP_TABLE]: [ROUTE_ACCOUNT] },
+          },
+        ];
+        await swapInstructions();
+
+        // The bare swap holds ROUTE_ACCOUNT as a 1-byte index into the table
+        // (a 36-byte lookup) and is 1194 bytes, 1246 with the compute budget
+        // instructions. Counted without the table, ROUTE_ACCOUNT would be a
+        // 32-byte static key and the bare swap 1191 bytes.
+        expect(overLimitWarnings.map((w) => w.size)).to.deep.eq([1246]);
+        expect(maxBytesSent()).to.deep.eq([null, "1180"]);
       });
 
       it("keeps the other parameters on a requote", async () => {
