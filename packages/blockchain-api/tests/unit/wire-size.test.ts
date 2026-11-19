@@ -72,8 +72,34 @@ const lookupTable = (size: number) =>
     },
   });
 
+/** A v0 transaction of `instructions` paid by a fresh key. */
+const v0Tx = (
+  instructions: TransactionInstruction[],
+  tables: AddressLookupTableAccount[] = [],
+): VersionedTransaction =>
+  new VersionedTransaction(
+    new TransactionMessage({
+      payerKey: Keypair.generate().publicKey,
+      recentBlockhash: BLOCKHASH,
+      instructions,
+    }).compileToV0Message(tables),
+  );
+
+/** An instruction of a fresh program with `keys` read-only accounts and `bytes` of data. */
+const instruction = (bytes: number, keys: PublicKey[] = []) =>
+  new TransactionInstruction({
+    programId: Keypair.generate().publicKey,
+    keys: keys.map((pubkey) => ({
+      pubkey,
+      isSigner: false,
+      isWritable: false,
+    })),
+    data: Buffer.alloc(bytes, 1),
+  });
+
 describe("wireSize", () => {
   let wireSize: BuildModule["wireSize"];
+  let v0WireSize: BuildModule["v0WireSize"];
   let isEncodingOverrun: BuildModule["isEncodingOverrun"];
 
   before(async () => {
@@ -84,7 +110,7 @@ describe("wireSize", () => {
     process.env.JUPITER_API_KEY = "test";
     process.env.NO_PG = "true";
     process.env.SOLANA_RPC_URL ??= "http://127.0.0.1:0";
-    ({ wireSize, isEncodingOverrun } =
+    ({ wireSize, v0WireSize, isEncodingOverrun } =
       await import("../../src/lib/utils/build-transaction"));
   });
 
@@ -111,6 +137,30 @@ describe("wireSize", () => {
     expect(wireSize(past)).to.eq(fits.serialize().length + 500);
   });
 
+  // web3.js encodes the instructions into a buffer of the packet size, and
+  // when the limit falls on a one-byte field it throws an offset out of range
+  // instead of "encoding overruns".
+  it("counts a v0 transaction whose packet limit falls on an instruction's program index", () => {
+    // The first instruction's encoding ends exactly at byte 1232 of the
+    // instruction buffer: index (1), no accounts (1), data length (2), data
+    // (1228).
+    const past = v0Tx([instruction(1228), instruction(4)]);
+
+    expect(() => past.serialize()).to.throw(/out of range/);
+    expect(wireSize(past)).to.eq(1439);
+  });
+
+  it("counts a v0 transaction whose packet limit falls inside an instruction's account indexes", () => {
+    const table = lookupTable(200);
+    const past = v0Tx(
+      [instruction(1150), instruction(4, table.state.addresses)],
+      [table],
+    );
+
+    expect(() => past.serialize()).to.throw(/out of range/);
+    expect(wireSize(past)).to.eq(1797);
+  });
+
   it("rethrows a legacy transaction whose message is past the packet limit", () => {
     const past = memoTx(1400, { legacy: true });
 
@@ -132,6 +182,37 @@ describe("wireSize", () => {
     };
 
     expect(() => wireSize(tx)).to.throw("boom");
+  });
+
+  it("sizes a v0 transaction of the given instructions and tables alone", () => {
+    const table = lookupTable(20);
+    const feePayer = Keypair.generate().publicKey;
+    const instructions = [instruction(900, table.state.addresses)];
+    const built = new VersionedTransaction(
+      new TransactionMessage({
+        payerKey: feePayer,
+        recentBlockhash: BLOCKHASH,
+        instructions,
+      }).compileToV0Message([table]),
+    );
+
+    expect(
+      v0WireSize({ instructions, feePayer, addressLookupTables: [table] }),
+    ).to.eq(built.serialize().length);
+    // Without the table its 20 addresses are static keys (32 bytes each),
+    // and its lookup (the table key, two index-list lengths and 20 indexes)
+    // is gone.
+    expect(
+      v0WireSize({ instructions, feePayer, addressLookupTables: [] }),
+    ).to.eq(built.serialize().length + 20 * 32 - (32 + 2 + 20));
+    // Past the packet limit it is counted.
+    expect(
+      v0WireSize({
+        instructions: [instruction(1400)],
+        feePayer,
+        addressLookupTables: [],
+      }),
+    ).to.eq(wireSize(v0Tx([instruction(1400)])));
   });
 
   it("recognises web3.js's overrun and nothing else", () => {

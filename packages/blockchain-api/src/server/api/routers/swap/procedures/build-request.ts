@@ -10,16 +10,21 @@ export const BUILD_SWAP_MODE = "ExactIn";
 export const SIZE_REQUOTES = 3;
 
 /**
- * The `maxBytes` of the next requote after a build at `budget` serialized to
- * `size` bytes: `budget` lowered by how far `size` is over the packet limit.
- * `/build` sizes only the bare swap against `maxBytes`, so the first build
- * sends none and its budget counts as the packet limit. The bytes the server
- * adds around the swap (compute budget instructions, signature slots) are
- * left out of Jupiter's count, and lowering the budget by the overshoot
- * leaves room for them.
+ * The `maxBytes` of the next requote after a build at `budget` whose bare
+ * swap is estimated at `bare` bytes and whose transaction serialized to
+ * `size` bytes. `/build` sizes only the bare swap against `maxBytes`, and the
+ * server adds `size - bare` bytes around it (compute budget instructions), so
+ * the bare swap fits when it is at most the packet limit less those bytes:
+ * `bare` lowered by the overshoot. A route Jupiter returned under `budget`
+ * keeps its size at any budget it still fits, so the next budget starts from
+ * the smaller of the two. The first build sends no `maxBytes`, and its budget
+ * counts as the packet limit.
  */
-export const nextMaxBytes = (budget: number, size: number): number =>
-  budget - (size - PACKET_DATA_SIZE);
+export const nextMaxBytes = (
+  budget: number,
+  bare: number,
+  size: number,
+): number => Math.min(budget, bare) - (size - PACKET_DATA_SIZE);
 
 /** The DEX labels in a comma-separated `excludeDexes`, without blanks. */
 export const excludedLabels = (excludeDexes: string | undefined): Set<string> =>

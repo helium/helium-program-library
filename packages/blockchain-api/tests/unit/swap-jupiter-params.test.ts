@@ -70,6 +70,14 @@ class BuildReply {
  * buildOverrides, or a BuildReply that replaces it.
  */
 let buildAnswers: (Record<string, unknown> | BuildReply)[] = [];
+/**
+ * When a case sets it, the fields laid over the stubbed `/build` answer for
+ * the call's `maxBytes` (null when the call sends none), in place of
+ * buildAnswers.
+ */
+let buildForMaxBytes:
+  | ((maxBytes: number | null) => Record<string, unknown>)
+  | undefined;
 /** A status and body that replace the stubbed `/build` answer, when a case sets one. */
 let buildReply: { status: number; body: unknown } | undefined;
 /** A status and body that replace the stubbed quote answer, when a case sets one. */
@@ -253,7 +261,10 @@ const stubFetch: typeof fetch = async (input, init) => {
     if (buildReply) {
       return jsonResponse(buildReply.body, buildReply.status);
     }
-    const answer = buildAnswers.shift() ?? {};
+    const maxBytes = url.searchParams.get("maxBytes");
+    const answer = buildForMaxBytes
+      ? buildForMaxBytes(maxBytes === null ? null : Number(maxBytes))
+      : (buildAnswers.shift() ?? {});
     if (answer instanceof BuildReply) {
       return jsonResponse(answer.body, answer.status);
     }
@@ -366,6 +377,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     jupiterCalls = [];
     buildOverrides = {};
     buildAnswers = [];
+    buildForMaxBytes = undefined;
     buildReply = undefined;
     quoteReply = undefined;
     rpcMethods = [];
@@ -1657,16 +1669,24 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         "The swap route does not fit in one transaction; try a smaller amount or a different pair";
       const realWarn = console.warn;
       let overLimitWarnings: Record<string, unknown>[] = [];
+      let refusalWarnings: Record<string, unknown>[] = [];
 
       beforeEach(() => {
         overLimitWarnings = [];
+        refusalWarnings = [];
         console.warn = (...args: unknown[]) => {
+          const message = String(args[0]);
           if (
-            String(args[0]).startsWith(
-              "Jupiter /build transaction over the packet limit"
-            )
+            message.startsWith("Jupiter /build transaction over the packet limit")
           ) {
             overLimitWarnings.push(args[1] as Record<string, unknown>);
+          }
+          if (
+            message.startsWith(
+              "Jupiter /build transaction refused over the packet limit"
+            )
+          ) {
+            refusalWarnings.push(args[1] as Record<string, unknown>);
           }
         };
       });
@@ -1694,6 +1714,29 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const AT_LIMIT = 973;
       /** A transaction `over` bytes past the packet limit. */
       const over = (bytes: number) => padding(AT_LIMIT + bytes);
+
+      // Of those 259 bytes, the server adds 52 around Jupiter's instructions:
+      // the compute budget program's key (32) and its two instructions (8 and
+      // 12). The bare swap of a padded route, a v0 transaction of Jupiter's
+      // instructions alone, is 207 bytes plus the padding: the signature slot
+      // (65), version and header (4), three account keys (97), the blockhash
+      // (32), and the framing of the instruction list (1), the padding
+      // instruction (4), the swap instruction (3) and the lookups (1). A
+      // transaction 1 byte over the limit has a bare swap of 1181 bytes, and
+      // a requote's maxBytes of 1180 fits it whatever the overshoot.
+      /** The bare swap of a route padded with `bytes` of 128 or more. */
+      const BARE_FRAME = 207;
+
+      /**
+       * A Jupiter that answers its best route, whose bare swap it counts as
+       * `best` bytes, whenever `maxBytes` allows it, and otherwise the largest
+       * route that fits `maxBytes`. It counts a padded route's bare swap as
+       * the padding plus `frame` bytes.
+       */
+      const jupiterWithin =
+        (best: number, frame = BARE_FRAME) =>
+        (maxBytes: number | null) =>
+          padding(Math.min(best, maxBytes ?? Infinity) - frame);
 
       /**
        * A route whose message fits the packet but whose transaction does not
@@ -1741,20 +1784,22 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(maxBytesSent()).to.deep.eq([null]);
       });
 
-      it("requotes a build one byte over the packet limit with maxBytes one below it", async () => {
+      it("requotes a build one byte over the packet limit with its bare swap less the overshoot", async () => {
         buildAnswers = [over(1)];
         const { result } = await swapInstructions();
 
-        expect(maxBytesSent()).to.deep.eq([null, String(PACKET_LIMIT - 1)]);
+        // A bare swap of 1181 bytes, 1 byte over.
+        expect(maxBytesSent()).to.deep.eq([null, "1180"]);
         expect(overLimitWarnings[0].size).to.eq(PACKET_LIMIT + 1);
         expect(sizeOf(result)).to.be.at.most(PACKET_LIMIT);
       });
 
-      it("lowers maxBytes by the overshoot when the transaction is over the packet limit", async () => {
+      it("lowers the bare swap's size by the overshoot when the transaction is over the packet limit", async () => {
         buildAnswers = [{ ...OVER_WITH_SIGNATURE, outAmount: "778" }];
         const { result } = await swapInstructions();
 
-        expect(maxBytesSent()).to.deep.eq([null, String(PACKET_LIMIT - 27)]);
+        // A bare swap of 1207 bytes, 27 bytes over.
+        expect(maxBytesSent()).to.deep.eq([null, "1180"]);
         expect(sizeOf(result)).to.be.at.most(PACKET_LIMIT);
         // The requote's answer is the one built.
         expect(result.transactions[0].metadata?.outputAmount).to.eq("777");
@@ -1775,7 +1820,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
           Object.fromEntries(c.url.searchParams)
         );
         const { maxBytes, ...rest } = second;
-        expect(maxBytes).to.eq(String(PACKET_LIMIT - 27));
+        expect(maxBytes).to.eq("1180");
         expect(rest).to.deep.eq(first);
       });
 
@@ -1783,32 +1828,72 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         buildAnswers = [OVER_AS_MESSAGE];
         const { result } = await swapInstructions();
 
-        expect(maxBytesSent()).to.deep.eq([null, String(PACKET_LIMIT - 527)]);
+        // A bare swap of 1707 bytes is over the first budget of 1232, so the
+        // budget is lowered by the 527-byte overshoot.
+        expect(maxBytesSent()).to.deep.eq([null, "705"]);
         expect(overLimitWarnings[0].size).to.eq(PACKET_LIMIT + 527);
         expect(sizeOf(result)).to.be.at.most(PACKET_LIMIT);
       });
 
-      it("lowers each requote's maxBytes from the previous one and stops at the first build that fits", async () => {
+      it("caps each requote's maxBytes at the previous one and stops at the first build that fits", async () => {
+        // The requote at 1180 answers a route with a bare swap of 1200 bytes,
+        // so the next budget is 1180 less the 20-byte overshoot.
         buildAnswers = [over(10), over(20)];
         await swapInstructions();
 
-        expect(maxBytesSent()).to.deep.eq([
-          null,
-          String(PACKET_LIMIT - 10),
-          String(PACKET_LIMIT - 10 - 20),
-        ]);
+        expect(maxBytesSent()).to.deep.eq([null, "1180", "1160"]);
         expect(overLimitWarnings.map((w) => w.maxBytes)).to.deep.eq([
           null,
-          PACKET_LIMIT - 10,
+          1180,
         ]);
       });
 
-      for (const [name, overrides, bytes] of [
+      for (const [name, B0, sizes] of [
+        // Transactions 7 and 17 bytes over the limit.
+        ["bare 1187", 1187, [1239]],
+        ["bare 1197", 1197, [1249]],
+      ] as const) {
+        it(`fits in one requote a route Jupiter keeps while it fits the budget (${name})`, async () => {
+          buildForMaxBytes = jupiterWithin(B0);
+          const { result } = await swapInstructions();
+
+          expect(maxBytesSent()).to.deep.eq([null, "1180"]);
+          expect(overLimitWarnings.map((w) => w.size)).to.deep.eq(sizes);
+          expect(sizeOf(result)).to.eq(PACKET_LIMIT);
+        });
+      }
+
+      for (const [B0, sent, sizes] of [
+        [1180, [null, "1180", "1173"], [1239, 1239]],
+        [1190, [null, "1180", "1173"], [1249, 1239]],
+      ] as const) {
+        it(`fits in two requotes a route whose bare swap Jupiter counts 7 bytes under the estimate (Jupiter's bare ${B0})`, async () => {
+          // Jupiter counts a padded route's bare swap as the padding plus 200
+          // bytes, so the server adds 59 bytes to Jupiter's count and a bare
+          // swap fits at a maxBytes of 1173.
+          buildForMaxBytes = jupiterWithin(B0, 200);
+          const { result } = await swapInstructions();
+
+          expect(maxBytesSent()).to.deep.eq(sent);
+          expect(overLimitWarnings.map((w) => w.size)).to.deep.eq(sizes);
+          expect(sizeOf(result)).to.eq(PACKET_LIMIT);
+        });
+      }
+
+      for (const [name, overrides, sent, size] of [
         // 300 bytes over is a message alone past the limit (the signature
         // slot and its count are 65 bytes) that still leaves three requotes
-        // a budget of 1 or more.
-        ["its message alone", over(300), 300],
-        ["its signature slot", OVER_WITH_SIGNATURE, 27],
+        // a budget of 1 or more. Its bare swap of 1480 bytes is over every
+        // budget, so each budget is the previous one less 300.
+        ["its message alone", over(300), [null, "932", "632", "332"], 1532],
+        // Its bare swap of 1207 bytes caps the first budget, then each budget
+        // is the previous one less 27.
+        [
+          "its signature slot",
+          OVER_WITH_SIGNATURE,
+          [null, "1180", "1153", "1126"],
+          1259,
+        ],
       ] as const) {
         it(`refuses with TRANSACTION_TOO_LARGE after ${SIZE_REQUOTES} requotes when the build stays over the limit through ${name}`, async () => {
           buildOverrides = overrides;
@@ -1822,12 +1907,12 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
           expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
           expect(error.message).to.eq(TOO_LARGE_MESSAGE);
-          expect(maxBytesSent()).to.deep.eq(
-            [null, 1, 2, 3].map((k) =>
-              k === null ? null : String(PACKET_LIMIT - k * bytes)
-            )
-          );
+          expect(maxBytesSent()).to.deep.eq(sent);
           expect(overLimitWarnings).to.have.length(SIZE_REQUOTES);
+          // The last build, refused, is logged with its size.
+          expect(refusalWarnings).to.deep.eq([
+            { maxBytes: Number(sent[3]), size, limit: PACKET_LIMIT },
+          ]);
           // Nothing past the build is spent on a refused route.
           expect(rpcMethods).to.not.include("getBalance");
         });
@@ -1862,7 +1947,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
         expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
         expect(error.message).to.eq(TOO_LARGE_MESSAGE);
-        expect(maxBytesSent()).to.deep.eq([null, String(PACKET_LIMIT - 27)]);
+        expect(maxBytesSent()).to.deep.eq([null, "1180"]);
       });
 
       it("answers no route on the first build as BAD_REQUEST", async () => {
@@ -1920,16 +2005,16 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         ).to.deep.eq([
           [null, "50"],
           [null, "518"],
-          ["1205", "50"],
-          ["1205", "518"],
-          ["1178", "50"],
-          ["1178", "518"],
-          ["1151", "50"],
-          ["1151", "518"],
+          ["1180", "50"],
+          ["1180", "518"],
+          ["1153", "50"],
+          ["1153", "518"],
+          ["1126", "50"],
+          ["1126", "518"],
         ]);
       });
 
-      it("refuses a requote whose output falls below the quote's minimum as an expired quote", async () => {
+      it("refuses a requote whose output falls below the quote's minimum as too large", async () => {
         const quoteResponse = {
           ...(await quote()),
           otherAmountThreshold: "773",
@@ -1941,8 +2026,25 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         ];
         const error = await rejection({ quoteResponse, userPublicKey: WALLET });
 
+        // The quote is current: only the routes that fit pay out less, and a
+        // fresh quote would find the same oversized route.
+        expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
+        expect(error.message).to.eq(TOO_LARGE_MESSAGE);
+        expect(maxBytesSent()).to.deep.eq([null, "1180"]);
+      });
+
+      it("refuses a first build whose output falls below the quote's minimum as an expired quote", async () => {
+        const quoteResponse = {
+          ...(await quote()),
+          otherAmountThreshold: "773",
+        };
+        jupiterCalls = [];
+        buildAnswers = [{ otherAmountThreshold: "700", outAmount: "700" }];
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
         expect(error.code).to.eq("BAD_REQUEST");
         expect(error.message).to.match(/^Quote expired: /);
+        expect(maxBytesSent()).to.deep.eq([null]);
       });
     });
   });

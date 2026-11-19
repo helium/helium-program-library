@@ -2,8 +2,10 @@ import {
   AddressLookupTableAccount,
   Connection,
   Keypair,
+  PACKET_DATA_SIZE,
   PublicKey,
   TransactionInstruction,
+  TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -46,8 +48,8 @@ const sizedBytes = (n: number): number => shortVecSize(n) + n;
 
 /**
  * The bytes a v0 `tx` takes on the wire, signature slots included, counted
- * from its parts, for a message `serialize` cannot encode because it is past
- * the packet limit.
+ * from its parts. `serialize` cannot encode a message past the packet limit,
+ * so this count is what measures one.
  */
 const countedWireSize = (tx: VersionedTransaction): number => {
   const message = tx.message;
@@ -84,18 +86,45 @@ const countedWireSize = (tx: VersionedTransaction): number => {
 };
 
 /**
- * The bytes `tx` takes on the wire, signature slots included, whether or not
- * its v0 message fits the packet limit. A legacy message past the limit
- * fails to serialize with another error, which is rethrown.
+ * The bytes `tx` takes on the wire, signature slots included. A v0 message is
+ * counted first and serialized only when the count is within the packet
+ * limit, so a v0 transaction past the limit returns its counted size whatever
+ * error web3.js would raise for it ("encoding overruns", or an offset out of
+ * range when the limit falls on a one-byte field). A legacy transaction is
+ * serialized, so one past the limit throws web3.js's error.
  */
 export const wireSize = (tx: VersionedTransaction): number => {
-  try {
-    return tx.serialize().length;
-  } catch (error) {
-    if (!isEncodingOverrun(error)) throw error;
-    return countedWireSize(tx);
+  if (tx.version === 0) {
+    const counted = countedWireSize(tx);
+    if (counted > PACKET_DATA_SIZE) return counted;
   }
+  return tx.serialize().length;
 };
+
+/**
+ * The bytes a v0 transaction holding only `instructions`, paid by `feePayer`
+ * and compiled against `addressLookupTables`, takes on the wire, signature
+ * slots included, counted like `wireSize` counts a v0 transaction.
+ */
+export const v0WireSize = ({
+  instructions,
+  feePayer,
+  addressLookupTables,
+}: {
+  instructions: TransactionInstruction[];
+  feePayer: PublicKey;
+  addressLookupTables: AddressLookupTableAccount[];
+}): number =>
+  countedWireSize(
+    new VersionedTransaction(
+      new TransactionMessage({
+        payerKey: feePayer,
+        // A blockhash is 32 bytes whatever its value.
+        recentBlockhash: PublicKey.default.toBase58(),
+        instructions,
+      }).compileToV0Message(addressLookupTables),
+    ),
+  );
 
 export function getHeliumLookupTable(): PublicKey {
   return getCluster() === "devnet"

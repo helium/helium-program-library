@@ -8,9 +8,11 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from "@solana/web3.js";
+import { getAddressLookupTableAccounts } from "@helium/spl-utils";
 import {
   buildVersionedTransaction,
   serializeTransaction,
+  v0WireSize,
   wireSize,
 } from "@/lib/utils/build-transaction";
 import {
@@ -281,7 +283,8 @@ const takerRentLamports = async (
  * returned, not the earlier quote's. The built swap's minimum output must not
  * fall below the quote's, so the chain enforces at least the floor the caller
  * was shown; a re-quote that falls below it is built once more at a narrower
- * slippage, or refused as an expired quote.
+ * slippage, or refused: as an expired quote on the first build, as too large
+ * on a size requote.
  */
 export const getInstructions = publicProcedure.swap.getInstructions.handler(
   async ({ input, errors }) => {
@@ -403,7 +406,9 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
 
     /**
      * The route `/build` answers within `maxBytes`, with the minimum-output
-     * check applied, built into a transaction.
+     * check applied, built into a transaction, and the estimated size of its
+     * bare swap: a v0 transaction of Jupiter's instructions and lookup tables
+     * alone, without the compute budget instructions the server adds.
      */
     const buildAt = async (maxBytes: number | undefined) => {
       // otherAmountThreshold is the minimum output the swap instruction enforces
@@ -432,6 +437,12 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
             retried: attempts.length > 1,
             passed: false,
           });
+          // On a size requote the routes that fit pay out less than the
+          // quote, and a fresh quote finds the same oversized route, so the
+          // swap is refused as too large rather than as an expired quote.
+          if (maxBytes !== undefined) {
+            throw errors.TRANSACTION_TOO_LARGE();
+          }
           throw errors.BAD_REQUEST({ message: QUOTE_EXPIRED_MESSAGE });
         }
         build = await requestBuild(Number(slippageBps), maxBytes);
@@ -469,29 +480,45 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           : []),
       ];
 
+      // The tables are read from chain by key, so the transaction compiles
+      // against their on-chain contents. They are read once here, for both
+      // the transaction and the bare swap's estimate.
+      const feePayer = new PublicKey(userPublicKey);
+      const addressLookupTableAddresses = Object.keys(
+        build.addressesByLookupTableAddress ?? {},
+      ).map((key) => new PublicKey(key));
+      const addressLookupTables = await getAddressLookupTableAccounts(
+        connection,
+        addressLookupTableAddresses,
+      );
       const tx = await buildVersionedTransaction({
         connection,
         draft: {
           instructions: jupIxs,
-          feePayer: new PublicKey(userPublicKey),
-          // The tables are read from chain by key, so the transaction compiles
-          // against their on-chain contents.
-          addressLookupTableAddresses: Object.keys(
-            build.addressesByLookupTableAddress ?? {},
-          ).map((key) => new PublicKey(key)),
+          feePayer,
+          addressLookupTableAddresses,
+          addressLookupTables,
         },
       });
-      return { build, tx };
+      const bare = v0WireSize({
+        instructions: jupIxs,
+        feePayer,
+        addressLookupTables,
+      });
+      return { build, tx, bare };
     };
 
     // A built route can serialize over the packet limit once the compute
-    // budget instructions and signature slots are added. The first build
-    // sends no maxBytes, so a route that fits is the one Jupiter picks by
-    // default. The serialized transaction is measured, and while it is over
-    // the limit /build is asked again, up to SIZE_REQUOTES times, with a
-    // maxBytes lowered by the overshoot (nextMaxBytes). A transaction over
-    // the limit is not returned: it is refused with TRANSACTION_TOO_LARGE, as
-    // is a requote Jupiter finds no route for within its budget.
+    // budget instructions are added. The first build sends no maxBytes, so a
+    // route that fits is the one Jupiter picks by default. The serialized
+    // transaction is measured, and while it is over the limit /build is asked
+    // again, up to SIZE_REQUOTES times, with a maxBytes of the estimated bare
+    // swap (capped at the previous budget) lowered by the overshoot
+    // (nextMaxBytes). When Jupiter counts the bare swap as the estimate does,
+    // one requote fits; the further requotes absorb a difference between the
+    // two counts. A transaction over the limit is not returned: it is refused
+    // with TRANSACTION_TOO_LARGE, as is a requote Jupiter finds no route for
+    // within its budget or whose routes fall below the quote's minimum output.
     //
     // /build is requested at most (1 + SIZE_REQUOTES) * (1 + MIN_OUTPUT_RETRIES)
     // = 8 times: each build gets its own minimum-output check, which asks
@@ -511,7 +538,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
         size,
         limit: PACKET_DATA_SIZE,
       });
-      budget = nextMaxBytes(budget, size);
+      budget = nextMaxBytes(budget, built.bare, size);
       // Jupiter takes a maxBytes of 1 or more.
       if (budget < 1) break;
       maxBytes = budget;
@@ -519,6 +546,11 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       size = wireSize(built.tx);
     }
     if (size > PACKET_DATA_SIZE) {
+      console.warn("Jupiter /build transaction refused over the packet limit", {
+        maxBytes: maxBytes ?? null,
+        size,
+        limit: PACKET_DATA_SIZE,
+      });
       throw errors.TRANSACTION_TOO_LARGE();
     }
     const { build, tx } = built;
