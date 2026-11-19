@@ -1689,7 +1689,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
       });
 
-      it("retries a swap whose message alone exceeds the packet limit with 101 bytes less, then refuses it", async () => {
+      it("retries a swap whose message alone exceeds the packet limit with 166 bytes less, then refuses it", async () => {
         const quoteResponse = await quote();
         jupiterCalls = [];
         buildOverrides = swapWithData(PACKET_DATA_SIZE);
@@ -1700,7 +1700,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(error.message).to.eq(
           "Jupiter found no route for this swap that fits one transaction (over 1232 bytes, limit 1132)"
         );
-        expect(buildMaxBytes()).to.deep.eq(["1080", "979"]);
+        expect(buildMaxBytes()).to.deep.eq(["1080", "914"]);
       });
     });
 

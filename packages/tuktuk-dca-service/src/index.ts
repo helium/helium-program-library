@@ -6,7 +6,6 @@ import {
   customSignerKey,
   init,
   RemoteTaskTransactionV0,
-  taskKey,
 } from "@helium/tuktuk-sdk";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
@@ -128,7 +127,9 @@ server.post<{
       .instruction();
 
     // The crank turner runs the task with the queue's lookup tables, its own key as payer and
-    // fresh task ids for the task's free tasks. The ids it picks do not change the size.
+    // unused task ids for the task's free tasks. Only their count changes the size, so random keys
+    // stand in for their task accounts: a real task key could match the running task and be
+    // counted once.
     const taskAccount = await tuktukProgram.account.taskV0.fetch(task);
     const taskQueueAccount = await tuktukProgram.account.taskQueueV0.fetch(
       taskQueue
@@ -224,8 +225,8 @@ server.post<{
         })
         .remainingAccounts([
           ...remainingAccounts.map((acc) => ({ ...acc, isSigner: false })),
-          ...freeTaskIds.map((id) => ({
-            pubkey: taskKey(taskQueue, id)[0],
+          ...freeTaskIds.map(() => ({
+            pubkey: Keypair.generate().publicKey,
             isWritable: true,
             isSigner: false,
           })),

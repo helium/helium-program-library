@@ -76,14 +76,21 @@ const describeSize = (size: number | undefined): string =>
   size === undefined ? `over ${CRANK_MAX_TX_BYTES} bytes` : `${size} bytes`;
 
 /**
+ * The smallest signed transaction whose message overruns the packet limit: one signature, its
+ * length byte and a message one byte too long. web3.js throws only when the message alone is over
+ * PACKET_DATA_SIZE.
+ */
+const OVERRUN_MIN_TX_BYTES = PACKET_DATA_SIZE + 1 + 1 + 64;
+
+/**
  * The `maxBytes` for the one retry of an order whose crank transaction came to `size` bytes, or
- * past the packet limit when `size` is undefined: the default budget less the overshoot. An
- * unknown size counts as one byte past the limit. The swap's bytes reach the crank transaction
+ * whose message overran the packet limit when `size` is undefined: the default budget less the
+ * overshoot. An unknown size counts as OVERRUN_MIN_TX_BYTES. The swap's bytes reach the crank transaction
  * about one for one, as instruction data in the signed task and as accounts of run_task_v0, but
  * that is not exact, so the retry can still miss.
  */
 export const retrySwapMaxBytes = (size: number | undefined): number =>
-  DCA_SWAP_MAX_BYTES - ((size ?? CRANK_MAX_TX_BYTES + 1) - CRANK_MAX_TX_BYTES);
+  DCA_SWAP_MAX_BYTES - ((size ?? OVERRUN_MIN_TX_BYTES) - CRANK_MAX_TX_BYTES);
 
 /**
  * Build an order's remote task with the default `maxBytes`. When its crank transaction does not

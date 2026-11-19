@@ -89,8 +89,8 @@ describe("tuktuk-dca-service crank transaction size", () => {
       assert.equal(retrySwapMaxBytes(1300), DCA_SWAP_MAX_BYTES - 68);
     });
 
-    it("counts an unknown size as one byte over", () => {
-      assert.equal(retrySwapMaxBytes(undefined), DCA_SWAP_MAX_BYTES - 1);
+    it("counts an unknown size as the smallest signed transaction whose message overruns", () => {
+      assert.equal(retrySwapMaxBytes(undefined), DCA_SWAP_MAX_BYTES - 66);
     });
   });
 
@@ -126,7 +126,7 @@ describe("tuktuk-dca-service crank transaction size", () => {
         message:
           "Jupiter found no route for this DCA order whose crank transaction fits (1233 bytes, limit 1232)",
       });
-      assert.deepEqual(budgets, [DCA_SWAP_MAX_BYTES, DCA_SWAP_MAX_BYTES - 1]);
+      assert.deepEqual(budgets, [DCA_SWAP_MAX_BYTES, DCA_SWAP_MAX_BYTES - 66]);
     });
 
     it("refuses without a retry when the overshoot is the whole budget", async () => {
