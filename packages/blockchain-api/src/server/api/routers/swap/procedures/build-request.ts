@@ -38,18 +38,26 @@ export const excludedWithDefaults = (
  */
 const COMPUTE_BUDGET_OVERHEAD_BYTES = 52;
 
-/** Room for Jupiter's own byte count to differ from the compiled size. */
-const ROUTE_MARGIN_BYTES = 100;
+/**
+ * Room left under the packet limit for the guard instructions a wallet appends
+ * after the server builds the swap: Phantom and Solflare add Lighthouse
+ * assertions, each with the Lighthouse program's key and its own data. An
+ * estimate, not a measurement; the wallets skip their guards when there is no
+ * room, so a short reserve costs protection, not the swap.
+ */
+const WALLET_GUARD_RESERVE_BYTES = 100;
+
+/** The largest signed swap transaction getInstructions returns. */
+export const SWAP_MAX_TX_BYTES = PACKET_DATA_SIZE - WALLET_GUARD_RESERVE_BYTES;
 
 /**
  * The byte budget `/build` gets for the bare swap (`maxBytes`), so the swap
- * transaction fits Solana's packet limit. Unbounded, `/build` answered routes
- * whose transaction ran past it. Jupiter marks `maxBytes` as experimental, so
- * `maxAccounts` bounds the route too, and getInstructions refuses a
- * transaction that still does not fit.
+ * transaction fits SWAP_MAX_TX_BYTES. Unbounded, `/build` answered routes whose
+ * transaction ran past the packet limit. Jupiter marks `maxBytes` as
+ * experimental, so `maxAccounts` bounds the route too, and getInstructions
+ * refuses a transaction that still does not fit.
  */
-export const ROUTE_MAX_BYTES =
-  PACKET_DATA_SIZE - COMPUTE_BUDGET_OVERHEAD_BYTES - ROUTE_MARGIN_BYTES;
+export const ROUTE_MAX_BYTES = SWAP_MAX_TX_BYTES - COMPUTE_BUDGET_OVERHEAD_BYTES;
 
 /** The account limit every `/build` route is built with (`maxAccounts`). */
 export const ROUTE_MAX_ACCOUNTS = 40;

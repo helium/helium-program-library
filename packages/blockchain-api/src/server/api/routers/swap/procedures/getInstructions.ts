@@ -39,6 +39,7 @@ import {
   ALWAYS_EXCLUDED_LABELS,
   BUILD_SWAP_MODE,
   boundRoute,
+  SWAP_MAX_TX_BYTES,
   checkBuildAnswer,
   excludedLabels,
 } from "./build-request";
@@ -103,16 +104,19 @@ const slippageBpsKeeping = (outAmount: bigint, minimum: bigint): bigint =>
   outAmount < minimum ? BigInt(0) : ((outAmount - minimum) * BPS) / outAmount;
 
 /**
- * The signed size of `tx` in bytes, or undefined when its message alone runs
- * past the packet limit: web3.js cannot serialize such a message at all.
+ * The size of `tx` when it is too large to return, or undefined when it fits
+ * SWAP_MAX_TX_BYTES. A message that alone runs past the packet limit has no
+ * size: web3.js throws a RangeError instead of serializing it.
  */
-const signedSize = (tx: VersionedTransaction): number | undefined => {
+const oversize = (tx: VersionedTransaction): string | undefined => {
+  let size: number;
   try {
-    return tx.serialize().length;
+    size = tx.serialize().length;
   } catch (error) {
-    if (error instanceof RangeError) return undefined;
+    if (error instanceof RangeError) return `over ${PACKET_DATA_SIZE} bytes`;
     throw error;
   }
+  return size > SWAP_MAX_TX_BYTES ? `${size} bytes` : undefined;
 };
 
 const toInstruction = (instruction: JupiterInstruction) =>
@@ -483,17 +487,17 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       },
     });
 
-    // The route bounds aim to keep the swap inside the packet limit, but
+    // The route bounds aim to keep the swap inside SWAP_MAX_TX_BYTES, but
     // Jupiter marks maxBytes as experimental, so a transaction that still does
     // not fit is refused here instead of failing when it is submitted.
-    const size = signedSize(tx);
-    if (size === undefined || size > PACKET_DATA_SIZE) {
+    const tooLarge = oversize(tx);
+    if (tooLarge) {
       console.warn("Jupiter /build swap too large for one transaction", {
-        size: size ?? `message over ${PACKET_DATA_SIZE}`,
+        size: tooLarge,
         route: build.routePlan.map((hop) => hop.swapInfo.label),
       });
       throw errors.JUPITER_ERROR({
-        message: `Jupiter built a swap too large for one transaction (${size ?? "over " + PACKET_DATA_SIZE} bytes, limit ${PACKET_DATA_SIZE}); refresh the quote`,
+        message: `Jupiter built a swap too large for one transaction (${tooLarge}, limit ${SWAP_MAX_TX_BYTES}); refresh the quote`,
       });
     }
 

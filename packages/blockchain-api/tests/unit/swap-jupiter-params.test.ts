@@ -1,7 +1,12 @@
 import { createServer, Server } from "http";
 import { AddressInfo } from "net";
 import { call, ORPCError } from "@orpc/server";
-import { Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
+import {
+  Keypair,
+  PACKET_DATA_SIZE,
+  PublicKey,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import {
   ACCOUNT_SIZE,
   ExtensionType,
@@ -10,6 +15,7 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import { expect } from "chai";
+import { SWAP_MAX_TX_BYTES } from "../../src/server/api/routers/swap/procedures/build-request";
 import { after, afterEach, before, beforeEach, describe, it } from "mocha";
 
 /**
@@ -1590,36 +1596,49 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         },
       });
 
-      // Seen in production: a route whose message fits but whose signed
-      // transaction runs past 1232 bytes, and one whose message alone does.
-      for (const [label, bytes] of [
-        ["whose signed transaction exceeds the packet limit", 1026],
-        ["whose message alone exceeds the packet limit", 1200],
-      ] as const) {
-        it(`refuses a /build answer ${label} with JUPITER_ERROR`, async () => {
-          const quoteResponse = await quote();
-          buildOverrides = swapWithData(bytes);
-
-          const error = await rejection({
-            quoteResponse,
-            userPublicKey: WALLET,
-          });
-
-          expect(error.code).to.eq("JUPITER_ERROR");
-          expect(error.message).to.match(/too large/);
-        });
-      }
-
-      it("builds a /build answer that fits the packet limit", async () => {
-        buildOverrides = swapWithData(900);
-
+      /** The signed size of the swap built from swapWithData(`bytes`). */
+      const builtSize = async (bytes: number) => {
+        buildOverrides = swapWithData(bytes);
         const { result } = await swapInstructions();
-
-        const serialized = Buffer.from(
+        return Buffer.from(
           result.transactions[0].serializedTransaction,
           "base64"
+        ).length;
+      };
+
+      /** The swap data size that builds a transaction of exactly SWAP_MAX_TX_BYTES. */
+      const dataAtLimit = async () =>
+        SWAP_MAX_TX_BYTES - ((await builtSize(900)) - 900);
+
+      it("builds a swap of exactly SWAP_MAX_TX_BYTES", async () => {
+        expect(await builtSize(await dataAtLimit())).to.eq(SWAP_MAX_TX_BYTES);
+      });
+
+      it("refuses a swap one byte over SWAP_MAX_TX_BYTES with JUPITER_ERROR", async () => {
+        const bytes = (await dataAtLimit()) + 1;
+        const quoteResponse = await quote();
+        buildOverrides = swapWithData(bytes);
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("JUPITER_ERROR");
+        expect(error.message).to.eq(
+          `Jupiter built a swap too large for one transaction (${
+            SWAP_MAX_TX_BYTES + 1
+          } bytes, limit ${SWAP_MAX_TX_BYTES}); refresh the quote`
         );
-        expect(serialized.length).to.be.at.most(1232);
+      });
+
+      it("refuses a swap whose message alone exceeds the packet limit with JUPITER_ERROR", async () => {
+        const quoteResponse = await quote();
+        buildOverrides = swapWithData(PACKET_DATA_SIZE);
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("JUPITER_ERROR");
+        expect(error.message).to.eq(
+          `Jupiter built a swap too large for one transaction (over ${PACKET_DATA_SIZE} bytes, limit ${SWAP_MAX_TX_BYTES}); refresh the quote`
+        );
       });
     });
 
