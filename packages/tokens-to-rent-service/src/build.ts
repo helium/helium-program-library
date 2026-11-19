@@ -15,7 +15,10 @@ import { RequestError, UpstreamError } from "./errors";
 const JUPITER_BUILD_PATH = "/swap/v2/build";
 
 /**
- * Solana's limit on a serialized transaction.
+ * Solana's limit on a serialized transaction. The fee-funding transaction keeps no room for the
+ * guard instructions a wallet appends to a swap it pays for: the platform wallet pays and signs
+ * it before the user's wallet sees it, and a wallet that appends an instruction changes the
+ * message under that signature, so the transaction fails whether or not it fits.
  */
 const TRANSACTION_SIZE_LIMIT = 1232;
 
@@ -48,7 +51,7 @@ export const FUND_FEES_MAX_ACCOUNTS = 20;
 
 /**
  * How `/build` bounds the route.
- * - `quote`: unbounded, for a price whose instructions are discarded.
+ * - `quote`: unbounded, for a price whose instructions are discarded. See `estimateRequest`.
  * - `fundFees`: `maxAccounts` and `maxBytes`, to fit the fee-funding transaction.
  * - `fundFeesAccountsOnly`: `maxAccounts` only. IOT to SOL gets no route with both bounds, so IOT
  *   uses `maxAccounts` only. `refuseOversizedTransaction` guards the byte limit before the
@@ -142,7 +145,10 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
 /**
  * The `/build` request that prices the swap: SOL into `mint`, built for the platform wallet,
  * whose instructions are discarded. `/build` has no quote-only form, so the request is not
- * bounded to fit the fee-funding transaction.
+ * bounded to fit the fee-funding transaction: its size does not matter, and a bound only lowers
+ * the price. The user sells the amount this buys, so a lower price sells less and brings the sale
+ * closer to `MIN_FUND_FEES_OUT_LAMPORTS`. Live builds of 0.020015 SOL with the fee-funding bounds
+ * bought 0.19% less HNT and 0.71% less MOBILE than unbounded ones.
  */
 export function estimateRequest(params: {
   apiUrl: string;
