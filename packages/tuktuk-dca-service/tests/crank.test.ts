@@ -10,6 +10,7 @@ import {
   CRANK_MAX_TX_BYTES,
   crankTransactionSize,
   retrySwapMaxBytes,
+  runTaskRemainingAccounts,
 } from "../src/crank";
 import { DCA_SWAP_MAX_BYTES } from "../src/jupiter";
 
@@ -78,6 +79,21 @@ describe("tuktuk-dca-service crank transaction size", () => {
         undefined
       );
     });
+
+    it("refuses a run_task_v0 that names no crank turner", () => {
+      const unsigned = new TransactionInstruction({
+        programId: TUKTUK,
+        keys: REMAINING.map((pubkey) => ({
+          pubkey,
+          isSigner: false,
+          isWritable: true,
+        })),
+        data: Buffer.alloc(14),
+      });
+      assert.throws(() => crankTransactionSize(remoteTask(300), unsigned, []), {
+        message: "run_task_v0 names no crank turner",
+      });
+    });
   });
 
   describe("retrySwapMaxBytes", () => {
@@ -94,13 +110,46 @@ describe("tuktuk-dca-service crank transaction size", () => {
     });
   });
 
+  describe("runTaskRemainingAccounts", () => {
+    const compiled = [
+      { pubkey: key(), isSigner: true, isWritable: true },
+      { pubkey: key(), isSigner: false, isWritable: false },
+      { pubkey: key(), isSigner: true, isWritable: false },
+    ];
+
+    it("keeps the compiled accounts in order, none of them signing", () => {
+      const accounts = runTaskRemainingAccounts(compiled, 2);
+      assert.deepEqual(
+        accounts.slice(0, compiled.length),
+        compiled.map(({ pubkey, isWritable }) => ({
+          pubkey,
+          isWritable,
+          isSigner: false,
+        }))
+      );
+      assert.ok(accounts.every((account) => !account.isSigner));
+    });
+
+    it("adds one writable stand-in for each free task", () => {
+      const standIns = runTaskRemainingAccounts(compiled, 3).slice(
+        compiled.length
+      );
+      assert.equal(standIns.length, 3);
+      assert.ok(standIns.every((account) => account.isWritable));
+      assert.equal(new Set(standIns.map((a) => a.pubkey.toBase58())).size, 3);
+    });
+  });
+
   describe("buildFittingTask", () => {
     /** A build that answers the given sizes in order and records the budgets it was given. */
     const builds = (sizes: (number | undefined)[]) => {
       const budgets: number[] = [];
-      const build = async (maxBytes: number) => {
+      const build = (maxBytes: number) => {
         budgets.push(maxBytes);
-        return { task: `task@${maxBytes}`, size: sizes[budgets.length - 1] };
+        return Promise.resolve({
+          task: `task@${maxBytes}`,
+          size: sizes[budgets.length - 1],
+        });
       };
       return { budgets, build };
     };

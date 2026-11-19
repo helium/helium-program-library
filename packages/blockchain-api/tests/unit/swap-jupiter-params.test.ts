@@ -15,6 +15,7 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import { expect } from "chai";
+import { GetInstructionsInputSchema } from "@helium/blockchain-api";
 import { swapContract } from "@helium/blockchain-api/contracts";
 import { OpenAPIGenerator } from "@orpc/openapi";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
@@ -70,6 +71,8 @@ let buildOverrides: Record<string, unknown> = {};
 let buildAnswers: Record<string, unknown>[] = [];
 /** A status and body that replace the stubbed `/build` answer, when a case sets one. */
 let buildReply: { status: number; body: unknown } | undefined;
+/** Status and body that replace one `/build` answer each, in call order, before buildReply. */
+let buildReplies: ({ status: number; body: unknown } | undefined)[] = [];
 /** A status and body that replace the stubbed quote answer, when a case sets one. */
 let quoteReply: { status: number; body: unknown } | undefined;
 /** Every RPC method the handlers called, in order. */
@@ -248,8 +251,9 @@ const stubFetch: typeof fetch = async (input, init) => {
     });
   }
   if (url.pathname === "/swap/v2/build") {
-    if (buildReply) {
-      return jsonResponse(buildReply.body, buildReply.status);
+    const reply = buildReplies.shift() ?? buildReply;
+    if (reply) {
+      return jsonResponse(reply.body, reply.status);
     }
     return jsonResponse({
       inputMint: url.searchParams.get("inputMint"),
@@ -361,6 +365,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     buildOverrides = {};
     buildAnswers = [];
     buildReply = undefined;
+    buildReplies = [];
     quoteReply = undefined;
     rpcMethods = [];
     chainAccounts = new Map();
@@ -803,6 +808,19 @@ describe("swap endpoints' optional Jupiter parameters", () => {
           expect(body.properties[name].description, name).to.match(
             /^Deprecated\. /
           );
+        }
+      });
+
+      it("marks the deprecated params in the schema's own metadata", () => {
+        for (const name of [
+          "dynamicComputeUnitLimit",
+          "useSharedAccounts",
+          "prioritizationFeeLamports",
+        ] as const) {
+          expect(
+            GetInstructionsInputSchema.shape[name].meta()?.deprecated,
+            name
+          ).to.eq(true);
         }
       });
 
@@ -1701,6 +1719,93 @@ describe("swap endpoints' optional Jupiter parameters", () => {
           "Jupiter found no route for this swap that fits one transaction (over 1232 bytes, limit 1132)"
         );
         expect(buildMaxBytes()).to.deep.eq(["1080", "914"]);
+      });
+
+      describe("a retry that /build cannot answer", () => {
+        const realWarn = console.warn;
+        let warnings: unknown[][] = [];
+
+        beforeEach(() => {
+          warnings = [];
+          console.warn = (...args: unknown[]) => {
+            if (args[0] === "Jupiter /build swap too large for one transaction") {
+              warnings.push(args);
+            }
+          };
+        });
+
+        afterEach(() => {
+          console.warn = realWarn;
+        });
+
+        it("refuses with JUPITER_ERROR when the retry finds no route, after logging the oversize", async () => {
+          const bytes = (await dataAtLimit()) + 1;
+          const quoteResponse = await quote();
+          jupiterCalls = [];
+          buildOverrides = swapWithData(bytes);
+          buildReplies = [
+            undefined,
+            { status: 400, body: { error: "No routes found" } },
+          ];
+
+          const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+          expect(error.code).to.eq("JUPITER_ERROR");
+          expect(error.message).to.eq(
+            "Jupiter found no route for this swap that fits one transaction (1133 bytes, limit 1132)"
+          );
+          expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
+          expect(warnings).to.have.length(1);
+          expect(warnings[0][1]).to.deep.include({
+            size: "1133 bytes",
+            retryMaxBytes: 1079,
+          });
+        });
+
+        it("answers RATE_LIMITED when the retry is rate limited", async () => {
+          const bytes = (await dataAtLimit()) + 1;
+          const quoteResponse = await quote();
+          buildOverrides = swapWithData(bytes);
+          buildReplies = [
+            undefined,
+            { status: 429, body: { error: "Too many requests" } },
+          ];
+
+          const code = await rejectionCode({
+            quoteResponse,
+            userPublicKey: WALLET,
+          });
+
+          expect(code).to.eq("RATE_LIMITED");
+        });
+
+        it("keeps the RPC error when the retry's compile cannot read its lookup table", async () => {
+          const bytes = (await dataAtLimit()) + 1;
+          const quoteResponse = await quote();
+          jupiterCalls = [];
+          rpcMethods = [];
+          buildOverrides = swapWithData(bytes);
+          // Only the retry names a lookup table, so only its compile reads
+          // one from chain.
+          buildAnswers = [
+            {},
+            { addressesByLookupTableAddress: { [LOOKUP_TABLE]: [] } },
+          ];
+          failMultipleAccounts = true;
+
+          let failure: unknown;
+          try {
+            await call(getInstructions, { quoteResponse, userPublicKey: WALLET });
+          } catch (error) {
+            failure = error;
+          }
+
+          expect(failure).to.be.instanceOf(Error);
+          expect(failure).to.not.be.instanceOf(ORPCError);
+          expect((failure as Error).message).to.contain("node is unhealthy");
+          expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
+          expect(rpcMethods).to.include("getMultipleAccounts");
+        });
       });
     });
 

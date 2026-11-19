@@ -385,11 +385,16 @@ describe("tuktuk-dca-service Jupiter /build", () => {
       const setup = [
         new TransactionInstruction({
           programId: ASSOCIATED_TOKEN_PROGRAM_ID,
-          keys: [{ pubkey: new PublicKey(TAKER), isSigner: true, isWritable: true }],
+          keys: [
+            { pubkey: new PublicKey(TAKER), isSigner: true, isWritable: true },
+          ],
           data: Buffer.from([1]),
         }),
       ];
-      assert.throws(() => setupCreateTargets(setup), /ATA create without the account/);
+      assert.throws(
+        () => setupCreateTargets(setup),
+        /ATA create without the account/
+      );
     });
   });
 
@@ -467,6 +472,18 @@ describe("tuktuk-dca-service Jupiter /build", () => {
       assert.deepEqual(headers, {});
     });
 
+    it("sends the maxBytes it is given", async () => {
+      let url = "";
+      const fetchImpl = ((fetched: string) => {
+        url = fetched;
+        return Promise.resolve(
+          new Response(JSON.stringify(buildBody()), { status: 200 })
+        );
+      }) as typeof fetch;
+      await buildJupiterSwap(REQUEST, fetchImpl, 300);
+      assert.equal(new URL(url).searchParams.get("maxBytes"), "300");
+    });
+
     it("refuses a failed request", async () => {
       const fetchImpl = (async () =>
         new Response("No routes found", {
@@ -482,14 +499,20 @@ describe("tuktuk-dca-service Jupiter /build", () => {
     it("keeps the first 300 characters of a failed request's body", async () => {
       const body = "x".repeat(300) + "TRUNCATED";
       const fetchImpl = (async () =>
-        new Response(body, { status: 500, statusText: "Server Error" })) as typeof fetch;
-      await assert.rejects(buildJupiterSwap(REQUEST, fetchImpl), (error: Error) => {
-        assert.equal(
-          error.message,
-          `Jupiter /build error: 500 Server Error: ${"x".repeat(300)}`
-        );
-        return true;
-      });
+        new Response(body, {
+          status: 500,
+          statusText: "Server Error",
+        })) as typeof fetch;
+      await assert.rejects(
+        buildJupiterSwap(REQUEST, fetchImpl),
+        (error: Error) => {
+          assert.equal(
+            error.message,
+            `Jupiter /build error: 500 Server Error: ${"x".repeat(300)}`
+          );
+          return true;
+        }
+      );
     });
   });
 });

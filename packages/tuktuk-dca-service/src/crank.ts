@@ -1,7 +1,9 @@
 import {
+  AccountMeta,
   AddressLookupTableAccount,
   ComputeBudgetProgram,
   Ed25519Program,
+  Keypair,
   PACKET_DATA_SIZE,
   PublicKey,
   TransactionInstruction,
@@ -97,9 +99,9 @@ export const retrySwapMaxBytes = (size: number | undefined): number =>
  * fit, build it once more with `retrySwapMaxBytes`, and refuse the order when that still does
  * not fit. `build` returns the task and its crank transaction size.
  */
-export async function buildFittingTask<T>(
+export const buildFittingTask = async <T,>(
   build: (maxBytes: number) => Promise<{ task: T; size: number | undefined }>
-): Promise<T> {
+): Promise<T> => {
   const first = await build(DCA_SWAP_MAX_BYTES);
   if (fits(first.size)) {
     return first.task;
@@ -126,4 +128,20 @@ export async function buildFittingTask<T>(
     return retry.task;
   }
   throw refusal(retry.size);
-}
+};
+
+/**
+ * The remaining accounts of run_task_v0: the compiled task's accounts, none of them signing,
+ * followed by `freeTaskCount` random writable stand-ins for the free task accounts.
+ */
+export const runTaskRemainingAccounts = (
+  remainingAccounts: AccountMeta[],
+  freeTaskCount: number
+): AccountMeta[] => [
+  ...remainingAccounts.map((acc) => ({ ...acc, isSigner: false })),
+  ...Array.from({ length: freeTaskCount }, () => ({
+    pubkey: Keypair.generate().publicKey,
+    isWritable: true,
+    isSigner: false,
+  })),
+];

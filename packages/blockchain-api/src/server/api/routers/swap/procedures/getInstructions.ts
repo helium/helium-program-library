@@ -1,5 +1,6 @@
 import { publicProcedure } from "../../../procedures";
 import { GetInstructionsInputSchema } from "@helium/blockchain-api";
+import { ORPCError } from "@orpc/server";
 import { JSON_SCHEMA_REGISTRY } from "@orpc/zod/zod4";
 import { env } from "@/lib/env";
 import {
@@ -523,13 +524,27 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     if (!fits(firstSize)) {
       const firstRoute = build.routePlan.map((hop) => hop.swapInfo.label);
       const retryMaxBytes = retryRouteMaxBytes(firstSize);
-      build = await buildKeepingMinimum(retryMaxBytes);
-      tx = await compileSwap(build);
-      const retrySize = signedSize(tx);
       console.warn("Jupiter /build swap too large for one transaction", {
         size: describeSize(firstSize),
         route: firstRoute,
         retryMaxBytes,
+      });
+      // A retry that Jupiter cannot answer reports the oversize instead of its
+      // own error. A rate limit, which the caller retries, and a non-Jupiter
+      // failure (such as an RPC error while compiling) keep their own error.
+      try {
+        build = await buildKeepingMinimum(retryMaxBytes);
+        tx = await compileSwap(build);
+      } catch (error) {
+        if (!(error instanceof ORPCError) || error.code === "RATE_LIMITED") {
+          throw error;
+        }
+        throw errors.JUPITER_ERROR({
+          message: `Jupiter found no route for this swap that fits one transaction (${describeSize(firstSize)}, limit ${SWAP_MAX_TX_BYTES})`,
+        });
+      }
+      const retrySize = signedSize(tx);
+      console.warn("Jupiter /build swap retry with a smaller maxBytes", {
         retrySize: describeSize(retrySize),
         retryRoute: build.routePlan.map((hop) => hop.swapInfo.label),
         passed: fits(retrySize),

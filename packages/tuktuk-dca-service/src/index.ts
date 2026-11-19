@@ -12,7 +12,11 @@ import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
 import { dcaTaskBindingError } from "./binding";
-import { buildFittingTask, crankTransactionSize } from "./crank";
+import {
+  buildFittingTask,
+  crankTransactionSize,
+  runTaskRemainingAccounts,
+} from "./crank";
 import { wrapRoute } from "./wrap";
 import {
   buildJupiterSwap,
@@ -223,14 +227,9 @@ server.post<{
           taskQueue,
           task,
         })
-        .remainingAccounts([
-          ...remainingAccounts.map((acc) => ({ ...acc, isSigner: false })),
-          ...freeTaskIds.map(() => ({
-            pubkey: Keypair.generate().publicKey,
-            isWritable: true,
-            isSigner: false,
-          })),
-        ])
+        .remainingAccounts(
+          runTaskRemainingAccounts(remainingAccounts, freeTaskIds.length)
+        )
         .instruction();
       const size = crankTransactionSize(
         { signer: DCA_SIGNER.publicKey, message: serialized, signature },

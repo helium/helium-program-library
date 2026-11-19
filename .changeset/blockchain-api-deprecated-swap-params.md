@@ -1,5 +1,5 @@
 ---
-"@helium/blockchain-api": patch
+"@helium/blockchain-api": minor
 "@helium/blockchain-api-service": patch
 ---
 
