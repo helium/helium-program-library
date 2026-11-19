@@ -57,14 +57,16 @@ export const SWAP_MAX_TX_BYTES = PACKET_DATA_SIZE - WALLET_GUARD_RESERVE_BYTES;
  * experimental, so `maxAccounts` bounds the route too, and getInstructions
  * refuses a transaction that still does not fit.
  */
-export const ROUTE_MAX_BYTES = SWAP_MAX_TX_BYTES - COMPUTE_BUDGET_OVERHEAD_BYTES;
+const ROUTE_MAX_BYTES = SWAP_MAX_TX_BYTES - COMPUTE_BUDGET_OVERHEAD_BYTES;
 
 /** The account limit every `/build` route is built with (`maxAccounts`). */
-export const ROUTE_MAX_ACCOUNTS = 40;
+const ROUTE_MAX_ACCOUNTS = 40;
 
 /**
  * Bound the route a `/build` request may answer with. getQuote and
- * getInstructions both apply it, so the quoted route is one that can be built.
+ * getInstructions both ask for routes inside these bounds. getInstructions asks
+ * `/build` again for the real taker, so its route can differ from the quote's,
+ * and it still checks the compiled size.
  */
 export const boundRoute = (url: URL): void => {
   url.searchParams.set("maxAccounts", String(ROUTE_MAX_ACCOUNTS));
