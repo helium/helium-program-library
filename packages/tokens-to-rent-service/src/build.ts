@@ -147,8 +147,8 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
  * whose instructions are discarded. `/build` has no quote-only form, so the request is not
  * bounded to fit the fee-funding transaction: its size does not matter, and a bound only lowers
  * the price. The user sells the amount this buys, so a lower price sells less and brings the sale
- * closer to `MIN_FUND_FEES_OUT_LAMPORTS`. Live builds of 0.020015 SOL with the fee-funding bounds
- * bought 0.19% less HNT and 0.71% less MOBILE than unbounded ones.
+ * closer to `MIN_FUND_FEES_OUT_LAMPORTS`. One live build per pair (2026-11-19) of 0.020015 SOL
+ * with the fee-funding bounds bought 0.19% less HNT and 0.71% less MOBILE than an unbounded one.
  */
 export function estimateRequest(params: {
   apiUrl: string;
