@@ -15,6 +15,9 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import { expect } from "chai";
+import { swapContract } from "@helium/blockchain-api/contracts";
+import { OpenAPIGenerator } from "@orpc/openapi";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { SWAP_MAX_TX_BYTES } from "../../src/server/api/routers/swap/procedures/build-request";
 import { after, afterEach, before, beforeEach, describe, it } from "mocha";
 
@@ -751,6 +754,12 @@ describe("swap endpoints' optional Jupiter parameters", () => {
             userPublicKey: WALLET,
             dynamicComputeUnitLimit: true,
             useSharedAccounts: false,
+            prioritizationFeeLamports: {
+              priorityLevelWithMaxLamports: {
+                maxLamports: 1000,
+                priorityLevel: "high",
+              },
+            },
           },
           {
             context: {
@@ -763,11 +772,38 @@ describe("swap endpoints' optional Jupiter parameters", () => {
           [
             "swap.getInstructions deprecated params",
             {
-              params: ["dynamicComputeUnitLimit", "useSharedAccounts"],
+              params: [
+                "dynamicComputeUnitLimit",
+                "useSharedAccounts",
+                "prioritizationFeeLamports",
+              ],
               userAgent: "wallet/1.2.3",
             },
           ],
         ]);
+      });
+
+      it("marks the deprecated params in the OpenAPI spec", async () => {
+        const generator = new OpenAPIGenerator({
+          schemaConverters: [new ZodToJsonSchemaConverter()],
+        });
+        const spec = await generator.generate(swapContract, {
+          info: { title: "test", version: "1" },
+        });
+        const body = (spec.paths!["/swap/instructions"]!.post!
+          .requestBody as { content: Record<string, { schema: any }> })
+          .content["application/json"].schema;
+
+        for (const name of [
+          "dynamicComputeUnitLimit",
+          "useSharedAccounts",
+          "prioritizationFeeLamports",
+        ]) {
+          expect(body.properties[name].deprecated, name).to.eq(true);
+          expect(body.properties[name].description, name).to.match(
+            /^Deprecated\. /
+          );
+        }
       });
 
       it("logs nothing when a caller sends no deprecated params", async () => {
@@ -1623,9 +1659,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
         expect(error.code).to.eq("JUPITER_ERROR");
         expect(error.message).to.eq(
-          `Jupiter built a swap too large for one transaction (${
-            SWAP_MAX_TX_BYTES + 1
-          } bytes, limit ${SWAP_MAX_TX_BYTES}); refresh the quote`
+          "Jupiter built a swap too large for one transaction (1133 bytes, limit 1132); refresh the quote"
         );
       });
 
@@ -1637,7 +1671,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
         expect(error.code).to.eq("JUPITER_ERROR");
         expect(error.message).to.eq(
-          `Jupiter built a swap too large for one transaction (over ${PACKET_DATA_SIZE} bytes, limit ${SWAP_MAX_TX_BYTES}); refresh the quote`
+          "Jupiter built a swap too large for one transaction (over 1232 bytes, limit 1132); refresh the quote"
         );
       });
     });

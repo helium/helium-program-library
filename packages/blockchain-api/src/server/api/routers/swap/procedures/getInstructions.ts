@@ -1,4 +1,6 @@
 import { publicProcedure } from "../../../procedures";
+import { GetInstructionsInputSchema } from "@helium/blockchain-api";
+import { JSON_SCHEMA_REGISTRY } from "@orpc/zod/zod4";
 import { env } from "@/lib/env";
 import {
   AccountInfo,
@@ -286,6 +288,24 @@ const takerRentLamports = async (
   );
 };
 
+/** Inputs that Swap V2 ignores. Logged with the caller's user agent, to find the clients that still send them. */
+const DEPRECATED_PARAMS = [
+  "dynamicComputeUnitLimit",
+  "useSharedAccounts",
+  "prioritizationFeeLamports",
+] as const;
+
+// The OpenAPI converter copies only title, description and examples from zod's
+// own metadata, so the deprecated flag goes in its registry. An entry there
+// replaces the zod metadata, so it carries the description too.
+for (const name of DEPRECATED_PARAMS) {
+  const schema = GetInstructionsInputSchema.shape[name];
+  JSON_SCHEMA_REGISTRY.add(schema, {
+    description: schema.description,
+    deprecated: true,
+  });
+}
+
 /**
  * Build a swap transaction through Jupiter's Swap V2 `/build`.
  *
@@ -296,13 +316,6 @@ const takerRentLamports = async (
  * was shown; a re-quote that falls below it is built once more at a narrower
  * slippage, or refused as an expired quote.
  */
-/** Inputs that Swap V2 ignores. Logged with the caller's user agent, to find the clients that still send them. */
-const DEPRECATED_PARAMS = [
-  "dynamicComputeUnitLimit",
-  "useSharedAccounts",
-  "prioritizationFeeLamports",
-] as const;
-
 export const getInstructions = publicProcedure.swap.getInstructions.handler(
   async ({ input, errors, context }) => {
     const { quoteResponse, userPublicKey, destinationTokenAccount, excludeDexes } =
