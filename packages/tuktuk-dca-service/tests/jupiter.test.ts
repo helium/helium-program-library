@@ -86,9 +86,16 @@ describe("tuktuk-dca-service Jupiter /build", () => {
         taker: TAKER,
         slippageBps: "50",
         destinationTokenAccount: DESTINATION,
+        maxAccounts: "20",
         maxBytes: "520",
         excludeDexes: RFQ_V2_LABEL,
       });
+    });
+
+    it("sends the byte budget it is given", () => {
+      const url = buildSwapUrl(REQUEST, 480);
+      assert.equal(url.searchParams.get("maxBytes"), "480");
+      assert.equal(url.searchParams.get("maxAccounts"), "20");
     });
 
     it("excludes Jupiter RFQ v2", () => {
