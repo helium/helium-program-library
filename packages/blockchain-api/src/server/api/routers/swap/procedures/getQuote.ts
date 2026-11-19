@@ -4,7 +4,6 @@ import { env } from "@/lib/env";
 import { createTtlCache } from "@/lib/utils/ttl-cache";
 import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
 import {
-  BUILD_MAX_ACCOUNTS,
   BUILD_SWAP_MODE,
   checkBuildAnswer,
   excludedLabels,
@@ -61,7 +60,6 @@ export const getQuote = publicProcedure.swap.getQuote.handler(
       quoteUrl.searchParams.set("taker", QUOTE_TAKER);
       quoteUrl.searchParams.set("slippageBps", slippageBps.toString());
       quoteUrl.searchParams.set("excludeDexes", excluded);
-      quoteUrl.searchParams.set("maxAccounts", String(BUILD_MAX_ACCOUNTS));
 
       const quoteResponse = await fetch(quoteUrl.toString(), {
         headers: {

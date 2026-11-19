@@ -7,11 +7,11 @@ import {
   PublicKey,
   SystemProgram,
   TransactionInstruction,
-  VersionedTransaction,
 } from "@solana/web3.js";
 import {
   buildVersionedTransaction,
   serializeTransaction,
+  wireSize,
 } from "@/lib/utils/build-transaction";
 import {
   generateTransactionTag,
@@ -34,13 +34,16 @@ import {
 } from "@solana/spl-token";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 import { TOKEN_NAMES } from "@/lib/constants/tokens";
-import { classifyJupiterError } from "@/lib/utils/jupiter-errors";
+import {
+  classifyJupiterError,
+  NO_ROUTE_MESSAGE,
+} from "@/lib/utils/jupiter-errors";
 import {
   ALWAYS_EXCLUDED_LABELS,
   BUILD_SWAP_MODE,
   checkBuildAnswer,
   excludedLabels,
-  maxAccountsForRequote,
+  nextMaxBytes,
   SIZE_REQUOTES,
 } from "./build-request";
 import BN from "bn.js";
@@ -309,10 +312,15 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     ]);
 
     /**
-     * One `/build` request at `slippageBps` for a route of at most
-     * `maxAccounts` accounts, validated against the quote.
+     * One `/build` request at `slippageBps`, validated against the quote.
+     * `maxBytes`, sent only on a size requote, bounds the bare swap's
+     * serialized size; Jupiter finding no route within it means the swap does
+     * not fit a transaction.
      */
-    const requestBuild = async (slippageBps: number, maxAccounts: number) => {
+    const requestBuild = async (
+      slippageBps: number,
+      maxBytes: number | undefined,
+    ) => {
       const buildUrl = new URL(`${env.JUPITER_API_URL}/swap/v2/build`);
       buildUrl.searchParams.set("inputMint", quoteResponse.inputMint);
       buildUrl.searchParams.set("outputMint", quoteResponse.outputMint);
@@ -320,7 +328,9 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       buildUrl.searchParams.set("taker", userPublicKey);
       buildUrl.searchParams.set("slippageBps", String(slippageBps));
       buildUrl.searchParams.set("excludeDexes", [...excluded].join(","));
-      buildUrl.searchParams.set("maxAccounts", String(maxAccounts));
+      if (maxBytes !== undefined) {
+        buildUrl.searchParams.set("maxBytes", String(maxBytes));
+      }
       if (destinationTokenAccount) {
         buildUrl.searchParams.set(
           "destinationTokenAccount",
@@ -343,6 +353,13 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           body: errorText,
           operation: "Failed to build swap with Jupiter",
         });
+        if (
+          classification.kind === "BAD_REQUEST" &&
+          classification.message === NO_ROUTE_MESSAGE &&
+          maxBytes !== undefined
+        ) {
+          throw errors.TRANSACTION_TOO_LARGE();
+        }
         if (classification.kind === "BAD_REQUEST") {
           throw errors.BAD_REQUEST({ message: classification.message });
         }
@@ -385,10 +402,10 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
 
     /**
-     * The route `/build` answers for at most `maxAccounts` accounts, with the
-     * minimum-output check applied, built into a transaction.
+     * The route `/build` answers within `maxBytes`, with the minimum-output
+     * check applied, built into a transaction.
      */
-    const buildAt = async (maxAccounts: number) => {
+    const buildAt = async (maxBytes: number | undefined) => {
       // otherAmountThreshold is the minimum output the swap instruction enforces
       // on chain, and a re-quote at the quote's slippage enforces less than the
       // quote whenever its output is lower. While the re-quote's output still
@@ -396,7 +413,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       // so /build is asked again with it. Otherwise the swap is refused, so the
       // chain enforces at least the minimum the signer was shown.
       const quoteMinimum = BigInt(quoteResponse.otherAmountThreshold);
-      let build = await requestBuild(quoteResponse.slippageBps, maxAccounts);
+      let build = await requestBuild(quoteResponse.slippageBps, maxBytes);
       const attempts: { otherAmountThreshold: string; outAmount: string }[] =
         [];
       while (BigInt(build.otherAmountThreshold) < quoteMinimum) {
@@ -417,7 +434,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           });
           throw errors.BAD_REQUEST({ message: QUOTE_EXPIRED_MESSAGE });
         }
-        build = await requestBuild(Number(slippageBps), maxAccounts);
+        build = await requestBuild(Number(slippageBps), maxBytes);
       }
       if (attempts.length > 0) {
         console.warn("Jupiter /build minimum output below the quote's", {
@@ -468,41 +485,38 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     };
 
     // A built route can serialize over the packet limit once the compute
-    // budget instructions and signature slots are added, and Jupiter reports
-    // no size for it. The serialized transaction is measured, and /build is
-    // asked again for a route of fewer accounts, up to SIZE_REQUOTES times,
-    // until it fits. A transaction over the limit is never returned.
+    // budget instructions and signature slots are added. The first build
+    // sends no maxBytes, so a route that fits is the one Jupiter picks by
+    // default. The serialized transaction is measured, and while it is over
+    // the limit /build is asked again, up to SIZE_REQUOTES times, with a
+    // maxBytes lowered by the overshoot (nextMaxBytes). A transaction over
+    // the limit is not returned: it is refused with TRANSACTION_TOO_LARGE, as
+    // is a requote Jupiter finds no route for within its budget.
     //
     // /build is requested at most (1 + SIZE_REQUOTES) * (1 + MIN_OUTPUT_RETRIES)
-    // = 8 times: each of the 1 + SIZE_REQUOTES values of maxAccounts gets its
-    // own minimum-output check, which asks again at most MIN_OUTPUT_RETRIES
-    // times. A requote can route worse, so it is held to the quote's minimum
-    // like the first request, and the two loops share no other state.
-    const serializedSize = (tx: VersionedTransaction) => {
-      try {
-        return tx.serialize().length;
-      } catch (error) {
-        // serialize writes into a fixed-size buffer and throws when a message
-        // alone is past the packet limit.
-        const message = error instanceof Error ? error.message : String(error);
-        if (!message.includes("encoding overruns")) throw error;
-        return Infinity;
-      }
-    };
-    let built = await buildAt(maxAccountsForRequote(0));
-    let size = serializedSize(built.tx);
+    // = 8 times: each build gets its own minimum-output check, which asks
+    // again at most MIN_OUTPUT_RETRIES times. A requote can route worse, so it
+    // is held to the quote's minimum like the first request.
+    let budget = PACKET_DATA_SIZE;
+    let maxBytes: number | undefined;
+    let built = await buildAt(maxBytes);
+    let size = wireSize(built.tx);
     for (
       let requote = 1;
       size > PACKET_DATA_SIZE && requote <= SIZE_REQUOTES;
       requote++
     ) {
       console.warn("Jupiter /build transaction over the packet limit", {
-        maxAccounts: maxAccountsForRequote(requote - 1),
-        size: Number.isFinite(size) ? size : null,
+        maxBytes: maxBytes ?? null,
+        size,
         limit: PACKET_DATA_SIZE,
       });
-      built = await buildAt(maxAccountsForRequote(requote));
-      size = serializedSize(built.tx);
+      budget = nextMaxBytes(budget, size);
+      // Jupiter takes a maxBytes of 1 or more.
+      if (budget < 1) break;
+      maxBytes = budget;
+      built = await buildAt(maxBytes);
+      size = wireSize(built.tx);
     }
     if (size > PACKET_DATA_SIZE) {
       throw errors.TRANSACTION_TOO_LARGE();

@@ -16,13 +16,16 @@ const CLIENT_ERROR_MESSAGES: Record<string, string> = {
   TOKEN_NOT_TRADABLE: "Token is not tradable",
 };
 
+/** The BAD_REQUEST message for a swap Jupiter finds no route for. */
+export const NO_ROUTE_MESSAGE = "No route found for this swap";
+
 /**
  * Jupiter error texts, from the `error` field of a body that carries no
  * `errorCode`, that describe the caller's request. Swap V2 `/build` answers a
  * pair it cannot route with a bare `{"error":"No routes found"}`.
  */
 const CLIENT_ERROR_TEXTS: Record<string, string> = {
-  "No routes found": "No route found for this swap",
+  "No routes found": NO_ROUTE_MESSAGE,
 };
 
 /**

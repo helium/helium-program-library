@@ -27,6 +27,76 @@ import {
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 
+/**
+ * Whether `error` is web3.js failing to serialize a message: it encodes a
+ * message into a buffer of the packet size and reports "encoding overruns"
+ * when the message is past it.
+ */
+export function isEncodingOverrun(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("encoding overruns");
+}
+
+/** The bytes a compact-u16 length prefix of `n` takes on the wire. */
+const shortVecSize = (n: number): number =>
+  n < 0x80 ? 1 : n < 0x4000 ? 2 : 3;
+
+/** The bytes a compact-u16 length followed by `n` bytes takes on the wire. */
+const sizedBytes = (n: number): number => shortVecSize(n) + n;
+
+/**
+ * The bytes a v0 `tx` takes on the wire, signature slots included, counted
+ * from its parts, for a message `serialize` cannot encode because it is past
+ * the packet limit.
+ */
+const countedWireSize = (tx: VersionedTransaction): number => {
+  const message = tx.message;
+  const instructions = message.compiledInstructions.reduce(
+    (total, ix) =>
+      total +
+      1 +
+      sizedBytes(ix.accountKeyIndexes.length) +
+      sizedBytes(ix.data.length),
+    shortVecSize(message.compiledInstructions.length),
+  );
+  const lookups = message.addressTableLookups.reduce(
+    (total, lookup) =>
+      total +
+      32 +
+      sizedBytes(lookup.writableIndexes.length) +
+      sizedBytes(lookup.readonlyIndexes.length),
+    shortVecSize(message.addressTableLookups.length),
+  );
+  return (
+    // Signature slots.
+    shortVecSize(tx.signatures.length) +
+    64 * tx.signatures.length +
+    // Version prefix and header.
+    1 +
+    3 +
+    // Static account keys and the recent blockhash.
+    shortVecSize(message.staticAccountKeys.length) +
+    32 * message.staticAccountKeys.length +
+    32 +
+    instructions +
+    lookups
+  );
+};
+
+/**
+ * The bytes `tx` takes on the wire, signature slots included, whether or not
+ * its v0 message fits the packet limit. A legacy message past the limit
+ * fails to serialize with another error, which is rethrown.
+ */
+export const wireSize = (tx: VersionedTransaction): number => {
+  try {
+    return tx.serialize().length;
+  } catch (error) {
+    if (!isEncodingOverrun(error)) throw error;
+    return countedWireSize(tx);
+  }
+};
+
 export function getHeliumLookupTable(): PublicKey {
   return getCluster() === "devnet"
     ? HELIUM_COMMON_LUT_DEVNET
@@ -151,8 +221,7 @@ export async function buildVersionedTransaction({
       ),
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("encoding overruns")) {
+    if (isEncodingOverrun(error)) {
       throw new Error(
         `Transaction too large to serialize (${instructionsWithFees.length} instructions). Split into smaller batches.`,
       );

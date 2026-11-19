@@ -1,6 +1,7 @@
 import {
   buildVersionedTransaction,
   getHeliumLookupTable,
+  isEncodingOverrun,
   serializeTransaction,
 } from "@/lib/utils/build-transaction";
 import { getCluster } from "@/lib/solana";
@@ -122,8 +123,7 @@ async function buildOrSplit(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const isOversized =
-      message.includes("encoding overruns") ||
-      message.includes("too large to serialize");
+      isEncodingOverrun(error) || message.includes("too large to serialize");
     if (isOversized && instructions.length > 1) {
       const mid = Math.ceil(instructions.length / 2);
       const [first, second] = await Promise.all([
