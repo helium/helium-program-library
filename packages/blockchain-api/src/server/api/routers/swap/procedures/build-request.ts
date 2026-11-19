@@ -1,3 +1,4 @@
+import { WALLET_GUARD_RESERVE_BYTES } from "@/lib/utils/wallet-guard";
 import { PACKET_DATA_SIZE } from "@solana/web3.js";
 
 /** The only swap mode `/build` quotes and builds. */
@@ -38,15 +39,6 @@ export const excludedWithDefaults = (
  */
 const COMPUTE_BUDGET_OVERHEAD_BYTES = 52;
 
-/**
- * Room left under the packet limit for the guard instructions a wallet appends
- * after the server builds the swap: Phantom and Solflare add Lighthouse
- * assertions, each with the Lighthouse program's key and its own data. An
- * estimate, not a measurement: a wallet that adds more than this to a swap
- * near the limit can still push it past the packet limit.
- */
-const WALLET_GUARD_RESERVE_BYTES = 100;
-
 /** The largest signed swap transaction getInstructions returns. */
 export const SWAP_MAX_TX_BYTES = PACKET_DATA_SIZE - WALLET_GUARD_RESERVE_BYTES;
 
@@ -66,12 +58,22 @@ const ROUTE_MAX_ACCOUNTS = 40;
  * Bound the route a `/build` request may answer with. getQuote and
  * getInstructions both ask for routes inside these bounds. getInstructions asks
  * `/build` again for the real taker, so its route can differ from the quote's,
- * and it still checks the compiled size.
+ * and it still checks the compiled size. `maxBytes` is lower only when
+ * getInstructions retries a swap that did not fit.
  */
-export const boundRoute = (url: URL): void => {
+export const boundRoute = (url: URL, maxBytes = ROUTE_MAX_BYTES): void => {
   url.searchParams.set("maxAccounts", String(ROUTE_MAX_ACCOUNTS));
-  url.searchParams.set("maxBytes", String(ROUTE_MAX_BYTES));
+  url.searchParams.set("maxBytes", String(maxBytes));
 };
+
+/**
+ * The `maxBytes` for the one retry of a swap that compiled to `size` bytes, or
+ * past the packet limit when `size` is undefined: the default budget less the
+ * overshoot, so a route the size of the first misses it. An unknown size counts
+ * as one byte past the packet limit.
+ */
+export const retryRouteMaxBytes = (size: number | undefined): number =>
+  ROUTE_MAX_BYTES - ((size ?? PACKET_DATA_SIZE + 1) - SWAP_MAX_TX_BYTES);
 
 /** A base-10 token amount in base units, as Jupiter writes amounts. */
 const AMOUNT = /^\d+$/;

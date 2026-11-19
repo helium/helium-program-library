@@ -1650,29 +1650,57 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(await builtSize(await dataAtLimit())).to.eq(SWAP_MAX_TX_BYTES);
       });
 
-      it("refuses a swap one byte over SWAP_MAX_TX_BYTES with JUPITER_ERROR", async () => {
+      /** The maxBytes each /build call of the swap sent, in order. */
+      const buildMaxBytes = () =>
+        jupiterCalls
+          .filter((c) => c.url.pathname === "/swap/v2/build")
+          .map((c) => c.url.searchParams.get("maxBytes"));
+
+      it("builds the retry when the first route is one byte over SWAP_MAX_TX_BYTES", async () => {
         const bytes = (await dataAtLimit()) + 1;
         const quoteResponse = await quote();
+        jupiterCalls = [];
+        buildAnswers = [swapWithData(bytes), swapWithData(bytes - 1)];
+
+        const result = await call(getInstructions, {
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
+
+        expect(
+          Buffer.from(result.transactions[0].serializedTransaction, "base64")
+            .length
+        ).to.eq(SWAP_MAX_TX_BYTES);
+        expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
+      });
+
+      it("refuses a swap whose retry is still over SWAP_MAX_TX_BYTES with JUPITER_ERROR", async () => {
+        const bytes = (await dataAtLimit()) + 1;
+        const quoteResponse = await quote();
+        jupiterCalls = [];
         buildOverrides = swapWithData(bytes);
 
         const error = await rejection({ quoteResponse, userPublicKey: WALLET });
 
         expect(error.code).to.eq("JUPITER_ERROR");
         expect(error.message).to.eq(
-          "Jupiter built a swap too large for one transaction (1133 bytes, limit 1132); refresh the quote"
+          "Jupiter found no route for this swap that fits one transaction (1133 bytes, limit 1132)"
         );
+        expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
       });
 
-      it("refuses a swap whose message alone exceeds the packet limit with JUPITER_ERROR", async () => {
+      it("retries a swap whose message alone exceeds the packet limit with 101 bytes less, then refuses it", async () => {
         const quoteResponse = await quote();
+        jupiterCalls = [];
         buildOverrides = swapWithData(PACKET_DATA_SIZE);
 
         const error = await rejection({ quoteResponse, userPublicKey: WALLET });
 
         expect(error.code).to.eq("JUPITER_ERROR");
         expect(error.message).to.eq(
-          "Jupiter built a swap too large for one transaction (over 1232 bytes, limit 1132); refresh the quote"
+          "Jupiter found no route for this swap that fits one transaction (over 1232 bytes, limit 1132)"
         );
+        expect(buildMaxBytes()).to.deep.eq(["1080", "979"]);
       });
     });
 

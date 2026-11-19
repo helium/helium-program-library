@@ -41,6 +41,7 @@ import {
   ALWAYS_EXCLUDED_LABELS,
   BUILD_SWAP_MODE,
   boundRoute,
+  retryRouteMaxBytes,
   SWAP_MAX_TX_BYTES,
   checkBuildAnswer,
   excludedLabels,
@@ -105,21 +106,27 @@ const QUOTE_EXPIRED_MESSAGE =
 const slippageBpsKeeping = (outAmount: bigint, minimum: bigint): bigint =>
   outAmount < minimum ? BigInt(0) : ((outAmount - minimum) * BPS) / outAmount;
 
+/** A built swap's signed size, or undefined when the message alone runs past the packet limit. */
+type SwapSize = number | undefined;
+
 /**
- * The size of `tx` when it is too large to return, or undefined when it fits
- * SWAP_MAX_TX_BYTES. A message that alone runs past the packet limit has no
- * size: web3.js throws a RangeError instead of serializing it.
+ * The signed size of `tx`. A message that alone runs past the packet limit has
+ * no size: web3.js throws a RangeError instead of serializing it.
  */
-const oversize = (tx: VersionedTransaction): string | undefined => {
-  let size: number;
+const signedSize = (tx: VersionedTransaction): SwapSize => {
   try {
-    size = tx.serialize().length;
+    return tx.serialize().length;
   } catch (error) {
-    if (error instanceof RangeError) return `over ${PACKET_DATA_SIZE} bytes`;
+    if (error instanceof RangeError) return undefined;
     throw error;
   }
-  return size > SWAP_MAX_TX_BYTES ? `${size} bytes` : undefined;
 };
+
+const fits = (size: SwapSize): boolean =>
+  size !== undefined && size <= SWAP_MAX_TX_BYTES;
+
+const describeSize = (size: SwapSize): string =>
+  size === undefined ? `over ${PACKET_DATA_SIZE} bytes` : `${size} bytes`;
 
 const toInstruction = (instruction: JupiterInstruction) =>
   new TransactionInstruction({
@@ -353,7 +360,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     ]);
 
     /** One `/build` request at `slippageBps`, validated against the quote. */
-    const requestBuild = async (slippageBps: number) => {
+    const requestBuild = async (slippageBps: number, maxBytes?: number) => {
       const buildUrl = new URL(`${env.JUPITER_API_URL}/swap/v2/build`);
       buildUrl.searchParams.set("inputMint", quoteResponse.inputMint);
       buildUrl.searchParams.set("outputMint", quoteResponse.outputMint);
@@ -361,7 +368,7 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       buildUrl.searchParams.set("taker", userPublicKey);
       buildUrl.searchParams.set("slippageBps", String(slippageBps));
       buildUrl.searchParams.set("excludeDexes", [...excluded].join(","));
-      boundRoute(buildUrl);
+      boundRoute(buildUrl, maxBytes);
       if (destinationTokenAccount) {
         buildUrl.searchParams.set(
           "destinationTokenAccount",
@@ -430,88 +437,108 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     // so /build is asked again with it. Otherwise the swap is refused, so the
     // chain enforces at least the minimum the signer was shown.
     const quoteMinimum = BigInt(quoteResponse.otherAmountThreshold);
-    let build = await requestBuild(quoteResponse.slippageBps);
-    const attempts: { otherAmountThreshold: string; outAmount: string }[] = [];
-    while (BigInt(build.otherAmountThreshold) < quoteMinimum) {
-      attempts.push({
-        otherAmountThreshold: build.otherAmountThreshold,
-        outAmount: build.outAmount,
-      });
-      const slippageBps = slippageBpsKeeping(
-        BigInt(build.outAmount),
-        quoteMinimum,
-      );
-      if (attempts.length > MIN_OUTPUT_RETRIES || slippageBps === BigInt(0)) {
+    /** A `/build` answer within `maxBytes` whose minimum output keeps the quote's. */
+    const buildKeepingMinimum = async (maxBytes?: number) => {
+      let build = await requestBuild(quoteResponse.slippageBps, maxBytes);
+      const attempts: { otherAmountThreshold: string; outAmount: string }[] = [];
+      while (BigInt(build.otherAmountThreshold) < quoteMinimum) {
+        attempts.push({
+          otherAmountThreshold: build.otherAmountThreshold,
+          outAmount: build.outAmount,
+        });
+        const slippageBps = slippageBpsKeeping(
+          BigInt(build.outAmount),
+          quoteMinimum,
+        );
+        if (attempts.length > MIN_OUTPUT_RETRIES || slippageBps === BigInt(0)) {
+          console.warn("Jupiter /build minimum output below the quote's", {
+            quoteMinimum: quoteResponse.otherAmountThreshold,
+            attempts,
+            retried: attempts.length > 1,
+            passed: false,
+          });
+          throw errors.BAD_REQUEST({ message: QUOTE_EXPIRED_MESSAGE });
+        }
+        build = await requestBuild(Number(slippageBps), maxBytes);
+      }
+      if (attempts.length > 0) {
         console.warn("Jupiter /build minimum output below the quote's", {
           quoteMinimum: quoteResponse.otherAmountThreshold,
           attempts,
-          retried: attempts.length > 1,
-          passed: false,
+          retried: true,
+          passed: true,
+          final: {
+            otherAmountThreshold: build.otherAmountThreshold,
+            outAmount: build.outAmount,
+          },
         });
-        throw errors.BAD_REQUEST({ message: QUOTE_EXPIRED_MESSAGE });
       }
-      build = await requestBuild(Number(slippageBps));
-    }
-    if (attempts.length > 0) {
-      console.warn("Jupiter /build minimum output below the quote's", {
-        quoteMinimum: quoteResponse.otherAmountThreshold,
-        attempts,
-        retried: true,
-        passed: true,
-        final: {
-          otherAmountThreshold: build.otherAmountThreshold,
-          outAmount: build.outAmount,
-        },
-      });
-    }
 
-    // otherInstructions are not characterised for /build, so the signer is
-    // not handed instructions nobody has checked.
-    const otherCount = build.otherInstructions?.length ?? 0;
-    if (otherCount > 0) {
-      throw errors.JUPITER_ERROR({
-        message: `Jupiter built a swap with ${otherCount} otherInstructions, which this procedure does not sign`,
-      });
-    }
+      // otherInstructions are not characterised for /build, so the signer is
+      // not handed instructions nobody has checked.
+      const otherCount = build.otherInstructions?.length ?? 0;
+      if (otherCount > 0) {
+        throw errors.JUPITER_ERROR({
+          message: `Jupiter built a swap with ${otherCount} otherInstructions, which this procedure does not sign`,
+        });
+      }
+      return build;
+    };
 
     const connection = new Connection(process.env.SOLANA_RPC_URL!);
 
-    // computeBudgetInstructions are left out: buildVersionedTransaction sets
-    // the compute unit limit and price itself. tipInstruction is only present
-    // when tipAmount is requested, which this procedure never sends.
-    const jupIxs = [
-      ...(build.setupInstructions ?? []).map(toInstruction),
-      toInstruction(build.swapInstruction),
-      ...(build.cleanupInstruction
-        ? [toInstruction(build.cleanupInstruction)]
-        : []),
-    ];
-
-    const tx = await buildVersionedTransaction({
-      connection,
-      draft: {
-        instructions: jupIxs,
-        feePayer: new PublicKey(userPublicKey),
-        // The tables are read from chain by key, so the transaction compiles
-        // against their on-chain contents.
-        addressLookupTableAddresses: Object.keys(
-          build.addressesByLookupTableAddress ?? {},
-        ).map((key) => new PublicKey(key)),
-      },
-    });
+    /** The swap transaction for `build`, compiled as the signer receives it. */
+    const compileSwap = (build: Awaited<ReturnType<typeof buildKeepingMinimum>>) =>
+      buildVersionedTransaction({
+        connection,
+        draft: {
+          // computeBudgetInstructions are left out: buildVersionedTransaction
+          // sets the compute unit limit and price itself. tipInstruction is only
+          // present when tipAmount is requested, which this procedure never
+          // sends.
+          instructions: [
+            ...(build.setupInstructions ?? []).map(toInstruction),
+            toInstruction(build.swapInstruction),
+            ...(build.cleanupInstruction
+              ? [toInstruction(build.cleanupInstruction)]
+              : []),
+          ],
+          feePayer: new PublicKey(userPublicKey),
+          // The tables are read from chain by key, so the transaction compiles
+          // against their on-chain contents.
+          addressLookupTableAddresses: Object.keys(
+            build.addressesByLookupTableAddress ?? {},
+          ).map((key) => new PublicKey(key)),
+        },
+      });
 
     // The route bounds aim to keep the swap inside SWAP_MAX_TX_BYTES, but
-    // Jupiter marks maxBytes as experimental, so a transaction that still does
-    // not fit is refused here instead of failing when it is submitted.
-    const tooLarge = oversize(tx);
-    if (tooLarge) {
+    // Jupiter marks maxBytes as experimental. A swap that does not fit is
+    // built once more with maxBytes cut by the overshoot, because the same
+    // bounds would answer the same route. A retry that still does not fit is
+    // refused here instead of failing when it is submitted.
+    let build = await buildKeepingMinimum();
+    let tx = await compileSwap(build);
+    const firstSize = signedSize(tx);
+    if (!fits(firstSize)) {
+      const firstRoute = build.routePlan.map((hop) => hop.swapInfo.label);
+      const retryMaxBytes = retryRouteMaxBytes(firstSize);
+      build = await buildKeepingMinimum(retryMaxBytes);
+      tx = await compileSwap(build);
+      const retrySize = signedSize(tx);
       console.warn("Jupiter /build swap too large for one transaction", {
-        size: tooLarge,
-        route: build.routePlan.map((hop) => hop.swapInfo.label),
+        size: describeSize(firstSize),
+        route: firstRoute,
+        retryMaxBytes,
+        retrySize: describeSize(retrySize),
+        retryRoute: build.routePlan.map((hop) => hop.swapInfo.label),
+        passed: fits(retrySize),
       });
-      throw errors.JUPITER_ERROR({
-        message: `Jupiter built a swap too large for one transaction (${tooLarge}, limit ${SWAP_MAX_TX_BYTES}); refresh the quote`,
-      });
+      if (!fits(retrySize)) {
+        throw errors.JUPITER_ERROR({
+          message: `Jupiter found no route for this swap that fits one transaction (${describeSize(retrySize)}, limit ${SWAP_MAX_TX_BYTES})`,
+        });
+      }
     }
 
     // Check wallet has sufficient balance using actual transaction fees
