@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  AccountMeta,
   AddressLookupTableAccount,
   ComputeBudgetProgram,
   Ed25519Program,
@@ -16,6 +17,7 @@ import {
   crankTransactionSize,
   retrySwapMaxBytes,
   runTaskRemainingAccounts,
+  signedTaskCrankSize,
 } from "../src/crank";
 import { DCA_SWAP_MAX_BYTES } from "../src/jupiter";
 
@@ -164,6 +166,59 @@ describe("tuktuk-dca-service crank transaction size", () => {
       assert.equal(standIns.length, 3);
       assert.ok(standIns.every((account) => account.isWritable));
       assert.equal(new Set(standIns.map((a) => a.pubkey.toBase58())).size, 3);
+    });
+  });
+
+  describe("signedTaskCrankSize", () => {
+    const compiled = REMAINING.map((pubkey) => ({
+      pubkey,
+      isSigner: false,
+      isWritable: true,
+    }));
+
+    /** Size the task with 2 free tasks, recording the accounts run_task_v0 was built over. */
+    const sized = async (
+      queueLookupTables: AddressLookupTableAccount[],
+      swapLookupTables: AddressLookupTableAccount[]
+    ) => {
+      let built: AccountMeta[] = [];
+      const size = await signedTaskCrankSize({
+        remoteTask: remoteTask(300),
+        remainingAccounts: compiled,
+        freeTaskCount: 2,
+        queueLookupTables,
+        swapLookupTables,
+        runTask: async (accounts) => {
+          built = accounts;
+          return runTask(accounts.map(({ pubkey }) => pubkey));
+        },
+      });
+      return { size, built };
+    };
+
+    it("builds run_task_v0 over the task's accounts and one stand-in per free task", async () => {
+      const { built } = await sized([], []);
+      assert.equal(built.length, compiled.length + 2);
+      assert.deepEqual(built.slice(0, compiled.length), compiled);
+      assert.ok(built.slice(compiled.length).every((a) => a.isWritable));
+    });
+
+    it("counts the queue's lookup tables beside the swap's", async () => {
+      const swapTable = table([key()]);
+      const { size, built } = await sized([table(REMAINING)], [swapTable]);
+      const withBoth = crankTransactionSize(
+        remoteTask(300),
+        runTask(built.map((a) => a.pubkey)),
+        [table(REMAINING), swapTable]
+      );
+      const swapOnly = crankTransactionSize(
+        remoteTask(300),
+        runTask(built.map((a) => a.pubkey)),
+        [swapTable]
+      );
+      assert.ok(withBoth !== undefined && swapOnly !== undefined);
+      assert.equal(size, withBoth);
+      assert.ok(swapOnly > withBoth);
     });
   });
 

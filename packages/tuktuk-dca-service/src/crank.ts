@@ -107,7 +107,7 @@ export const retrySwapMaxBytes = (size: number | undefined): number =>
  * fit, build it once more with `retrySwapMaxBytes`, and refuse the order when that still does
  * not fit. `build` returns the task and its crank transaction size.
  */
-export const buildFittingTask = async <T,>(
+export const buildFittingTask = async <T>(
   build: (maxBytes: number) => Promise<{ task: T; size: number | undefined }>
 ): Promise<T> => {
   const first = await build(DCA_SWAP_MAX_BYTES);
@@ -153,3 +153,29 @@ export const runTaskRemainingAccounts = (
     isSigner: false,
   })),
 ];
+
+/**
+ * The crank transaction size of a signed remote task: `runTask` builds run_task_v0 over the
+ * task's accounts and one stand-in per free task, and the queue's and the swap's lookup
+ * tables both compress it.
+ */
+export const signedTaskCrankSize = async ({
+  remoteTask,
+  remainingAccounts,
+  freeTaskCount,
+  queueLookupTables,
+  swapLookupTables,
+  runTask,
+}: {
+  remoteTask: SignedRemoteTask;
+  remainingAccounts: AccountMeta[];
+  freeTaskCount: number;
+  queueLookupTables: AddressLookupTableAccount[];
+  swapLookupTables: AddressLookupTableAccount[];
+  runTask: (remaining: AccountMeta[]) => Promise<TransactionInstruction>;
+}): Promise<number | undefined> =>
+  crankTransactionSize(
+    remoteTask,
+    await runTask(runTaskRemainingAccounts(remainingAccounts, freeTaskCount)),
+    [...queueLookupTables, ...swapLookupTables]
+  );

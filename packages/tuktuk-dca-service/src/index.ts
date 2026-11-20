@@ -11,7 +11,7 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
-import { crankTransactionSize, runTaskRemainingAccounts } from "./crank";
+import { signedTaskCrankSize } from "./crank";
 import {
   answerDcaRequest,
   BuildDcaTask,
@@ -208,28 +208,30 @@ const prepareTask = async (
       sign.detached(Uint8Array.from(serialized), DCA_SIGNER.secretKey)
     );
 
-    const runTaskIx = await tuktukProgram.methods
-      .runTaskV0({ freeTaskIds })
-      .accountsPartial({
-        crankTurner: CRANK_TURNER_STAND_IN,
-        rentRefund: taskAccount.rentRefund,
-        taskQueue,
-        task,
-      })
-      .remainingAccounts(
-        runTaskRemainingAccounts(remainingAccounts, freeTaskIds.length)
-      )
-      .instruction();
-    const size = crankTransactionSize(
-      { signer: DCA_SIGNER.publicKey, message: serialized, signature },
-      runTaskIx,
-      [
-        ...queueLookupTables,
-        ...(await lookupTableAccounts(
-          swap.lookupTables.map((key) => new PublicKey(key))
-        )),
-      ]
-    );
+    const size = await signedTaskCrankSize({
+      remoteTask: {
+        signer: DCA_SIGNER.publicKey,
+        message: serialized,
+        signature,
+      },
+      remainingAccounts,
+      freeTaskCount: freeTaskIds.length,
+      queueLookupTables,
+      swapLookupTables: await lookupTableAccounts(
+        swap.lookupTables.map((key) => new PublicKey(key))
+      ),
+      runTask: (accounts) =>
+        tuktukProgram.methods
+          .runTaskV0({ freeTaskIds })
+          .accountsPartial({
+            crankTurner: CRANK_TURNER_STAND_IN,
+            rentRefund: taskAccount.rentRefund,
+            taskQueue,
+            task,
+          })
+          .remainingAccounts(accounts)
+          .instruction(),
+    });
     console.log(
       `DCA ${dca.toBase58()}: crank transaction ${size ?? "over limit"} bytes`
     );
