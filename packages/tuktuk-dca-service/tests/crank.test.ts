@@ -12,12 +12,12 @@ import {
 } from "@solana/web3.js";
 import {
   buildFittingTask,
+  crankSizer,
   CRANK_MAX_TX_BYTES,
   CrankTooLargeError,
   crankTransactionSize,
   retrySwapMaxBytes,
   runTaskRemainingAccounts,
-  signedTaskCrankSize,
 } from "../src/crank";
 import { DCA_SWAP_MAX_BYTES } from "../src/jupiter";
 
@@ -169,53 +169,58 @@ describe("tuktuk-dca-service crank transaction size", () => {
     });
   });
 
-  describe("signedTaskCrankSize", () => {
+  describe("crankSizer", () => {
     const compiled = REMAINING.map((pubkey) => ({
       pubkey,
       isSigner: false,
       isWritable: true,
     }));
+    const QUEUE_TABLE = table(REMAINING);
+    const SWAP_TABLE = table([key()]);
+    const TABLES = new Map(
+      [QUEUE_TABLE, SWAP_TABLE].map((t) => [t.key.toBase58(), t])
+    );
 
-    /** Size the task with 2 free tasks, recording the accounts run_task_v0 was built over. */
-    const sized = async (
-      queueLookupTables: AddressLookupTableAccount[],
-      swapLookupTables: AddressLookupTableAccount[]
-    ) => {
-      let built: AccountMeta[] = [];
-      const size = await signedTaskCrankSize({
-        remoteTask: remoteTask(300),
-        remainingAccounts: compiled,
-        freeTaskCount: 2,
-        queueLookupTables,
-        swapLookupTables,
-        runTask: async (accounts) => {
-          built = accounts;
-          return runTask(accounts.map(({ pubkey }) => pubkey));
+    /**
+     * Size a task with 2 free tasks on a queue holding `queueTables`, recording what run_task_v0
+     * was built with.
+     */
+    const sized = async (queueTables: AddressLookupTableAccount[]) => {
+      const built: { freeTaskIds: number[]; remaining: AccountMeta[] }[] = [];
+      const sizeCrank = await crankSizer({
+        taskAccount: { freeTasks: 2 },
+        taskQueueAccount: { lookupTables: queueTables.map((t) => t.key) },
+        fetchLookupTables: async (keys) =>
+          keys.flatMap((k) => TABLES.get(k.toBase58()) ?? []),
+        runTask: async (freeTaskIds, remaining) => {
+          built.push({ freeTaskIds, remaining });
+          return runTask(remaining.map(({ pubkey }) => pubkey));
         },
       });
-      return { size, built };
+      const size = await sizeCrank({
+        remoteTask: remoteTask(300),
+        remainingAccounts: compiled,
+        swapLookupTables: [SWAP_TABLE.key.toBase58()],
+      });
+      return { size, ...built[0] };
     };
 
-    it("builds run_task_v0 over the task's accounts and one stand-in per free task", async () => {
-      const { built } = await sized([], []);
-      assert.equal(built.length, compiled.length + 2);
-      assert.deepEqual(built.slice(0, compiled.length), compiled);
-      assert.ok(built.slice(compiled.length).every((a) => a.isWritable));
+    it("builds run_task_v0 with one unused task id and one stand-in per free task", async () => {
+      const { freeTaskIds, remaining } = await sized([]);
+      assert.deepEqual(freeTaskIds, [0, 1]);
+      assert.equal(remaining.length, compiled.length + 2);
+      assert.deepEqual(remaining.slice(0, compiled.length), compiled);
+      assert.ok(remaining.slice(compiled.length).every((a) => a.isWritable));
     });
 
     it("counts the queue's lookup tables beside the swap's", async () => {
-      const swapTable = table([key()]);
-      const { size, built } = await sized([table(REMAINING)], [swapTable]);
-      const withBoth = crankTransactionSize(
-        remoteTask(300),
-        runTask(built.map((a) => a.pubkey)),
-        [table(REMAINING), swapTable]
-      );
-      const swapOnly = crankTransactionSize(
-        remoteTask(300),
-        runTask(built.map((a) => a.pubkey)),
-        [swapTable]
-      );
+      const { size, remaining } = await sized([QUEUE_TABLE]);
+      const ix = runTask(remaining.map((a) => a.pubkey));
+      const withBoth = crankTransactionSize(remoteTask(300), ix, [
+        QUEUE_TABLE,
+        SWAP_TABLE,
+      ]);
+      const swapOnly = crankTransactionSize(remoteTask(300), ix, [SWAP_TABLE]);
       assert.ok(withBoth !== undefined && swapOnly !== undefined);
       assert.equal(size, withBoth);
       assert.ok(swapOnly > withBoth);

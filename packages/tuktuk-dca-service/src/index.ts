@@ -11,7 +11,7 @@ import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
-import { signedTaskCrankSize } from "./crank";
+import { crankSizer } from "./crank";
 import {
   answerDcaRequest,
   BuildDcaTask,
@@ -120,26 +120,31 @@ const prepareTask = async (
     .accounts({ dca })
     .instruction();
 
-  // The crank turner runs the task with the queue's lookup tables, its own key as payer and
-  // unused task ids for the task's free tasks. Only their count changes the size, so random keys
-  // stand in for their task accounts: a real task key could match the running task and be
-  // counted once.
+  // The crank turner's key stands in as run_task_v0's payer.
   const taskAccount = await tuktukProgram.account.taskV0.fetch(task);
   const taskQueueAccount =
     await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
-  const freeTaskIds = Array.from(
-    { length: taskAccount.freeTasks },
-    (_, id) => id
-  );
-  const lookupTableAccounts = async (keys: PublicKey[]) =>
-    (
-      await Promise.all(
-        keys.map((key) => provider.connection.getAddressLookupTable(key))
-      )
-    ).flatMap(({ value }) => (value ? [value] : []));
-  const queueLookupTables = await lookupTableAccounts(
-    taskQueueAccount.lookupTables
-  );
+  const sizeCrank = await crankSizer({
+    taskAccount,
+    taskQueueAccount,
+    fetchLookupTables: async (keys) =>
+      (
+        await Promise.all(
+          keys.map((key) => provider.connection.getAddressLookupTable(key))
+        )
+      ).flatMap(({ value }) => (value ? [value] : [])),
+    runTask: (freeTaskIds, remaining) =>
+      tuktukProgram.methods
+        .runTaskV0({ freeTaskIds })
+        .accountsPartial({
+          crankTurner: CRANK_TURNER_STAND_IN,
+          rentRefund: taskAccount.rentRefund,
+          taskQueue,
+          task,
+        })
+        .remainingAccounts(remaining)
+        .instruction(),
+  });
 
   return async (maxBytes: number) => {
     // Build the swap through Jupiter, with the swap payer as the taker
@@ -208,29 +213,14 @@ const prepareTask = async (
       sign.detached(Uint8Array.from(serialized), DCA_SIGNER.secretKey)
     );
 
-    const size = await signedTaskCrankSize({
+    const size = await sizeCrank({
       remoteTask: {
         signer: DCA_SIGNER.publicKey,
         message: serialized,
         signature,
       },
       remainingAccounts,
-      freeTaskCount: freeTaskIds.length,
-      queueLookupTables,
-      swapLookupTables: await lookupTableAccounts(
-        swap.lookupTables.map((key) => new PublicKey(key))
-      ),
-      runTask: (accounts) =>
-        tuktukProgram.methods
-          .runTaskV0({ freeTaskIds })
-          .accountsPartial({
-            crankTurner: CRANK_TURNER_STAND_IN,
-            rentRefund: taskAccount.rentRefund,
-            taskQueue,
-            task,
-          })
-          .remainingAccounts(accounts)
-          .instruction(),
+      swapLookupTables: swap.lookupTables,
     });
     console.log(
       `DCA ${dca.toBase58()}: crank transaction ${size ?? "over limit"} bytes`

@@ -154,28 +154,53 @@ export const runTaskRemainingAccounts = (
   })),
 ];
 
-/**
- * The crank transaction size of a signed remote task: `runTask` builds run_task_v0 over the
- * task's accounts and one stand-in per free task, and the queue's and the swap's lookup
- * tables both compress it.
- */
-export const signedTaskCrankSize = async ({
-  remoteTask,
-  remainingAccounts,
-  freeTaskCount,
-  queueLookupTables,
-  swapLookupTables,
-  runTask,
-}: {
+/** The crank transaction size of one signed remote task, by its accounts and the swap's lookup tables. */
+export type CrankSizer = (signed: {
   remoteTask: SignedRemoteTask;
   remainingAccounts: AccountMeta[];
-  freeTaskCount: number;
-  queueLookupTables: AddressLookupTableAccount[];
-  swapLookupTables: AddressLookupTableAccount[];
-  runTask: (remaining: AccountMeta[]) => Promise<TransactionInstruction>;
-}): Promise<number | undefined> =>
-  crankTransactionSize(
-    remoteTask,
-    await runTask(runTaskRemainingAccounts(remainingAccounts, freeTaskCount)),
-    [...queueLookupTables, ...swapLookupTables]
+  swapLookupTables: string[];
+}) => Promise<number | undefined>;
+
+/**
+ * Size crank transactions for a task as the crank turner runs it: `runTask` builds run_task_v0
+ * with unused task ids for the task's free tasks, over the task's accounts and one random
+ * stand-in per free task, and the queue's and the swap's lookup tables both compress it.
+ */
+export const crankSizer = async ({
+  taskAccount,
+  taskQueueAccount,
+  fetchLookupTables,
+  runTask,
+}: {
+  taskAccount: { freeTasks: number };
+  taskQueueAccount: { lookupTables: PublicKey[] };
+  fetchLookupTables: (
+    keys: PublicKey[]
+  ) => Promise<AddressLookupTableAccount[]>;
+  runTask: (
+    freeTaskIds: number[],
+    remaining: AccountMeta[]
+  ) => Promise<TransactionInstruction>;
+}): Promise<CrankSizer> => {
+  const freeTaskIds = Array.from(
+    { length: taskAccount.freeTasks },
+    (_, id) => id
   );
+  const queueLookupTables = await fetchLookupTables(
+    taskQueueAccount.lookupTables
+  );
+  return async ({ remoteTask, remainingAccounts, swapLookupTables }) =>
+    crankTransactionSize(
+      remoteTask,
+      await runTask(
+        freeTaskIds,
+        runTaskRemainingAccounts(remainingAccounts, freeTaskIds.length)
+      ),
+      [
+        ...queueLookupTables,
+        ...(await fetchLookupTables(
+          swapLookupTables.map((key) => new PublicKey(key))
+        )),
+      ]
+    );
+};
