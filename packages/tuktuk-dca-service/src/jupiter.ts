@@ -24,6 +24,13 @@ const JUPITER_BUILD_PATH = "/swap/v2/build";
  */
 export const DCA_SWAP_MAX_BYTES = 520;
 
+/**
+ * The account limit every DCA route is built with (`maxAccounts`). Jupiter marks `maxBytes` as
+ * experimental, so this bounds the route too. The service also measures the crank transaction
+ * and retries once with a smaller `maxBytes` when it does not fit.
+ */
+export const DCA_SWAP_MAX_ACCOUNTS = 20;
+
 export const RFQ_V2_LABEL = "JupiterRfqV2";
 
 /** How much of a failed `/build` answer's body goes into the error. */
@@ -70,8 +77,11 @@ export const dcaSwapRequest = ({
   slippageBps,
 });
 
-/** The `/build` request for a DCA order, as a URL. */
-export function buildSwapUrl(request: BuildSwapRequest): URL {
+/** The `/build` request for a DCA order, as a URL, with `maxBytes` as the byte budget. */
+export function buildSwapUrl(
+  request: BuildSwapRequest,
+  maxBytes: number = DCA_SWAP_MAX_BYTES
+): URL {
   const url = new URL(`${request.apiUrl}${JUPITER_BUILD_PATH}`);
   url.searchParams.set("inputMint", request.inputMint);
   url.searchParams.set("outputMint", request.outputMint);
@@ -82,7 +92,8 @@ export function buildSwapUrl(request: BuildSwapRequest): URL {
     "destinationTokenAccount",
     request.destinationTokenAccount
   );
-  url.searchParams.set("maxBytes", String(DCA_SWAP_MAX_BYTES));
+  url.searchParams.set("maxAccounts", String(DCA_SWAP_MAX_ACCOUNTS));
+  url.searchParams.set("maxBytes", String(maxBytes));
   url.searchParams.set("excludeDexes", RFQ_V2_LABEL);
   return url;
 }
@@ -254,12 +265,13 @@ export function readBuildResponse(
   };
 }
 
-/** Builds a DCA order's swap through `/build` and reads the answer. */
+/** Builds a DCA order's swap through `/build` within `maxBytes` and reads the answer. */
 export async function buildJupiterSwap(
   request: BuildSwapRequest & { apiKey?: string },
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  maxBytes: number = DCA_SWAP_MAX_BYTES
 ): Promise<BuiltSwap> {
-  const response = await fetchImpl(buildSwapUrl(request).toString(), {
+  const response = await fetchImpl(buildSwapUrl(request, maxBytes).toString(), {
     headers: request.apiKey ? { "x-api-key": request.apiKey } : {},
   });
   if (!response.ok) {
