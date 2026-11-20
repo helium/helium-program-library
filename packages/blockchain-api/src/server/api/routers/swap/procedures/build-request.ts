@@ -67,20 +67,13 @@ export const boundRoute = (url: URL, maxBytes = ROUTE_MAX_BYTES): void => {
 };
 
 /**
- * The smallest signed transaction whose message overruns the packet limit: one
- * signature, its length byte and a message one byte too long. web3.js throws
- * only when the message alone is over PACKET_DATA_SIZE.
+ * The `maxBytes` for the one retry of a swap that compiled to `size` bytes:
+ * the default budget less the overshoot, so a route the size of the first
+ * misses it. Below 1 when the overshoot uses the whole budget, which Jupiter
+ * does not take.
  */
-const OVERRUN_MIN_TX_BYTES = PACKET_DATA_SIZE + 1 + 1 + 64;
-
-/**
- * The `maxBytes` for the one retry of a swap that compiled to `size` bytes, or
- * whose message overran the packet limit when `size` is undefined: the default
- * budget less the overshoot, so a route the size of the first misses it. An
- * unknown size counts as OVERRUN_MIN_TX_BYTES.
- */
-export const retryRouteMaxBytes = (size: number | undefined): number =>
-  ROUTE_MAX_BYTES - ((size ?? OVERRUN_MIN_TX_BYTES) - SWAP_MAX_TX_BYTES);
+export const retryRouteMaxBytes = (size: number): number =>
+  ROUTE_MAX_BYTES - (size - SWAP_MAX_TX_BYTES);
 
 /** A base-10 token amount in base units, as Jupiter writes amounts. */
 const AMOUNT = /^\d+$/;

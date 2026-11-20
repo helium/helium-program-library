@@ -6,15 +6,14 @@ import { env } from "@/lib/env";
 import {
   AccountInfo,
   Connection,
-  PACKET_DATA_SIZE,
   PublicKey,
   SystemProgram,
   TransactionInstruction,
-  VersionedTransaction,
 } from "@solana/web3.js";
 import {
   buildVersionedTransaction,
   serializeTransaction,
+  wireSize,
 } from "@/lib/utils/build-transaction";
 import {
   generateTransactionTag,
@@ -107,27 +106,10 @@ const QUOTE_EXPIRED_MESSAGE =
 const slippageBpsKeeping = (outAmount: bigint, minimum: bigint): bigint =>
   outAmount < minimum ? BigInt(0) : ((outAmount - minimum) * BPS) / outAmount;
 
-/** A built swap's signed size, or undefined when the message alone runs past the packet limit. */
-type SwapSize = number | undefined;
+const fits = (size: number): boolean => size <= SWAP_MAX_TX_BYTES;
 
-/**
- * The signed size of `tx`. A message that alone runs past the packet limit has
- * no size: web3.js throws a RangeError instead of serializing it.
- */
-const signedSize = (tx: VersionedTransaction): SwapSize => {
-  try {
-    return tx.serialize().length;
-  } catch (error) {
-    if (error instanceof RangeError) return undefined;
-    throw error;
-  }
-};
-
-const fits = (size: SwapSize): boolean =>
-  size !== undefined && size <= SWAP_MAX_TX_BYTES;
-
-const describeSize = (size: SwapSize): string =>
-  size === undefined ? `over ${PACKET_DATA_SIZE} bytes` : `${size} bytes`;
+const tooLargeMessage = (size: number): string =>
+  `Jupiter found no route for this swap that fits one transaction (${size} bytes, limit ${SWAP_MAX_TX_BYTES})`;
 
 const toInstruction = (instruction: JupiterInstruction) =>
   new TransactionInstruction({
@@ -520,38 +502,45 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
     // refused here instead of failing when it is submitted.
     let build = await buildKeepingMinimum();
     let tx = await compileSwap(build);
-    const firstSize = signedSize(tx);
+    const firstSize = wireSize(tx);
     if (!fits(firstSize)) {
       const firstRoute = build.routePlan.map((hop) => hop.swapInfo.label);
       const retryMaxBytes = retryRouteMaxBytes(firstSize);
       console.warn("Jupiter /build swap too large for one transaction", {
-        size: describeSize(firstSize),
+        size: firstSize,
         route: firstRoute,
         retryMaxBytes,
       });
-      // A retry that Jupiter cannot answer reports the oversize instead of its
-      // own error. A rate limit, which the caller retries, and a non-Jupiter
-      // failure (such as an RPC error while compiling) keep their own error.
+      // Jupiter takes a maxBytes of 1 or more.
+      if (retryMaxBytes < 1) {
+        throw errors.TRANSACTION_TOO_LARGE({
+          message: tooLargeMessage(firstSize),
+        });
+      }
+      // A retry that Jupiter answers as a bad request ("No routes found", or
+      // routes whose minimum output falls below the quote's) has no route that
+      // fits, and a fresh quote finds the same oversized one, so it is refused
+      // as too large. Every other failure keeps its own error.
       try {
         build = await buildKeepingMinimum(retryMaxBytes);
         tx = await compileSwap(build);
       } catch (error) {
-        if (!(error instanceof ORPCError) || error.code === "RATE_LIMITED") {
-          throw error;
+        if (error instanceof ORPCError && error.code === "BAD_REQUEST") {
+          throw errors.TRANSACTION_TOO_LARGE({
+            message: tooLargeMessage(firstSize),
+          });
         }
-        throw errors.JUPITER_ERROR({
-          message: `Jupiter found no route for this swap that fits one transaction (${describeSize(firstSize)}, limit ${SWAP_MAX_TX_BYTES})`,
-        });
+        throw error;
       }
-      const retrySize = signedSize(tx);
+      const retrySize = wireSize(tx);
       console.warn("Jupiter /build swap retry with a smaller maxBytes", {
-        retrySize: describeSize(retrySize),
+        retrySize,
         retryRoute: build.routePlan.map((hop) => hop.swapInfo.label),
         passed: fits(retrySize),
       });
       if (!fits(retrySize)) {
-        throw errors.JUPITER_ERROR({
-          message: `Jupiter found no route for this swap that fits one transaction (${describeSize(retrySize)}, limit ${SWAP_MAX_TX_BYTES})`,
+        throw errors.TRANSACTION_TOO_LARGE({
+          message: tooLargeMessage(retrySize),
         });
       }
     }

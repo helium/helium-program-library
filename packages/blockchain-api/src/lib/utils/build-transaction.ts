@@ -2,6 +2,7 @@ import {
   AddressLookupTableAccount,
   Connection,
   Keypair,
+  PACKET_DATA_SIZE,
   PublicKey,
   TransactionInstruction,
   VersionedTransaction,
@@ -26,6 +27,67 @@ import {
   getTransactionFee,
 } from "@/lib/utils/balance-validation";
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
+
+/** The bytes a compact-u16 length prefix of `n` takes on the wire. */
+const shortVecSize = (n: number): number => (n < 0x80 ? 1 : n < 0x4000 ? 2 : 3);
+
+/** The bytes a compact-u16 length followed by `n` bytes takes on the wire. */
+const sizedBytes = (n: number): number => shortVecSize(n) + n;
+
+/**
+ * The bytes a v0 `tx` takes on the wire, signature slots included, counted
+ * from its parts. `serialize` cannot encode a message past the packet limit,
+ * so this count is what measures one.
+ */
+const countedV0WireSize = (tx: VersionedTransaction): number => {
+  const message = tx.message;
+  const instructions = message.compiledInstructions.reduce(
+    (total, ix) =>
+      total +
+      1 +
+      sizedBytes(ix.accountKeyIndexes.length) +
+      sizedBytes(ix.data.length),
+    shortVecSize(message.compiledInstructions.length),
+  );
+  const lookups = message.addressTableLookups.reduce(
+    (total, lookup) =>
+      total +
+      32 +
+      sizedBytes(lookup.writableIndexes.length) +
+      sizedBytes(lookup.readonlyIndexes.length),
+    shortVecSize(message.addressTableLookups.length),
+  );
+  return (
+    // Signature slots.
+    shortVecSize(tx.signatures.length) +
+    64 * tx.signatures.length +
+    // Version prefix and header.
+    1 +
+    3 +
+    // Static account keys and the recent blockhash.
+    shortVecSize(message.staticAccountKeys.length) +
+    32 * message.staticAccountKeys.length +
+    32 +
+    instructions +
+    lookups
+  );
+};
+
+/**
+ * The bytes `tx` takes on the wire, signature slots included. A v0
+ * transaction is counted, and serialized only when the count is within the
+ * packet limit, so one past the limit returns its exact size instead of the
+ * error web3.js raises ("encoding overruns", or an offset out of range when
+ * the limit falls on a one-byte field). Any other version is serialized, so
+ * one past the limit throws web3.js's error.
+ */
+export const wireSize = (tx: VersionedTransaction): number => {
+  if (tx.version === 0) {
+    const counted = countedV0WireSize(tx);
+    if (counted > PACKET_DATA_SIZE) return counted;
+  }
+  return tx.serialize().length;
+};
 
 export function getHeliumLookupTable(): PublicKey {
   return getCluster() === "devnet"
