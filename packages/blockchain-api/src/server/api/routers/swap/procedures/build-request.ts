@@ -9,22 +9,47 @@ export const BUILD_SWAP_MODE = "ExactIn";
  */
 export const SIZE_REQUOTES = 3;
 
+/** A size requote: the `maxBytes` it sends, and how it was reached. */
+export interface Requote {
+  /** The `maxBytes` the requote sends. */
+  budget: number;
+  /** The serialized size of the build that called for the requote. */
+  size: number;
+  /** How far the budget was lowered below the cap it started from. */
+  step: number;
+}
+
 /**
- * The `maxBytes` of the next requote after a build at `budget` whose bare
- * swap is estimated at `bare` bytes and whose transaction serialized to
- * `size` bytes. `/build` sizes only the bare swap against `maxBytes`, and the
- * server adds `size - bare` bytes around it (compute budget instructions), so
- * the bare swap fits when it is at most the packet limit less those bytes:
- * `bare` lowered by the overshoot. A route Jupiter returned under `budget`
- * keeps its size at any budget it still fits, so the next budget starts from
- * the smaller of the two. The first build sends no `maxBytes`, and its budget
- * counts as the packet limit.
+ * The requote after a build whose bare swap is estimated at `bare` bytes and
+ * whose transaction serialized to `size` bytes, over the packet limit.
+ * `last` is the requote that produced the build, or undefined for the first
+ * build, which sends no `maxBytes` and so places no cap.
+ *
+ * `/build` sizes only the bare swap against `maxBytes`, and the server adds
+ * `size - bare` bytes around it (compute budget instructions), so the bare
+ * swap fits when it is at most the packet limit less those bytes: `bare`
+ * lowered by the overshoot. A route Jupiter returned under the last budget
+ * keeps its size at any budget it still fits, so after a requote the budget
+ * starts from the smaller of the last budget and `bare`.
+ *
+ * A requote whose transaction is no smaller than the build before it means
+ * Jupiter counts that route's bare swap below the estimate, so the overshoot
+ * alone does not move Jupiter off it. The step is then the overshoot plus
+ * twice the last step, and grows each round that does not shrink.
  */
-export const nextMaxBytes = (
-  budget: number,
+export const nextRequote = (
+  last: Requote | undefined,
   bare: number,
   size: number,
-): number => Math.min(budget, bare) - (size - PACKET_DATA_SIZE);
+): Requote => {
+  const overshoot = size - PACKET_DATA_SIZE;
+  const step =
+    last !== undefined && size >= last.size
+      ? overshoot + 2 * last.step
+      : overshoot;
+  const budget = Math.min(last?.budget ?? Infinity, bare) - step;
+  return { budget, size, step };
+};
 
 /** The DEX labels in a comma-separated `excludeDexes`, without blanks. */
 export const excludedLabels = (excludeDexes: string | undefined): Set<string> =>

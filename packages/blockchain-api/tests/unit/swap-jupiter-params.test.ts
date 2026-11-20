@@ -93,6 +93,8 @@ let chainAccounts: Map<
 let walletLamports = 5_000_000_000;
 /** Whether the stubbed chain answers getMultipleAccounts with an RPC error. */
 let failMultipleAccounts = false;
+/** How many more getMultipleAccounts calls the stubbed chain answers with an RPC error. */
+let failMultipleAccountsCalls = 0;
 const realFetch = globalThis.fetch;
 let rpc: Server;
 
@@ -172,7 +174,10 @@ function startStubRpc(): Promise<string> {
           params: unknown;
         }) => {
           rpcMethods.push(method);
-          if (method === "getMultipleAccounts" && failMultipleAccounts) {
+          if (
+            method === "getMultipleAccounts" &&
+            (failMultipleAccounts || failMultipleAccountsCalls-- > 0)
+          ) {
             return {
               jsonrpc: "2.0",
               id,
@@ -384,6 +389,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     chainAccounts = new Map();
     walletLamports = 5_000_000_000;
     failMultipleAccounts = false;
+    failMultipleAccountsCalls = 0;
   });
 
   describe("quote through /build", () => {
@@ -1581,10 +1587,44 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       expect(
         tx.message.staticAccountKeys.map((k) => k.toBase58())
       ).to.not.include(ROUTE_ACCOUNT);
-      // Read once, for both the transaction and the bare swap's estimate.
+      // Read once: a build within the packet limit makes no estimate of its
+      // bare swap.
       expect(
         rpcMethods.filter((method) => method === "getMultipleAccounts")
       ).to.have.length(1);
+    });
+
+    it("builds with the priority fee fallback when one lookup table read fails", async () => {
+      buildOverrides = {
+        swapInstruction: {
+          programId: MEMO_PROGRAM,
+          accounts: [
+            { pubkey: WALLET, isSigner: true, isWritable: true },
+            { pubkey: ROUTE_ACCOUNT, isSigner: false, isWritable: true },
+          ],
+          data: "",
+        },
+        addressesByLookupTableAddress: { [LOOKUP_TABLE]: [ROUTE_ACCOUNT] },
+      };
+      const quoteResponse = await quote();
+      rpcMethods = [];
+      failMultipleAccountsCalls = 1;
+      const result = await call(getInstructions, {
+        quoteResponse,
+        userPublicKey: WALLET,
+      });
+
+      const tx = VersionedTransaction.deserialize(
+        Buffer.from(result.transactions[0].serializedTransaction, "base64")
+      );
+      expect(tx.message.addressTableLookups[0].accountKey.toBase58()).to.eq(
+        LOOKUP_TABLE
+      );
+      // The failed read, then the read of the draft that compiles the
+      // transaction.
+      expect(
+        rpcMethods.filter((method) => method === "getMultipleAccounts")
+      ).to.have.length(2);
     });
 
     it("compiles against the on-chain table, not the addresses /build lists", async () => {
@@ -1725,8 +1765,9 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       // (65), version and header (4), three account keys (97), the blockhash
       // (32), and the framing of the instruction list (1), the padding
       // instruction (4), the swap instruction (3) and the lookups (1). A
-      // transaction 1 byte over the limit has a bare swap of 1181 bytes, and
-      // a requote's maxBytes of 1180 fits it whatever the overshoot.
+      // transaction k bytes over the limit has a bare swap of 1180 + k bytes,
+      // so the first requote's maxBytes is 1180, and a route Jupiter counts
+      // as this estimate does fits at it.
       /** The bare swap of a route padded with `bytes` of 128 or more. */
       const BARE_FRAME = 207;
 
@@ -1855,20 +1896,20 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         buildAnswers = [OVER_AS_MESSAGE];
         const { result } = await swapInstructions();
 
-        // A bare swap of 1707 bytes is over the first budget of 1232, so the
-        // budget is lowered by the 527-byte overshoot.
-        expect(maxBytesSent()).to.deep.eq([null, "705"]);
+        // The first build sends no maxBytes, so nothing caps the bare swap
+        // of 1707 bytes, lowered by the 527-byte overshoot.
+        expect(maxBytesSent()).to.deep.eq([null, "1180"]);
         expect(overLimitWarnings[0].size).to.eq(PACKET_LIMIT + 527);
         expect(sizeOf(result)).to.be.at.most(PACKET_LIMIT);
       });
 
-      it("caps each requote's maxBytes at the previous one and stops at the first build that fits", async () => {
-        // The requote at 1180 answers a route with a bare swap of 1200 bytes,
-        // so the next budget is 1180 less the 20-byte overshoot.
-        buildAnswers = [over(10), over(20)];
+      it("caps a requote's maxBytes at the previous one and stops at the first build that fits", async () => {
+        // The requote at 1180 answers a route with a bare swap of 1189 bytes,
+        // 9 bytes over, so the next budget is 1180 less 9.
+        buildAnswers = [over(10), over(9)];
         await swapInstructions();
 
-        expect(maxBytesSent()).to.deep.eq([null, "1180", "1160"]);
+        expect(maxBytesSent()).to.deep.eq([null, "1180", "1171"]);
         expect(overLimitWarnings.map((w) => w.maxBytes)).to.deep.eq([
           null,
           1180,
@@ -1879,6 +1920,8 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         // Transactions 7 and 17 bytes over the limit.
         ["bare 1187", 1187, [1239]],
         ["bare 1197", 1197, [1249]],
+        // A transaction 120 bytes over, its bare swap past the packet limit.
+        ["bare 1300", 1300, [1352]],
       ] as const) {
         it(`fits in one requote a route Jupiter keeps while it fits the budget (${name})`, async () => {
           buildForMaxBytes = jupiterWithin(B0);
@@ -1890,11 +1933,18 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         });
       }
 
-      for (const [B0, sent, sizes] of [
-        [1180, [null, "1180", "1173"], [1239, 1239]],
-        [1190, [null, "1180", "1173"], [1249, 1239]],
+      for (const [B0, sent, sizes, size] of [
+        // The requote at 1180 shrinks the transaction, so the next step is its
+        // 7-byte overshoot.
+        [1190, [null, "1180", "1173"], [1249, 1239], PACKET_LIMIT],
+        // The requote at 1180 returns the same route, so the next step is its
+        // 7-byte overshoot plus twice the 7-byte step before it.
+        [1180, [null, "1180", "1159"], [1239, 1239], 1218],
+        // A route 1 byte over that Jupiter keeps through two requotes: steps
+        // of 1, 1 + 2 and 1 + 6.
+        [1174, [null, "1180", "1177", "1170"], [1233, 1233, 1233], 1229],
       ] as const) {
-        it(`fits in two requotes a route whose bare swap Jupiter counts 7 bytes under the estimate (Jupiter's bare ${B0})`, async () => {
+        it(`fits a route whose bare swap Jupiter counts 7 bytes under the estimate (Jupiter's bare ${B0})`, async () => {
           // Jupiter counts a padded route's bare swap as the padding plus 200
           // bytes, so the server adds 59 bytes to Jupiter's count and a bare
           // swap fits at a maxBytes of 1173.
@@ -1903,24 +1953,21 @@ describe("swap endpoints' optional Jupiter parameters", () => {
 
           expect(maxBytesSent()).to.deep.eq(sent);
           expect(overLimitWarnings.map((w) => w.size)).to.deep.eq(sizes);
-          expect(sizeOf(result)).to.eq(PACKET_LIMIT);
+          expect(sizeOf(result)).to.eq(size);
         });
       }
 
       for (const [name, overrides, sent, size] of [
-        // 300 bytes over is a message alone past the limit (the signature
-        // slot and its count are 65 bytes) that still leaves three requotes
-        // a budget of 1 or more. Its bare swap of 1480 bytes is over every
-        // budget, so each budget is the previous one less 300.
-        ["its message alone", over(300), [null, "932", "632", "332"], 1532],
-        // Its bare swap of 1207 bytes caps the first budget, then each budget
-        // is the previous one less 27.
+        // A route 27 bytes over that every requote returns again: steps of
+        // 27, 27 + 54 and 27 + 162.
         [
           "its signature slot",
           OVER_WITH_SIGNATURE,
-          [null, "1180", "1153", "1126"],
+          [null, "1180", "1099", "910"],
           1259,
         ],
+        // A route 100 bytes over: steps of 100, 300 and 700.
+        ["its message alone", over(100), [null, "1180", "880", "180"], 1332],
       ] as const) {
         it(`refuses with TRANSACTION_TOO_LARGE after ${SIZE_REQUOTES} requotes when the build stays over the limit through ${name}`, async () => {
           buildOverrides = overrides;
@@ -1936,7 +1983,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
           expect(error.message).to.eq(TOO_LARGE_MESSAGE);
           expect(maxBytesSent()).to.deep.eq(sent);
           expect(overLimitWarnings).to.have.length(SIZE_REQUOTES);
-          // The last build, refused, is logged with its size.
+          // The last build, refused over the limit, is logged with its size.
           expect(refusalWarnings).to.deep.eq([
             { maxBytes: Number(sent[3]), size, limit: PACKET_LIMIT },
           ]);
@@ -1945,22 +1992,27 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         });
       }
 
-      it("refuses without asking /build when the next maxBytes would be below 1", async () => {
-        // 1232 bytes over leaves a budget of 0.
-        buildOverrides = over(PACKET_LIMIT);
+      it("refuses without asking /build when the next maxBytes would be 0", async () => {
         const quoteResponse = await quote();
         jupiterCalls = [];
+        // The requote at 1180 returns a route 400 bytes over, no smaller, so
+        // the next step is 400 + 2 * 390 and leaves a budget of 0.
+        buildAnswers = [over(390), over(400)];
         const error = await rejection({ quoteResponse, userPublicKey: WALLET });
 
         expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
-        expect(maxBytesSent()).to.deep.eq([null]);
+        expect(maxBytesSent()).to.deep.eq([null, "1180"]);
+        expect(refusalWarnings).to.deep.eq([
+          { maxBytes: 1180, size: PACKET_LIMIT + 400, limit: PACKET_LIMIT },
+        ]);
       });
 
       it("requotes when the next maxBytes is exactly 1", async () => {
-        buildAnswers = [over(PACKET_LIMIT - 1)];
+        // A step of 393 + 2 * 393 from 1180.
+        buildAnswers = [over(393), over(393)];
         await swapInstructions();
 
-        expect(maxBytesSent()).to.deep.eq([null, "1"]);
+        expect(maxBytesSent()).to.deep.eq([null, "1180", "1"]);
       });
 
       it("refuses with TRANSACTION_TOO_LARGE when a requote finds no route within its maxBytes", async () => {
@@ -2034,10 +2086,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
           [null, "518"],
           ["1180", "50"],
           ["1180", "518"],
-          ["1153", "50"],
-          ["1153", "518"],
-          ["1126", "50"],
-          ["1126", "518"],
+          ["1099", "50"],
+          ["1099", "518"],
+          ["910", "50"],
+          ["910", "518"],
         ]);
       });
 

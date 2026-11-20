@@ -45,7 +45,8 @@ import {
   BUILD_SWAP_MODE,
   checkBuildAnswer,
   excludedLabels,
-  nextMaxBytes,
+  nextRequote,
+  type Requote,
   SIZE_REQUOTES,
 } from "./build-request";
 import BN from "bn.js";
@@ -406,9 +407,8 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
 
     /**
      * The route `/build` answers within `maxBytes`, with the minimum-output
-     * check applied, built into a transaction, and the estimated size of its
-     * bare swap: a v0 transaction of Jupiter's instructions and lookup tables
-     * alone, without the compute budget instructions the server adds.
+     * check applied, built into a transaction, with Jupiter's instructions
+     * and lookup table addresses for the bare swap's estimate.
      */
     const buildAt = async (maxBytes: number | undefined) => {
       // otherAmountThreshold is the minimum output the swap instruction enforces
@@ -481,67 +481,80 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
       ];
 
       // The tables are read from chain by key, so the transaction compiles
-      // against their on-chain contents. They are read once here, for both
-      // the transaction and the bare swap's estimate.
-      const feePayer = new PublicKey(userPublicKey);
+      // against their on-chain contents.
       const addressLookupTableAddresses = Object.keys(
         build.addressesByLookupTableAddress ?? {},
       ).map((key) => new PublicKey(key));
-      const addressLookupTables = await getAddressLookupTableAccounts(
-        connection,
-        addressLookupTableAddresses,
-      );
       const tx = await buildVersionedTransaction({
         connection,
         draft: {
           instructions: jupIxs,
-          feePayer,
+          feePayer: new PublicKey(userPublicKey),
           addressLookupTableAddresses,
-          addressLookupTables,
         },
       });
-      const bare = v0WireSize({
-        instructions: jupIxs,
-        feePayer,
-        addressLookupTables,
-      });
-      return { build, tx, bare };
+      return { build, tx, jupIxs, addressLookupTableAddresses };
     };
+
+    /**
+     * The estimated size of a build's bare swap: a v0 transaction of
+     * Jupiter's instructions and lookup tables alone, without the compute
+     * budget instructions the server adds. It reads the lookup tables again,
+     * so it runs only for a build over the packet limit; a failed read fails
+     * the request.
+     */
+    const bareSize = async ({
+      jupIxs,
+      addressLookupTableAddresses,
+    }: Awaited<ReturnType<typeof buildAt>>) =>
+      v0WireSize({
+        instructions: jupIxs,
+        feePayer: new PublicKey(userPublicKey),
+        addressLookupTables: await getAddressLookupTableAccounts(
+          connection,
+          addressLookupTableAddresses,
+        ),
+      });
 
     // A built route can serialize over the packet limit once the compute
     // budget instructions are added. The first build sends no maxBytes, so a
     // route that fits is the one Jupiter picks by default. The serialized
     // transaction is measured, and while it is over the limit /build is asked
     // again, up to SIZE_REQUOTES times, with a maxBytes of the estimated bare
-    // swap (capped at the previous budget) lowered by the overshoot
-    // (nextMaxBytes). When Jupiter counts the bare swap as the estimate does,
-    // one requote fits; the further requotes absorb a difference between the
-    // two counts. A transaction over the limit is not returned: it is refused
-    // with TRANSACTION_TOO_LARGE, as is a requote Jupiter finds no route for
-    // within its budget or whose routes fall below the quote's minimum output.
+    // swap (capped at the previous maxBytes once one is sent) lowered by the
+    // overshoot, and by more each round that does not shrink the transaction
+    // (nextRequote). When Jupiter counts the bare swap as the estimate does
+    // and has a route within the first requote's maxBytes, that route fits.
+    // When Jupiter counts it lower, a requote can return the same route; the
+    // steps of 1, 3 and 7 times the overshoot then move Jupiter off a route it
+    // counts up to 10 times the overshoot below the estimate. A transaction
+    // over the limit is not returned: it is refused with
+    // TRANSACTION_TOO_LARGE, as is a requote Jupiter finds no route for within
+    // its budget or whose routes fall below the quote's minimum output. Only
+    // the refusal over the limit logs the last build's size.
     //
     // /build is requested at most (1 + SIZE_REQUOTES) * (1 + MIN_OUTPUT_RETRIES)
     // = 8 times: each build gets its own minimum-output check, which asks
     // again at most MIN_OUTPUT_RETRIES times. A requote can route worse, so it
     // is held to the quote's minimum like the first request.
-    let budget = PACKET_DATA_SIZE;
+    let requote: Requote | undefined;
     let maxBytes: number | undefined;
     let built = await buildAt(maxBytes);
     let size = wireSize(built.tx);
     for (
-      let requote = 1;
-      size > PACKET_DATA_SIZE && requote <= SIZE_REQUOTES;
-      requote++
+      let round = 1;
+      size > PACKET_DATA_SIZE && round <= SIZE_REQUOTES;
+      round++
     ) {
       console.warn("Jupiter /build transaction over the packet limit", {
         maxBytes: maxBytes ?? null,
         size,
         limit: PACKET_DATA_SIZE,
       });
-      budget = nextMaxBytes(budget, built.bare, size);
+      requote = nextRequote(requote, await bareSize(built), size);
       // Jupiter takes a maxBytes of 1 or more.
-      if (budget < 1) break;
-      maxBytes = budget;
+      if (requote.budget < 1) break;
+      maxBytes = requote.budget;
       built = await buildAt(maxBytes);
       size = wireSize(built.tx);
     }
