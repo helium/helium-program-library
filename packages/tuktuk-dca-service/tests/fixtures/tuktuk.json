@@ -1,0 +1,1581 @@
+{
+  "address": "tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA",
+  "metadata": {
+    "name": "tuktuk",
+    "version": "0.2.13",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "add_queue_authority_v0",
+      "discriminator": [
+        122,
+        25,
+        219,
+        246,
+        39,
+        195,
+        74,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "update_authority",
+          "signer": true,
+          "relations": [
+            "task_queue"
+          ]
+        },
+        {
+          "name": "queue_authority"
+        },
+        {
+          "name": "task_queue_authority",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  113,
+                  117,
+                  101,
+                  117,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task_queue"
+              },
+              {
+                "kind": "account",
+                "path": "queue_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task_queue",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_task_queue_v0",
+      "discriminator": [
+        196,
+        228,
+        35,
+        71,
+        131,
+        69,
+        175,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "rent_refund",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "update_authority",
+          "signer": true,
+          "relations": [
+            "task_queue"
+          ]
+        },
+        {
+          "name": "tuktuk_config",
+          "writable": true,
+          "relations": [
+            "task_queue"
+          ]
+        },
+        {
+          "name": "task_queue",
+          "writable": true
+        },
+        {
+          "name": "task_queue_name_mapping",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "dequeue_task_v0",
+      "discriminator": [
+        92,
+        141,
+        249,
+        132,
+        219,
+        109,
+        215,
+        126
+      ],
+      "accounts": [
+        {
+          "name": "queue_authority",
+          "signer": true
+        },
+        {
+          "name": "rent_refund",
+          "writable": true,
+          "relations": [
+            "task"
+          ]
+        },
+        {
+          "name": "task_queue_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  113,
+                  117,
+                  101,
+                  117,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task_queue"
+              },
+              {
+                "kind": "account",
+                "path": "queue_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task_queue",
+          "writable": true,
+          "relations": [
+            "task"
+          ]
+        },
+        {
+          "name": "task",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "dummy_ix",
+      "discriminator": [
+        234,
+        95,
+        176,
+        185,
+        7,
+        42,
+        35,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "dummy",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_task_queue_v0",
+      "discriminator": [
+        150,
+        100,
+        6,
+        8,
+        32,
+        179,
+        250,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "tuktuk_config",
+          "writable": true
+        },
+        {
+          "name": "update_authority"
+        },
+        {
+          "name": "task_queue",
+          "writable": true
+        },
+        {
+          "name": "task_queue_name_mapping",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeTaskQueueArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_tuktuk_config_v0",
+      "discriminator": [
+        67,
+        128,
+        98,
+        227,
+        103,
+        60,
+        179,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "approver",
+          "signer": true
+        },
+        {
+          "name": "authority"
+        },
+        {
+          "name": "tuktuk_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  117,
+                  107,
+                  116,
+                  117,
+                  107,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeTuktukConfigArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "queue_task_v0",
+      "discriminator": [
+        177,
+        95,
+        195,
+        252,
+        241,
+        2,
+        178,
+        88
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "queue_authority",
+          "signer": true
+        },
+        {
+          "name": "task_queue_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  113,
+                  117,
+                  101,
+                  117,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task_queue"
+              },
+              {
+                "kind": "account",
+                "path": "queue_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task_queue",
+          "writable": true
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "QueueTaskArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "remove_queue_authority_v0",
+      "discriminator": [
+        180,
+        26,
+        196,
+        229,
+        80,
+        40,
+        245,
+        187
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "rent_refund",
+          "writable": true
+        },
+        {
+          "name": "update_authority",
+          "signer": true,
+          "relations": [
+            "task_queue"
+          ]
+        },
+        {
+          "name": "queue_authority"
+        },
+        {
+          "name": "task_queue_authority",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  113,
+                  117,
+                  101,
+                  117,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task_queue"
+              },
+              {
+                "kind": "account",
+                "path": "queue_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task_queue",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "return_tasks_v0",
+      "discriminator": [
+        38,
+        235,
+        111,
+        148,
+        44,
+        99,
+        189,
+        164
+      ],
+      "accounts": [
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ReturnTasksArgsV0"
+            }
+          }
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "RunTaskReturnV0"
+        }
+      }
+    },
+    {
+      "name": "run_task_v0",
+      "discriminator": [
+        52,
+        184,
+        39,
+        129,
+        126,
+        245,
+        176,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "crank_turner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "rent_refund",
+          "writable": true,
+          "relations": [
+            "task"
+          ]
+        },
+        {
+          "name": "task_queue",
+          "writable": true,
+          "relations": [
+            "task"
+          ]
+        },
+        {
+          "name": "task",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "sysvar_instructions",
+          "docs": [
+            "the supplied Sysvar could be anything else.",
+            "The Instruction Sysvar has not been implemented",
+            "in the Anchor framework yet, so this is the safe approach."
+          ],
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "RunTaskArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_task_queue_v0",
+      "discriminator": [
+        107,
+        147,
+        81,
+        119,
+        75,
+        1,
+        18,
+        41
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "update_authority",
+          "signer": true,
+          "relations": [
+            "task_queue"
+          ]
+        },
+        {
+          "name": "task_queue",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "UpdateTaskQueueArgsV0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw_task_queue_surplus_v0",
+      "discriminator": [
+        131,
+        145,
+        143,
+        179,
+        172,
+        71,
+        113,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "update_authority",
+          "signer": true,
+          "relations": [
+            "task_queue"
+          ]
+        },
+        {
+          "name": "queue_authority",
+          "writable": true
+        },
+        {
+          "name": "task_queue_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  97,
+                  115,
+                  107,
+                  95,
+                  113,
+                  117,
+                  101,
+                  117,
+                  101,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "task_queue"
+              },
+              {
+                "kind": "account",
+                "path": "queue_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "task_queue",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "WithdrawTaskQueueSurplusArgsV0"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "RemoteTaskTransactionV0",
+      "discriminator": [
+        244,
+        225,
+        238,
+        116,
+        199,
+        12,
+        9,
+        191
+      ]
+    },
+    {
+      "name": "TaskQueueAuthorityV0",
+      "discriminator": [
+        206,
+        37,
+        171,
+        34,
+        162,
+        191,
+        47,
+        50
+      ]
+    },
+    {
+      "name": "TaskQueueNameMappingV0",
+      "discriminator": [
+        112,
+        41,
+        174,
+        94,
+        48,
+        84,
+        56,
+        217
+      ]
+    },
+    {
+      "name": "TaskQueueV0",
+      "discriminator": [
+        150,
+        24,
+        232,
+        159,
+        105,
+        32,
+        161,
+        17
+      ]
+    },
+    {
+      "name": "TaskV0",
+      "discriminator": [
+        242,
+        93,
+        213,
+        169,
+        42,
+        94,
+        239,
+        80
+      ]
+    },
+    {
+      "name": "TuktukConfigV0",
+      "discriminator": [
+        198,
+        255,
+        138,
+        207,
+        252,
+        149,
+        60,
+        1
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "TaskAlreadyExists",
+      "msg": "Task already exists"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidSigner",
+      "msg": "Signer account mismatched account in definition"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidWritable",
+      "msg": "Writable account mismatched account in definition"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidAccount",
+      "msg": "Account mismatched account in definition"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidDataIncrease",
+      "msg": "Invalid data increase"
+    },
+    {
+      "code": 6005,
+      "name": "TaskNotReady",
+      "msg": "Task not ready"
+    },
+    {
+      "code": 6006,
+      "name": "TaskQueueNotEmpty",
+      "msg": "Task queue not empty"
+    },
+    {
+      "code": 6007,
+      "name": "FreeTaskAccountNotEmpty",
+      "msg": "Free task account not empty"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidTaskPDA",
+      "msg": "Invalid task PDA"
+    },
+    {
+      "code": 6009,
+      "name": "TaskQueueInsufficientFunds",
+      "msg": "Task queue insufficient funds"
+    },
+    {
+      "code": 6010,
+      "name": "SigVerificationFailed",
+      "msg": "Sig verification failed"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidTransactionSource",
+      "msg": "Invalid transaction source"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidVerificationAccountsHash",
+      "msg": "Invalid task verification hash"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidRentRefund",
+      "msg": "Invalid rent refund"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidTaskId",
+      "msg": "Invalid task id"
+    },
+    {
+      "code": 6015,
+      "name": "DummyInstruction",
+      "msg": "Don't use the dummy instruction"
+    },
+    {
+      "code": 6016,
+      "name": "InvalidDescriptionLength",
+      "msg": "Invalid description length"
+    },
+    {
+      "code": 6017,
+      "name": "TaskQueueHasQueueAuthorities",
+      "msg": "Task queue has queue authorities"
+    },
+    {
+      "code": 6018,
+      "name": "FreeTasksGreaterThanCapacity",
+      "msg": "Free tasks must be less than the capacity of the task queue"
+    },
+    {
+      "code": 6019,
+      "name": "TaskIdAlreadyInUse",
+      "msg": "Task ID is already in use"
+    },
+    {
+      "code": 6020,
+      "name": "DuplicateTaskIds",
+      "msg": "Duplicate task IDs provided"
+    },
+    {
+      "code": 6021,
+      "name": "MismatchedFreeTaskCounts",
+      "msg": "Number of free task IDs does not match number of free task accounts"
+    },
+    {
+      "code": 6022,
+      "name": "TooManyReturnedTasks",
+      "msg": "Too many returned tasks, increase free tasks count"
+    },
+    {
+      "code": 6023,
+      "name": "MalformedRemoteTransaction",
+      "msg": "Malformed remote transaction"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidAccountKey",
+      "msg": "Invalid account key"
+    },
+    {
+      "code": 6025,
+      "name": "InvalidCrankReward",
+      "msg": "Invalid crank reward"
+    },
+    {
+      "code": 6026,
+      "name": "InvalidSignerSeeds",
+      "msg": "Signer seeds do not resolve to a valid PDA"
+    },
+    {
+      "code": 6027,
+      "name": "InvalidAccountIndex",
+      "msg": "Instruction references an account index that was not provided"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidTasksAccountOwner",
+      "msg": "Returned tasks account is not owned by the program that returned it"
+    },
+    {
+      "code": 6029,
+      "name": "CrankRewardExceedsMax",
+      "msg": "Returned task crank reward exceeds the task queue's min crank reward"
+    },
+    {
+      "code": 6030,
+      "name": "ReturnedTaskTooLarge",
+      "msg": "Returned task is too large"
+    },
+    {
+      "code": 6031,
+      "name": "StaleTaskAgeCannotDecrease",
+      "msg": "stale_task_age may only be increased"
+    },
+    {
+      "code": 6032,
+      "name": "TaskNotQueued",
+      "msg": "Task is not queued (already dequeued, or currently running)"
+    },
+    {
+      "code": 6033,
+      "name": "TaskQueueBelowMinRemaining",
+      "msg": "Task queue would hold less than the minimum the caller asked to leave"
+    }
+  ],
+  "types": [
+    {
+      "name": "CompiledInstructionV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id_index",
+            "docs": [
+              "Index into the transaction keys array indicating the program account that executes this instruction."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "accounts",
+            "docs": [
+              "Ordered indices into the transaction keys array indicating which accounts to pass to the program."
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "docs": [
+              "The program input data."
+            ],
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CompiledTransactionV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "num_rw_signers",
+            "type": "u8"
+          },
+          {
+            "name": "num_ro_signers",
+            "type": "u8"
+          },
+          {
+            "name": "num_rw",
+            "type": "u8"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "instructions",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CompiledInstructionV0"
+                }
+              }
+            }
+          },
+          {
+            "name": "signer_seeds",
+            "docs": [
+              "Additional signer seeds. Should include bump. Useful for things like initializing a mint where",
+              "you cannot pass a keypair.",
+              "Note that these seeds will be prefixed with \"custom\", task_queue.key",
+              "and the bump you pass and account should be consistent with this. But to save space",
+              "in the instruction, they should be ommitted here. See tests for examples"
+            ],
+            "type": {
+              "vec": {
+                "vec": "bytes"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeTaskQueueArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "min_crank_reward",
+            "type": "u64"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "capacity",
+            "type": "u16"
+          },
+          {
+            "name": "lookup_tables",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "stale_task_age",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeTuktukConfigArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "min_deposit",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QueueTaskArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": "u16"
+          },
+          {
+            "name": "trigger",
+            "type": {
+              "defined": {
+                "name": "TriggerV0"
+              }
+            }
+          },
+          {
+            "name": "transaction",
+            "type": {
+              "defined": {
+                "name": "TransactionSourceV0"
+              }
+            }
+          },
+          {
+            "name": "crank_reward",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "free_tasks",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RemoteTaskTransactionV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "verification_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "transaction",
+            "type": {
+              "defined": {
+                "name": "CompiledTransactionV0"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReturnTasksArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tasks",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "TaskReturnV0"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RunTaskArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "free_task_ids",
+            "type": {
+              "vec": "u16"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RunTaskReturnV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tasks",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "TaskReturnV0"
+                }
+              }
+            }
+          },
+          {
+            "name": "tasks_accounts",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskQueueAuthorityV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_queue",
+            "type": "pubkey"
+          },
+          {
+            "name": "queue_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskQueueNameMappingV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_queue",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskQueueV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tuktuk_config",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u32"
+          },
+          {
+            "name": "update_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "reserved",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_crank_reward",
+            "type": "u64"
+          },
+          {
+            "name": "uncollected_protocol_fees",
+            "type": "u64"
+          },
+          {
+            "name": "capacity",
+            "type": "u16"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          },
+          {
+            "name": "task_bitmap",
+            "type": "bytes"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "lookup_tables",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "num_queue_authorities",
+            "type": "u16"
+          },
+          {
+            "name": "stale_task_age",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskReturnV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "trigger",
+            "type": {
+              "defined": {
+                "name": "TriggerV0"
+              }
+            }
+          },
+          {
+            "name": "transaction",
+            "type": {
+              "defined": {
+                "name": "TransactionSourceV0"
+              }
+            }
+          },
+          {
+            "name": "crank_reward",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "free_tasks",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TaskV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "task_queue",
+            "type": "pubkey"
+          },
+          {
+            "name": "rent_amount",
+            "type": "u64"
+          },
+          {
+            "name": "crank_reward",
+            "type": "u64"
+          },
+          {
+            "name": "id",
+            "type": "u16"
+          },
+          {
+            "name": "trigger",
+            "type": {
+              "defined": {
+                "name": "TriggerV0"
+              }
+            }
+          },
+          {
+            "name": "rent_refund",
+            "type": "pubkey"
+          },
+          {
+            "name": "transaction",
+            "type": {
+              "defined": {
+                "name": "TransactionSourceV0"
+              }
+            }
+          },
+          {
+            "name": "queued_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          },
+          {
+            "name": "free_tasks",
+            "type": "u8"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransactionSourceV0",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "CompiledV0",
+            "fields": [
+              {
+                "defined": {
+                  "name": "CompiledTransactionV0"
+                }
+              }
+            ]
+          },
+          {
+            "name": "RemoteV0",
+            "fields": [
+              {
+                "name": "url",
+                "type": "string"
+              },
+              {
+                "name": "signer",
+                "type": "pubkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "TriggerV0",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Now"
+          },
+          {
+            "name": "Timestamp",
+            "fields": [
+              "i64"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "TuktukConfigV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "min_task_queue_id",
+            "type": "u32"
+          },
+          {
+            "name": "next_task_queue_id",
+            "type": "u32"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_deposit",
+            "type": "u64"
+          },
+          {
+            "name": "bump_seed",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateTaskQueueArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "min_crank_reward",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "capacity",
+            "type": {
+              "option": "u16"
+            }
+          },
+          {
+            "name": "lookup_tables",
+            "type": {
+              "option": {
+                "vec": "pubkey"
+              }
+            }
+          },
+          {
+            "name": "update_authority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "stale_task_age",
+            "type": {
+              "option": "u32"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "WithdrawTaskQueueSurplusArgsV0",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "min_remaining",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

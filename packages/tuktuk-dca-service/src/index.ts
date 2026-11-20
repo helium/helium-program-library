@@ -7,11 +7,12 @@ import {
   init,
   RemoteTaskTransactionV0,
 } from "@helium/tuktuk-sdk";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
 import { crankSizer } from "./crank";
+import { runTaskBuilder } from "./run-task";
 import {
   answerDcaRequest,
   BuildDcaTask,
@@ -51,9 +52,6 @@ const wallet = new Wallet(DCA_SIGNER);
 const provider = new AnchorProvider(new Connection(SOLANA_URL), wallet, {
   commitment: "finalized",
 });
-
-/** Stands in for the crank turner, which pays for and signs the run, in the size estimate. */
-const CRANK_TURNER_STAND_IN = Keypair.generate().publicKey;
 
 let tuktukProgram: Promise<Program<Tuktuk>> | null = null;
 function getTuktukProgram() {
@@ -120,7 +118,6 @@ const prepareTask = async (
     .accounts({ dca })
     .instruction();
 
-  // The crank turner's key stands in as run_task_v0's payer.
   const taskAccount = await tuktukProgram.account.taskV0.fetch(task);
   const taskQueueAccount =
     await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
@@ -133,17 +130,7 @@ const prepareTask = async (
           keys.map((key) => provider.connection.getAddressLookupTable(key))
         )
       ).flatMap(({ value }) => (value ? [value] : [])),
-    runTask: (freeTaskIds, remaining) =>
-      tuktukProgram.methods
-        .runTaskV0({ freeTaskIds })
-        .accountsPartial({
-          crankTurner: CRANK_TURNER_STAND_IN,
-          rentRefund: taskAccount.rentRefund,
-          taskQueue,
-          task,
-        })
-        .remainingAccounts(remaining)
-        .instruction(),
+    runTask: runTaskBuilder(tuktukProgram, task, taskAccount),
   });
 
   return async (maxBytes: number) => {
