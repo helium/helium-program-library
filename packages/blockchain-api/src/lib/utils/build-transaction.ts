@@ -29,7 +29,7 @@ import {
 import { toTokenAmountOutput } from "@/lib/utils/token-math";
 
 /** The bytes a compact-u16 length prefix of `n` takes on the wire. */
-const shortVecSize = (n: number): number => (n < 0x80 ? 1 : n < 0x4000 ? 2 : 3);
+export const shortVecSize = (n: number): number => (n < 0x80 ? 1 : n < 0x4000 ? 2 : 3);
 
 /** The bytes a compact-u16 length followed by `n` bytes takes on the wire. */
 const sizedBytes = (n: number): number => shortVecSize(n) + n;

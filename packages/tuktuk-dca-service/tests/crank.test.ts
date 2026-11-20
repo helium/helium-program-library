@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import {
   AddressLookupTableAccount,
+  ComputeBudgetProgram,
+  Ed25519Program,
   Keypair,
   PublicKey,
   TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import {
   buildFittingTask,
   CRANK_MAX_TX_BYTES,
+  CrankTooLargeError,
   crankTransactionSize,
   retrySwapMaxBytes,
   runTaskRemainingAccounts,
@@ -56,6 +61,28 @@ const table = (addresses: PublicKey[]) =>
 
 describe("tuktuk-dca-service crank transaction size", () => {
   describe("crankTransactionSize", () => {
+    it("equals the crank turner's transaction: compute budget, ed25519 check, run_task_v0", () => {
+      const task = remoteTask(300);
+      const tables = [table(REMAINING)];
+      const expected = new VersionedTransaction(
+        new TransactionMessage({
+          payerKey: CRANK_TURNER,
+          recentBlockhash: PublicKey.default.toBase58(),
+          instructions: [
+            ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 }),
+            ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 1 }),
+            Ed25519Program.createInstructionWithPublicKey({
+              publicKey: task.signer.toBytes(),
+              message: task.message,
+              signature: task.signature,
+            }),
+            runTask(),
+          ],
+        }).compileToV0Message(tables)
+      ).serialize().length;
+      assert.equal(crankTransactionSize(task, runTask(), tables), expected);
+    });
+
     it("grows one byte for each byte of the signed remote task", () => {
       const small = crankTransactionSize(remoteTask(300), runTask(), []);
       const large = crankTransactionSize(remoteTask(400), runTask(), []);
@@ -171,9 +198,13 @@ describe("tuktuk-dca-service crank transaction size", () => {
 
     it("refuses the order when the retry still does not fit", async () => {
       const { budgets, build } = builds([undefined, CRANK_MAX_TX_BYTES + 1]);
-      await assert.rejects(buildFittingTask(build), {
-        message:
-          "Jupiter found no route for this DCA order whose crank transaction fits (1233 bytes, limit 1232)",
+      await assert.rejects(buildFittingTask(build), (error) => {
+        assert.ok(error instanceof CrankTooLargeError);
+        assert.equal(
+          error.message,
+          "Jupiter found no route for this DCA order whose crank transaction fits (1233 bytes, limit 1232)"
+        );
+        return true;
       });
       assert.deepEqual(budgets, [DCA_SWAP_MAX_BYTES, DCA_SWAP_MAX_BYTES - 66]);
     });
@@ -182,9 +213,13 @@ describe("tuktuk-dca-service crank transaction size", () => {
       const { budgets, build } = builds([
         CRANK_MAX_TX_BYTES + DCA_SWAP_MAX_BYTES,
       ]);
-      await assert.rejects(buildFittingTask(build), {
-        message:
-          "Jupiter found no route for this DCA order whose crank transaction fits (1752 bytes, limit 1232)",
+      await assert.rejects(buildFittingTask(build), (error) => {
+        assert.ok(error instanceof CrankTooLargeError);
+        assert.equal(
+          error.message,
+          "Jupiter found no route for this DCA order whose crank transaction fits (1752 bytes, limit 1232)"
+        );
+        return true;
       });
       assert.deepEqual(budgets, [DCA_SWAP_MAX_BYTES]);
     });

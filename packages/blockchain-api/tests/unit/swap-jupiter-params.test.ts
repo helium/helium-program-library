@@ -1691,6 +1691,42 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
       });
 
+      it("keeps the retry's maxBytes when the retry asks /build again for the quote's minimum", async () => {
+        const bytes = (await dataAtLimit()) + 1;
+        const quoteResponse = {
+          ...(await quote()),
+          otherAmountThreshold: "951",
+        };
+        jupiterCalls = [];
+        // The first answer is oversized. The retry's first answer falls below
+        // the quote's minimum, so /build is asked again at a narrower slippage.
+        buildAnswers = [
+          {
+            ...swapWithData(bytes),
+            outAmount: "1003",
+            otherAmountThreshold: "951",
+          },
+          {
+            ...swapWithData(bytes - 1),
+            outAmount: "1003",
+            otherAmountThreshold: "900",
+          },
+          {
+            ...swapWithData(bytes - 1),
+            outAmount: "1002",
+            otherAmountThreshold: "951",
+          },
+        ];
+
+        const result = await call(getInstructions, {
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
+
+        expect(result.transactions[0].metadata?.outputAmount).to.eq("1002");
+        expect(buildMaxBytes()).to.deep.eq(["1080", "1079", "1079"]);
+      });
+
       it("refuses a swap whose retry is still over SWAP_MAX_TX_BYTES with TRANSACTION_TOO_LARGE", async () => {
         const bytes = (await dataAtLimit()) + 1;
         const quoteResponse = await quote();

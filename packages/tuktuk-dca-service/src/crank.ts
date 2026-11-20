@@ -74,6 +74,14 @@ export const crankTransactionSize = (
 const fits = (size: number | undefined): size is number =>
   size !== undefined && size <= CRANK_MAX_TX_BYTES;
 
+/** An order refused because no route builds a crank transaction that fits. */
+export class CrankTooLargeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CrankTooLargeError";
+  }
+}
+
 const describeSize = (size: number | undefined): string =>
   size === undefined ? `over ${CRANK_MAX_TX_BYTES} bytes` : `${size} bytes`;
 
@@ -108,7 +116,7 @@ export const buildFittingTask = async <T,>(
   }
   const retryMaxBytes = retrySwapMaxBytes(first.size);
   const refusal = (size: number | undefined) =>
-    new Error(
+    new CrankTooLargeError(
       `Jupiter found no route for this DCA order whose crank transaction fits (${describeSize(
         size
       )}, limit ${CRANK_MAX_TX_BYTES})`

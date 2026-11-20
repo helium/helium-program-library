@@ -14,6 +14,7 @@ import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
 import { dcaTaskBindingError } from "./binding";
 import {
   buildFittingTask,
+  CrankTooLargeError,
   crankTransactionSize,
   runTaskRemainingAccounts,
 } from "./crank";
@@ -264,6 +265,10 @@ server.post<{
     });
   } catch (err: any) {
     console.error("DCA swap error:", err);
+    if (err instanceof CrankTooLargeError) {
+      reply.status(422).send({ error: err.message });
+      return;
+    }
     reply.status(500).send({ error: err.message });
   }
 });

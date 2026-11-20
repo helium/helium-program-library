@@ -517,10 +517,11 @@ export const getInstructions = publicProcedure.swap.getInstructions.handler(
           message: tooLargeMessage(firstSize),
         });
       }
-      // A retry that Jupiter answers as a bad request ("No routes found", or
-      // routes whose minimum output falls below the quote's) has no route that
-      // fits, and a fresh quote finds the same oversized one, so it is refused
-      // as too large. Every other failure keeps its own error.
+      // Any bad request on the retry is refused as too large. The first build
+      // of the same pair just succeeded, so in practice it is "No routes
+      // found" or a minimum output below the quote's: no route fits, and a
+      // fresh quote finds the same oversized one. Every other failure keeps
+      // its own error.
       try {
         build = await buildKeepingMinimum(retryMaxBytes);
         tx = await compileSwap(build);
