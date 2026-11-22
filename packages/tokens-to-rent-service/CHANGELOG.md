@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.12.2
+
+### Patch Changes
+
+- [#1399](https://github.com/helium/helium-program-library/pull/1399) [`9784253`](https://github.com/helium/helium-program-library/commit/97842537ba48331a253327e2568b30e29da9c809) Thanks [@bryzettler](https://github.com/bryzettler)! - Comments only: explain why the price lookup stays unbounded and why the fee transaction keeps no wallet guard reserve.
+
 ## 0.12.1
 
 ### Patch Changes
