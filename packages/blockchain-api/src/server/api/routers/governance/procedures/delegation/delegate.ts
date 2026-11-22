@@ -22,7 +22,12 @@ import {
   PROGRAM_ID as PROXY_PROGRAM_ID,
 } from "@helium/nft-proxy-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
-import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
+import {
+  PROGRAM_ID as TUKTUK_PROGRAM_ID,
+  init as initTuktuk,
+  nextAvailableTaskIds,
+  taskKey,
+} from "@helium/tuktuk-sdk";
 import {
   init as initVsr,
   positionKey,
@@ -165,11 +170,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
         delegationClaimBotKeys,
       ),
       automationEnabled
-        ? import("@helium/tuktuk-sdk")
-            .then((m) => initCachedProgram(m.init, m.PROGRAM_ID, provider))
-            .then((tuktukProgram) =>
+        ? initCachedProgram(initTuktuk, TUKTUK_PROGRAM_ID, provider).then(
+            (tuktukProgram) =>
               tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE),
-            )
+          )
         : Promise.resolve(null),
     ]);
 
@@ -183,11 +187,10 @@ export const delegate = publicProcedure.governance.delegatePositions.handler(
     }
     const taskRentRefunds =
       nextTaskKeys.length > 0
-        ? await import("@helium/tuktuk-sdk")
-            .then((m) => initCachedProgram(m.init, m.PROGRAM_ID, provider))
-            .then((tuktukProgram) =>
+        ? await initCachedProgram(initTuktuk, TUKTUK_PROGRAM_ID, provider).then(
+            (tuktukProgram) =>
               fetchTaskRentRefunds(connection, tuktukProgram, nextTaskKeys),
-            )
+          )
         : new Map<string, PublicKey>();
     /** The remaining accounts that let an instruction refund the task it dequeues. */
     const taskRentRefundMetas = (nextTask: PublicKey): AccountMeta[] => {
