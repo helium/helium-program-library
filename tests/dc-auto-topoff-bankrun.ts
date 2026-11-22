@@ -47,6 +47,7 @@ import {
   overwriteAccountData,
   readAccount,
   startBankrun,
+  usePinnedProgram,
   warpTo,
 } from "./utils/bankrun";
 import { DCA_TEST_SIGNER, DCA_TEST_URL } from "./utils/dca-test-server";
@@ -179,7 +180,7 @@ describe("dc-auto-topoff under bankrun", () => {
   }
 
   before(async () => {
-    ensureDumped("tuktuk", TUKTUK);
+    usePinnedProgram("tuktuk");
     ensureDumped("data_credits", DATA_CREDITS_PROGRAM);
     ensureDumped("circuit_breaker", CIRCUIT_BREAKER_PROGRAM);
     ctx = await startBankrun(
