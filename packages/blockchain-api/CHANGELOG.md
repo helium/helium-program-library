@@ -1,5 +1,18 @@
 # Change Log
 
+## 0.16.1
+
+### Patch Changes
+
+- [#1399](https://github.com/helium/helium-program-library/pull/1399) [`a64fa1a`](https://github.com/helium/helium-program-library/commit/a64fa1ae46c6342ffb30450e5edd2ef307819f39) Thanks [@bryzettler](https://github.com/bryzettler)! - Mark the ignored getInstructions inputs (dynamicComputeUnitLimit, useSharedAccounts, prioritizationFeeLamports) as deprecated in the schema and the OpenAPI spec, and log the user agent of callers that still send them. dynamicComputeUnitLimit no longer defaults to true, so in the parsed `GetInstructionsInput` type it is now `boolean | undefined`; nothing reads it.
+
+- [#1401](https://github.com/helium/helium-program-library/pull/1401) [`d1c640e`](https://github.com/helium/helium-program-library/commit/d1c640e2183c1136a5cde7637cf327621d74a1ba) Thanks [@bryzettler](https://github.com/bryzettler)! - `delegatePositions` and create position import `@helium/tuktuk-sdk` statically. The CJS build kept the dynamic `import()`, so Node loaded the SDK's broken ESM build and threw `ERR_MODULE_NOT_FOUND`. Delegation then failed for any position whose claim bot had a queued task, and auto claim could not be turned off.
+
+- [#1399](https://github.com/helium/helium-program-library/pull/1399) [`e5046e7`](https://github.com/helium/helium-program-library/commit/e5046e734b96dffe6a5978f24b480e99eef87650) Thanks [@bryzettler](https://github.com/bryzettler)! - Bound Jupiter `/build` routes (maxAccounts 40, maxBytes 1080) so swaps fit one transaction with 100 bytes left for wallet guard instructions. A swap over 1132 bytes is built once more with maxBytes lowered by the exact overshoot, counted from the message even past the packet limit. If that is still too large, or Jupiter finds no route inside the lower bound, getInstructions refuses it with the new TRANSACTION_TOO_LARGE error (422) instead of returning an unsendable transaction. Other retry failures keep their own error. Governance batches share the same 100-byte wallet guard reserve.
+
+- Updated dependencies [[`a64fa1a`](https://github.com/helium/helium-program-library/commit/a64fa1ae46c6342ffb30450e5edd2ef307819f39), [`e5046e7`](https://github.com/helium/helium-program-library/commit/e5046e734b96dffe6a5978f24b480e99eef87650)]:
+  - @helium/blockchain-api@0.21.0
+
 ## 0.16.0
 
 ### Minor Changes
