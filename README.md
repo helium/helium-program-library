@@ -347,8 +347,11 @@ solana-verify verify-from-repo -u https://api.mainnet-beta.solana.com \
   https://github.com/helium/helium-program-library \
   --program-id <program-id> \
   --commit-hash "$(git rev-list -n 1 program-<program-name>-<version>)" \
+  --arch v3 \
   --library-name <program_name>
 ```
+
+`--arch v3` needs solana-verify 0.5.2 or later. Drop it for a release built before the SBPFv3 switch.
 
 Answer no when it asks to write verify data on chain, and do not pass `-y`.
 
