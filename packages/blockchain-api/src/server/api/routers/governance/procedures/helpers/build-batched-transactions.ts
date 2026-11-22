@@ -25,6 +25,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { MAX_TXS_PER_CALL } from "./constants";
+import { WALLET_GUARD_RESERVE_BYTES } from "@/lib/utils/wallet-guard";
 
 export interface InstructionGroup {
   instructions: TransactionInstruction[];
@@ -57,7 +58,8 @@ export interface BuildBatchedTransactionsResult {
 
 // measureSize builds v0.
 const MAX_TX_SIZE = getTransactionSizeLimit(0);
-const SIZE_MARGIN = 100;
+// The user's wallet signs every batch, so each one leaves room for its guards.
+const SIZE_MARGIN = WALLET_GUARD_RESERVE_BYTES;
 
 const COMPUTE_BUDGET_PLACEHOLDERS = [
   ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),

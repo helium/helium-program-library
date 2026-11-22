@@ -1,3 +1,6 @@
+import { WALLET_GUARD_RESERVE_BYTES } from "@/lib/utils/wallet-guard";
+import { PACKET_DATA_SIZE } from "@solana/web3.js";
+
 /** The only swap mode `/build` quotes and builds. */
 export const BUILD_SWAP_MODE = "ExactIn";
 
@@ -27,6 +30,50 @@ export const excludedWithDefaults = (
   excludeDexes: string | undefined,
 ): Set<string> =>
   new Set([...excludedLabels(excludeDexes), ...ALWAYS_EXCLUDED_LABELS]);
+
+/**
+ * What buildVersionedTransaction adds to Jupiter's bare swap (setup, swap and
+ * cleanup instructions compiled alone): the compute unit limit and price
+ * instructions and the compute budget program's key. Measured from live
+ * `/build` answers: 52 bytes.
+ */
+const COMPUTE_BUDGET_OVERHEAD_BYTES = 52;
+
+/** The largest signed swap transaction getInstructions returns. */
+export const SWAP_MAX_TX_BYTES = PACKET_DATA_SIZE - WALLET_GUARD_RESERVE_BYTES;
+
+/**
+ * The byte budget `/build` gets for the bare swap (`maxBytes`), so the swap
+ * transaction fits SWAP_MAX_TX_BYTES. Unbounded, `/build` answered routes whose
+ * transaction ran past the packet limit. Jupiter marks `maxBytes` as
+ * experimental, so `maxAccounts` bounds the route too, and getInstructions
+ * refuses a transaction that still does not fit.
+ */
+const ROUTE_MAX_BYTES = SWAP_MAX_TX_BYTES - COMPUTE_BUDGET_OVERHEAD_BYTES;
+
+/** The account limit every `/build` route is built with (`maxAccounts`). */
+const ROUTE_MAX_ACCOUNTS = 40;
+
+/**
+ * Bound the route a `/build` request may answer with. getQuote and
+ * getInstructions both ask for routes inside these bounds. getInstructions asks
+ * `/build` again for the real taker, so its route can differ from the quote's,
+ * and it still checks the compiled size. `maxBytes` is lower only when
+ * getInstructions retries a swap that did not fit.
+ */
+export const boundRoute = (url: URL, maxBytes = ROUTE_MAX_BYTES): void => {
+  url.searchParams.set("maxAccounts", String(ROUTE_MAX_ACCOUNTS));
+  url.searchParams.set("maxBytes", String(maxBytes));
+};
+
+/**
+ * The `maxBytes` for the one retry of a swap that compiled to `size` bytes:
+ * the default budget less the overshoot, so a route the size of the first
+ * misses it. Below 1 when the overshoot uses the whole budget, which Jupiter
+ * does not take.
+ */
+export const retryRouteMaxBytes = (size: number): number =>
+  ROUTE_MAX_BYTES - (size - SWAP_MAX_TX_BYTES);
 
 /** A base-10 token amount in base units, as Jupiter writes amounts. */
 const AMOUNT = /^\d+$/;

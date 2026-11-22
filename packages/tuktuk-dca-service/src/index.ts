@@ -11,7 +11,14 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import Fastify, { FastifyInstance } from "fastify";
 import { sign } from "tweetnacl";
 import { init as initTuktukDca } from "@helium/tuktuk-dca-sdk";
-import { dcaTaskBindingError } from "./binding";
+import { crankSizer } from "./crank";
+import { runTaskBuilder } from "./run-task";
+import {
+  answerDcaRequest,
+  BuildDcaTask,
+  DcaRequestBody,
+  DcaRequestDeps,
+} from "./dca-request";
 import { wrapRoute } from "./wrap";
 import {
   buildJupiterSwap,
@@ -54,68 +61,79 @@ function getTuktukProgram() {
   return tuktukProgram;
 }
 
-server.post<{
-  Body: { task_queue: string; task: string; task_queued_at: string };
-  Params: { dcaKey: string };
-}>("/dca/:dcaKey", async (request, reply) => {
-  try {
-    const dca = new PublicKey(request.params.dcaKey);
-    const task = new PublicKey(request.body.task);
-    const taskQueue = new PublicKey(request.body.task_queue);
-    const taskQueuedAt = new BN(request.body.task_queued_at);
+type DcaProgram = Awaited<ReturnType<typeof initTuktukDca>>;
+type DcaAccount = Awaited<ReturnType<DcaProgram["account"]["dcaV0"]["fetch"]>>;
 
-    const tuktukProgram = await getTuktukProgram();
-    const dcaProgram = await initTuktukDca(provider);
+let dcaProgram: Promise<DcaProgram> | null = null;
+function getDcaProgram() {
+  if (!dcaProgram) {
+    dcaProgram = initTuktukDca(provider);
+  }
+  return dcaProgram;
+}
 
-    // Fetch DCA account
-    const dcaAccount = await dcaProgram.account.dcaV0.fetch(dca);
+/** The task builder for one order of the DCA `dca`, swapping `swapAmount`. */
+const prepareTask = async (
+  dca: PublicKey,
+  dcaAccount: DcaAccount,
+  swapAmount: BN
+): Promise<BuildDcaTask> => {
+  const tuktukProgram = await getTuktukProgram();
+  const dcaProgram = await getDcaProgram();
+  // answerDcaRequest checked that the request names these.
+  const task = dcaAccount.nextTask;
+  const taskQueue = dcaAccount.taskQueue;
+  const taskQueuedAt = dcaAccount.queuedAt;
 
-    const bindingError = dcaTaskBindingError(
-      { task, taskQueue, taskQueuedAt },
-      dcaAccount
-    );
-    if (bindingError) {
-      reply.status(400).send({ error: bindingError });
-      return;
-    }
+  // Get swap payer PDA
+  const [swapPayer, bump] = customSignerKey(dcaAccount.taskQueue, [
+    Buffer.from("dca_swap_payer"),
+  ]);
+  const bumpBuffer = Buffer.alloc(1);
+  bumpBuffer.writeUint8(bump);
 
-    // Get swap payer PDA
-    const [swapPayer, bump] = customSignerKey(dcaAccount.taskQueue, [
-      Buffer.from("dca_swap_payer"),
-    ]);
-    const bumpBuffer = Buffer.alloc(1);
-    bumpBuffer.writeUint8(bump);
+  console.log(
+    `DCA ${dca.toBase58()}: Swapping ${swapAmount.toString()} tokens`
+  );
+  console.log(`Input mint: ${dcaAccount.inputMint.toBase58()}`);
+  console.log(`Output mint: ${dcaAccount.outputMint.toBase58()}`);
+  console.log("Swap payer", swapPayer.toBase58());
 
-    // Get input account balance
-    const inputAccountInfo = await provider.connection.getAccountInfo(
-      dcaAccount.inputAccount
-    );
-    const inputBalance = new BN(inputAccountInfo!.data.slice(64, 72), "le");
+  // Create lend instruction to transfer input tokens
+  const lendIx = await dcaProgram.methods
+    .lendV0()
+    .accounts({
+      dca,
+      lendDestination: getAssociatedTokenAddressSync(
+        dcaAccount.inputMint,
+        swapPayer,
+        true
+      ),
+    })
+    .instruction();
 
-    // Calculate swap amount (use remaining balance for last order)
-    const swapAmount =
-      dcaAccount.numOrders === 1 ? inputBalance : dcaAccount.swapAmountPerOrder;
+  // Create check repay instruction
+  const checkRepayIx = await dcaProgram.methods
+    .checkRepayV0({})
+    .accounts({ dca })
+    .instruction();
 
-    console.log(
-      `DCA ${dca.toBase58()}: Swapping ${swapAmount.toString()} tokens`
-    );
-    console.log(`Input mint: ${dcaAccount.inputMint.toBase58()}`);
-    console.log(`Output mint: ${dcaAccount.outputMint.toBase58()}`);
-    console.log("Swap payer", swapPayer.toBase58());
+  const taskAccount = await tuktukProgram.account.taskV0.fetch(task);
+  const taskQueueAccount =
+    await tuktukProgram.account.taskQueueV0.fetch(taskQueue);
+  const sizeCrank = await crankSizer({
+    taskAccount,
+    taskQueueAccount,
+    fetchLookupTables: async (keys) =>
+      (
+        await Promise.all(
+          keys.map((key) => provider.connection.getAddressLookupTable(key))
+        )
+      ).flatMap(({ value }) => (value ? [value] : [])),
+    runTask: runTaskBuilder(tuktukProgram, task, taskAccount),
+  });
 
-    // Create lend instruction to transfer input tokens
-    const lendIx = await dcaProgram.methods
-      .lendV0()
-      .accounts({
-        dca,
-        lendDestination: getAssociatedTokenAddressSync(
-          dcaAccount.inputMint,
-          swapPayer,
-          true
-        ),
-      })
-      .instruction();
-
+  return async (maxBytes: number) => {
     // Build the swap through Jupiter, with the swap payer as the taker
     const swap = await buildJupiterSwap(
       dcaSwapRequest({
@@ -125,11 +143,13 @@ server.post<{
         swapAmount: swapAmount.toString(),
         swapPayer,
         slippageBps: Number(SLIPPAGE_BPS),
-      })
+      }),
+      fetch,
+      maxBytes
     );
 
     console.log(
-      `Jupiter build: ${swap.outAmount} output tokens, at least ${
+      `Jupiter build (maxBytes ${maxBytes}): ${swap.outAmount} output tokens, at least ${
         swap.otherAmountThreshold
       }, via ${swap.routeLabels.join(", ")}`
     );
@@ -138,15 +158,12 @@ server.post<{
     const jupiterInstructions = swap.instructions;
 
     // Setup instructions run with the swap payer PDA as payer, so refuse any that create an account.
-    await refuseSetupCreationsOnChain(provider.connection, swap.setupInstructions);
+    await refuseSetupCreationsOnChain(
+      provider.connection,
+      swap.setupInstructions
+    );
 
     console.log("Jupiter instructions", jupiterInstructions);
-
-    // Create check repay instruction
-    const checkRepayIx = await dcaProgram.methods
-      .checkRepayV0({})
-      .accounts({ dca })
-      .instruction();
 
     // Jupiter's route sets return data. `run_task_v0` reads the return data slot after each
     // instruction it invokes and, when the program it invoked is the one that set it, requires
@@ -179,23 +196,56 @@ server.post<{
       tuktukProgram.coder.accounts,
       remoteTx
     );
+    const signature = Buffer.from(
+      sign.detached(Uint8Array.from(serialized), DCA_SIGNER.secretKey)
+    );
 
-    reply.status(200).send({
-      transaction: serialized.toString("base64"),
-      signature: Buffer.from(
-        sign.detached(Uint8Array.from(serialized), DCA_SIGNER.secretKey)
-      ).toString("base64"),
-      remaining_accounts: remainingAccounts.map((acc) => ({
-        pubkey: acc.pubkey.toBase58(),
-        is_signer: acc.isSigner,
-        is_writable: acc.isWritable,
-      })),
-      lookup_tables: swap.lookupTables,
+    const size = await sizeCrank({
+      remoteTask: {
+        signer: DCA_SIGNER.publicKey,
+        message: serialized,
+        signature,
+      },
+      remainingAccounts,
+      swapLookupTables: swap.lookupTables,
     });
-  } catch (err: any) {
-    console.error("DCA swap error:", err);
-    reply.status(500).send({ error: err.message });
-  }
+    console.log(
+      `DCA ${dca.toBase58()}: crank transaction ${size ?? "over limit"} bytes`
+    );
+
+    return {
+      task: {
+        serialized,
+        signature,
+        remainingAccounts,
+        lookupTables: swap.lookupTables,
+      },
+      size,
+    };
+  };
+};
+
+const dcaRequestDeps: DcaRequestDeps<DcaAccount> = {
+  fetchOrder: async (dca) => (await getDcaProgram()).account.dcaV0.fetch(dca),
+  fetchInputBalance: async (dcaAccount) => {
+    const inputAccountInfo = await provider.connection.getAccountInfo(
+      dcaAccount.inputAccount
+    );
+    return new BN(inputAccountInfo!.data.slice(64, 72), "le");
+  },
+  prepareTask,
+};
+
+server.post<{
+  Body: DcaRequestBody;
+  Params: { dcaKey: string };
+}>("/dca/:dcaKey", async (request, reply) => {
+  const { status, body } = await answerDcaRequest(
+    dcaRequestDeps,
+    request.params.dcaKey,
+    request.body
+  );
+  reply.status(status).send(body);
 });
 
 const start = async () => {

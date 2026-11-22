@@ -37,6 +37,11 @@ export const swapContract = oc.tag("Swap").router({
       JUPITER_ERROR: {
         message: "Failed to get swap instructions from Jupiter",
       },
+      TRANSACTION_TOO_LARGE: {
+        message:
+          "The swap route does not fit in one transaction; try a smaller amount or a different pair",
+        status: 422,
+      },
       INSUFFICIENT_FUNDS,
       RATE_LIMITED,
     }),

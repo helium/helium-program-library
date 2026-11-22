@@ -1,7 +1,11 @@
 import { createServer, Server } from "http";
 import { AddressInfo } from "net";
 import { call, ORPCError } from "@orpc/server";
-import { Keypair, PublicKey, VersionedTransaction } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import {
   ACCOUNT_SIZE,
   ExtensionType,
@@ -10,6 +14,11 @@ import {
   TOKEN_2022_PROGRAM_ID,
 } from "@solana/spl-token";
 import { expect } from "chai";
+import { GetInstructionsInputSchema } from "@helium/blockchain-api";
+import { swapContract } from "@helium/blockchain-api/contracts";
+import { OpenAPIGenerator } from "@orpc/openapi";
+import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
+import { SWAP_MAX_TX_BYTES } from "../../src/server/api/routers/swap/procedures/build-request";
 import { after, afterEach, before, beforeEach, describe, it } from "mocha";
 
 /**
@@ -61,6 +70,8 @@ let buildOverrides: Record<string, unknown> = {};
 let buildAnswers: Record<string, unknown>[] = [];
 /** A status and body that replace the stubbed `/build` answer, when a case sets one. */
 let buildReply: { status: number; body: unknown } | undefined;
+/** Status and body that replace one `/build` answer each, in call order, before buildReply. */
+let buildReplies: ({ status: number; body: unknown } | undefined)[] = [];
 /** A status and body that replace the stubbed quote answer, when a case sets one. */
 let quoteReply: { status: number; body: unknown } | undefined;
 /** Every RPC method the handlers called, in order. */
@@ -239,8 +250,9 @@ const stubFetch: typeof fetch = async (input, init) => {
     });
   }
   if (url.pathname === "/swap/v2/build") {
-    if (buildReply) {
-      return jsonResponse(buildReply.body, buildReply.status);
+    const reply = buildReplies.shift() ?? buildReply;
+    if (reply) {
+      return jsonResponse(reply.body, reply.status);
     }
     return jsonResponse({
       inputMint: url.searchParams.get("inputMint"),
@@ -352,6 +364,7 @@ describe("swap endpoints' optional Jupiter parameters", () => {
     buildOverrides = {};
     buildAnswers = [];
     buildReply = undefined;
+    buildReplies = [];
     quoteReply = undefined;
     rpcMethods = [];
     chainAccounts = new Map();
@@ -396,6 +409,8 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         taker: SYSTEM_PROGRAM,
         slippageBps: "50",
         excludeDexes: "JupiterRfqV2",
+        maxAccounts: "40",
+        maxBytes: "1080",
       });
     });
 
@@ -517,12 +532,17 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const error = await quoteRejection();
 
       expect(error.code).to.eq("JUPITER_ERROR");
-      expect(error.message).to.eq("Jupiter API returned error: No routes found");
+      expect(error.message).to.eq(
+        "Jupiter API returned error: No routes found"
+      );
     });
 
     it("refuses an answer whose outAmount is not base-10 digits with JUPITER_ERROR", async () => {
       const amount = freshAmount();
-      quoteReply = { status: 200, body: quoteBody(amount, { outAmount: "1e3" }) };
+      quoteReply = {
+        status: 200,
+        body: quoteBody(amount, { outAmount: "1e3" }),
+      };
 
       const error = await quoteRejection({}, amount);
 
@@ -659,6 +679,8 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         taker: WALLET,
         slippageBps: "50",
         excludeDexes: "JupiterRfqV2",
+        maxAccounts: "40",
+        maxBytes: "1080",
       });
     });
 
@@ -708,6 +730,106 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         expect(calls[0].url.searchParams.has("useSharedAccounts")).to.eq(false);
       });
     }
+
+    describe("deprecated params", () => {
+      const realWarn = console.warn;
+      let warnings: unknown[][] = [];
+
+      beforeEach(() => {
+        warnings = [];
+        // Only the deprecated-params log: building the transaction warns too.
+        console.warn = (...args: unknown[]) => {
+          if (args[0] === "swap.getInstructions deprecated params") {
+            warnings.push(args);
+          }
+        };
+      });
+
+      afterEach(() => {
+        console.warn = realWarn;
+      });
+
+      it("logs the deprecated params a caller sends, with its user agent", async () => {
+        const quoteResponse = await quote();
+        await call(
+          getInstructions,
+          {
+            quoteResponse,
+            userPublicKey: WALLET,
+            dynamicComputeUnitLimit: true,
+            useSharedAccounts: false,
+            prioritizationFeeLamports: {
+              priorityLevelWithMaxLamports: {
+                maxLamports: 1000,
+                priorityLevel: "high",
+              },
+            },
+          },
+          {
+            context: {
+              reqHeaders: new Headers({ "user-agent": "wallet/1.2.3" }),
+            },
+          }
+        );
+
+        expect(warnings).to.deep.eq([
+          [
+            "swap.getInstructions deprecated params",
+            {
+              params: [
+                "dynamicComputeUnitLimit",
+                "useSharedAccounts",
+                "prioritizationFeeLamports",
+              ],
+              userAgent: "wallet/1.2.3",
+            },
+          ],
+        ]);
+      });
+
+      it("marks the deprecated params in the OpenAPI spec", async () => {
+        const generator = new OpenAPIGenerator({
+          schemaConverters: [new ZodToJsonSchemaConverter()],
+        });
+        const spec = await generator.generate(swapContract, {
+          info: { title: "test", version: "1" },
+        });
+        const body = (spec.paths!["/swap/instructions"]!.post!
+          .requestBody as { content: Record<string, { schema: any }> })
+          .content["application/json"].schema;
+
+        for (const name of [
+          "dynamicComputeUnitLimit",
+          "useSharedAccounts",
+          "prioritizationFeeLamports",
+        ]) {
+          expect(body.properties[name].deprecated, name).to.eq(true);
+          expect(body.properties[name].description, name).to.match(
+            /^Deprecated\. /
+          );
+        }
+      });
+
+      it("marks the deprecated params in the schema's own metadata", () => {
+        for (const name of [
+          "dynamicComputeUnitLimit",
+          "useSharedAccounts",
+          "prioritizationFeeLamports",
+        ] as const) {
+          expect(
+            GetInstructionsInputSchema.shape[name].meta()?.deprecated,
+            name
+          ).to.eq(true);
+        }
+      });
+
+      it("logs nothing when a caller sends no deprecated params", async () => {
+        const quoteResponse = await quote();
+        await call(getInstructions, { quoteResponse, userPublicKey: WALLET });
+
+        expect(warnings).to.deep.eq([]);
+      });
+    });
 
     it("forwards destinationTokenAccount and names it in the metadata", async () => {
       const destination = ROUTE_ACCOUNT;
@@ -940,7 +1062,10 @@ describe("swap endpoints' optional Jupiter parameters", () => {
         jupiterCalls = [];
         buildOverrides = { routePlan: routeThrough("X") };
 
-        const code = await rejectionCode({ quoteResponse, userPublicKey: WALLET });
+        const code = await rejectionCode({
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
 
         const calls = jupiterCalls.filter(
           (c) => c.url.pathname === "/swap/v2/build"
@@ -1512,6 +1637,246 @@ describe("swap endpoints' optional Jupiter parameters", () => {
       const { result } = await swapInstructions();
 
       expect(result.transactions).to.have.length(1);
+    });
+
+    describe("transaction size", () => {
+      /** A /build answer whose swap instruction carries `bytes` bytes of data. */
+      const swapWithData = (bytes: number) => ({
+        swapInstruction: {
+          programId: MEMO_PROGRAM,
+          accounts: [],
+          data: Buffer.alloc(bytes).toString("base64"),
+        },
+      });
+
+      /** The signed size of the swap built from swapWithData(`bytes`). */
+      const builtSize = async (bytes: number) => {
+        buildOverrides = swapWithData(bytes);
+        const { result } = await swapInstructions();
+        return Buffer.from(
+          result.transactions[0].serializedTransaction,
+          "base64"
+        ).length;
+      };
+
+      /** The swap data size that builds a transaction of exactly SWAP_MAX_TX_BYTES. */
+      const dataAtLimit = async () =>
+        SWAP_MAX_TX_BYTES - ((await builtSize(900)) - 900);
+
+      it("builds a swap of exactly SWAP_MAX_TX_BYTES", async () => {
+        expect(await builtSize(await dataAtLimit())).to.eq(SWAP_MAX_TX_BYTES);
+      });
+
+      /** The maxBytes each /build call of the swap sent, in order. */
+      const buildMaxBytes = () =>
+        jupiterCalls
+          .filter((c) => c.url.pathname === "/swap/v2/build")
+          .map((c) => c.url.searchParams.get("maxBytes"));
+
+      it("builds the retry when the first route is one byte over SWAP_MAX_TX_BYTES", async () => {
+        const bytes = (await dataAtLimit()) + 1;
+        const quoteResponse = await quote();
+        jupiterCalls = [];
+        buildAnswers = [swapWithData(bytes), swapWithData(bytes - 1)];
+
+        const result = await call(getInstructions, {
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
+
+        expect(
+          Buffer.from(result.transactions[0].serializedTransaction, "base64")
+            .length
+        ).to.eq(SWAP_MAX_TX_BYTES);
+        expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
+      });
+
+      it("keeps the retry's maxBytes when the retry asks /build again for the quote's minimum", async () => {
+        const bytes = (await dataAtLimit()) + 1;
+        const quoteResponse = {
+          ...(await quote()),
+          otherAmountThreshold: "951",
+        };
+        jupiterCalls = [];
+        // The first answer is oversized. The retry's first answer falls below
+        // the quote's minimum, so /build is asked again at a narrower slippage.
+        buildAnswers = [
+          {
+            ...swapWithData(bytes),
+            outAmount: "1003",
+            otherAmountThreshold: "951",
+          },
+          {
+            ...swapWithData(bytes - 1),
+            outAmount: "1003",
+            otherAmountThreshold: "900",
+          },
+          {
+            ...swapWithData(bytes - 1),
+            outAmount: "1002",
+            otherAmountThreshold: "951",
+          },
+        ];
+
+        const result = await call(getInstructions, {
+          quoteResponse,
+          userPublicKey: WALLET,
+        });
+
+        expect(result.transactions[0].metadata?.outputAmount).to.eq("1002");
+        expect(buildMaxBytes()).to.deep.eq(["1080", "1079", "1079"]);
+      });
+
+      it("refuses a swap whose retry is still over SWAP_MAX_TX_BYTES with TRANSACTION_TOO_LARGE", async () => {
+        const bytes = (await dataAtLimit()) + 1;
+        const quoteResponse = await quote();
+        jupiterCalls = [];
+        buildOverrides = swapWithData(bytes);
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
+        expect(error.message).to.eq(
+          "Jupiter found no route for this swap that fits one transaction (1133 bytes, limit 1132)"
+        );
+        expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
+      });
+
+      it("retries a swap whose message alone exceeds the packet limit by its exact overshoot, then refuses it", async () => {
+        const bytes = (await dataAtLimit()) + 200;
+        const quoteResponse = await quote();
+        jupiterCalls = [];
+        buildOverrides = swapWithData(bytes);
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
+        expect(error.message).to.eq(
+          `Jupiter found no route for this swap that fits one transaction (${SWAP_MAX_TX_BYTES + 200} bytes, limit 1132)`
+        );
+        expect(buildMaxBytes()).to.deep.eq(["1080", "880"]);
+      });
+
+      it("refuses with no retry a swap whose overshoot uses the whole maxBytes", async () => {
+        const bytes = (await dataAtLimit()) + 1080;
+        const quoteResponse = await quote();
+        jupiterCalls = [];
+        buildOverrides = swapWithData(bytes);
+
+        const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+        expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
+        expect(error.message).to.eq(
+          `Jupiter found no route for this swap that fits one transaction (${SWAP_MAX_TX_BYTES + 1080} bytes, limit 1132)`
+        );
+        expect(buildMaxBytes()).to.deep.eq(["1080"]);
+      });
+
+      describe("a retry that /build cannot answer", () => {
+        const realWarn = console.warn;
+        let warnings: unknown[][] = [];
+
+        beforeEach(() => {
+          warnings = [];
+          console.warn = (...args: unknown[]) => {
+            if (args[0] === "Jupiter /build swap too large for one transaction") {
+              warnings.push(args);
+            }
+          };
+        });
+
+        afterEach(() => {
+          console.warn = realWarn;
+        });
+
+        it("refuses with TRANSACTION_TOO_LARGE when the retry finds no route, after logging the oversize", async () => {
+          const bytes = (await dataAtLimit()) + 1;
+          const quoteResponse = await quote();
+          jupiterCalls = [];
+          buildOverrides = swapWithData(bytes);
+          buildReplies = [
+            undefined,
+            { status: 400, body: { error: "No routes found" } },
+          ];
+
+          const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+          expect(error.code).to.eq("TRANSACTION_TOO_LARGE");
+          expect(error.message).to.eq(
+            "Jupiter found no route for this swap that fits one transaction (1133 bytes, limit 1132)"
+          );
+          expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
+          expect(warnings).to.have.length(1);
+          expect(warnings[0][1]).to.deep.include({
+            size: 1133,
+            retryMaxBytes: 1079,
+          });
+        });
+
+        it("keeps JUPITER_ERROR when the retry answers with otherInstructions", async () => {
+          const bytes = (await dataAtLimit()) + 1;
+          const quoteResponse = await quote();
+          buildAnswers = [
+            swapWithData(bytes),
+            {
+              ...swapWithData(bytes - 1),
+              otherInstructions: [
+                { programId: MEMO_PROGRAM, accounts: [], data: "" },
+              ],
+            },
+          ];
+
+          const error = await rejection({ quoteResponse, userPublicKey: WALLET });
+
+          expect(error.code).to.eq("JUPITER_ERROR");
+          expect(error.message).to.contain("otherInstructions");
+        });
+
+        it("answers RATE_LIMITED when the retry is rate limited", async () => {
+          const bytes = (await dataAtLimit()) + 1;
+          const quoteResponse = await quote();
+          buildOverrides = swapWithData(bytes);
+          buildReplies = [
+            undefined,
+            { status: 429, body: { error: "Too many requests" } },
+          ];
+
+          const code = await rejectionCode({
+            quoteResponse,
+            userPublicKey: WALLET,
+          });
+
+          expect(code).to.eq("RATE_LIMITED");
+        });
+
+        it("keeps the RPC error when the retry's compile cannot read its lookup table", async () => {
+          const bytes = (await dataAtLimit()) + 1;
+          const quoteResponse = await quote();
+          jupiterCalls = [];
+          rpcMethods = [];
+          buildOverrides = swapWithData(bytes);
+          // Only the retry names a lookup table, so only its compile reads
+          // one from chain.
+          buildAnswers = [
+            {},
+            { addressesByLookupTableAddress: { [LOOKUP_TABLE]: [] } },
+          ];
+          failMultipleAccounts = true;
+
+          let failure: unknown;
+          try {
+            await call(getInstructions, { quoteResponse, userPublicKey: WALLET });
+          } catch (error) {
+            failure = error;
+          }
+
+          expect(failure).to.be.instanceOf(Error);
+          expect(failure).to.not.be.instanceOf(ORPCError);
+          expect((failure as Error).message).to.contain("node is unhealthy");
+          expect(buildMaxBytes()).to.deep.eq(["1080", "1079"]);
+          expect(rpcMethods).to.include("getMultipleAccounts");
+        });
+      });
     });
 
     it("refuses a /build answer with otherInstructions", async () => {

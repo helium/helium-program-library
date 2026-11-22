@@ -67,16 +67,18 @@ export const GetInstructionsInputSchema = z.object({
     ),
   dynamicComputeUnitLimit: z
     .boolean()
-    .default(true)
+    .optional()
     .describe(
-      "Accepted for compatibility and ignored: the server sets the compute unit limit itself.",
-    ),
+      "Deprecated. Accepted for compatibility and ignored: the server sets the compute unit limit itself.",
+    )
+    .meta({ deprecated: true }),
   useSharedAccounts: z
     .boolean()
     .optional()
     .describe(
-      "Accepted for compatibility and ignored: Jupiter's Swap V2 /build chooses whether the route uses shared program accounts and takes no option for it.",
-    ),
+      "Deprecated. Accepted for compatibility and ignored: Jupiter's Swap V2 /build chooses whether the route uses shared program accounts and takes no option for it.",
+    )
+    .meta({ deprecated: true }),
   prioritizationFeeLamports: z
     .object({
       priorityLevelWithMaxLamports: z.object({
@@ -86,8 +88,9 @@ export const GetInstructionsInputSchema = z.object({
     })
     .optional()
     .describe(
-      "Accepted for compatibility and ignored: the server sets the compute unit price itself.",
-    ),
+      "Deprecated. Accepted for compatibility and ignored: the server sets the compute unit price itself.",
+    )
+    .meta({ deprecated: true }),
 });
 
 export const TokenSchema = z.object({
