@@ -17,7 +17,11 @@ import {
   init as initHplCrons,
 } from "@helium/hpl-crons-sdk";
 import { HNT_MINT } from "@helium/spl-utils";
-import { nextAvailableTaskIds, taskKey } from "@helium/tuktuk-sdk";
+import {
+  init as initTuktuk,
+  nextAvailableTaskIds,
+  taskKey,
+} from "@helium/tuktuk-sdk";
 import { init as initVsr, positionKey } from "@helium/voter-stake-registry-sdk";
 import { init as initProxy } from "@helium/nft-proxy-sdk";
 import {
@@ -281,9 +285,7 @@ export const create = publicProcedure.governance.createPosition.handler(
           }),
         );
 
-        const tuktukProgram = await import("@helium/tuktuk-sdk").then((m) =>
-          m.init(provider),
-        );
+        const tuktukProgram = await initTuktuk(provider);
         const taskQueueAcc =
           await tuktukProgram.account.taskQueueV0.fetchNullable(TASK_QUEUE);
 
