@@ -15,6 +15,7 @@ import { lazyDistributorKey } from "@helium/lazy-distributor-sdk";
 import { lazySignerKey } from "@helium/lazy-transactions-sdk";
 import { init as poInit } from "@helium/price-oracle-sdk";
 import { HNT_PYTH_PRICE_FEED, toNumber } from "@helium/spl-utils";
+import { customSignerKey } from "@helium/tuktuk-sdk";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { BN } from "bn.js";
@@ -248,12 +249,17 @@ async function run() {
     );
   }
 
+  const hplCronsQueue = new PublicKey(
+    process.env.HPL_CRONS_QUEUE_KEY ||
+      "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7"
+  );
+  await monitorSolBalance(hplCronsQueue, "hpl-crons-queue");
+  // Fronts the rent of every DCA on the queue and is refunded when the DCA closes, so
+  // only an abandoned DCA lowers it. When it is short, dc-auto-top's top_off_hnt_v0 takes
+  // the rent from the auto top off account instead.
   await monitorSolBalance(
-    new PublicKey(
-      process.env.HPL_CRONS_QUEUE_KEY ||
-        "H39gEszvsi6AT4rYBiJTuZHJSF5hMHy6CKGTd7wzhsg7"
-    ),
-    "hpl-crons-queue"
+    customSignerKey(hplCronsQueue, [Buffer.from("dca_swap_payer")])[0],
+    "hpl_crons_dca_swap_payer"
   );
   await monitorSolBalance(
     new PublicKey(
