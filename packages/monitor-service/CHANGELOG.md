@@ -1,5 +1,11 @@
 # Change Log
 
+## 0.11.28
+
+### Patch Changes
+
+- [#1403](https://github.com/helium/helium-program-library/pull/1403) [`b2b2e13`](https://github.com/helium/helium-program-library/commit/b2b2e1346a08b5330931442f5bef632635fbb370) Thanks [@madninja](https://github.com/madninja)! - Export the SOL balance of the hpl-crons DCA swap payer as `solana_account_balance{name="hpl_crons_dca_swap_payer"}`. It is derived from `HPL_CRONS_QUEUE_KEY`.
+
 ## 0.11.27
 
 ### Patch Changes
